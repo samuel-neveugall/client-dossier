@@ -222,7 +222,7 @@ def render_dossier_yaml(cfg):
     for counterpart in cfg["counterparts"]:
         lines.append("  - name: {}".format(yaml_quote(counterpart["name"])))
         if "role" in counterpart:
-            lines.append("    role: {}".format(counterpart["role"]))
+            lines.append("    role: {}".format(yaml_quote(counterpart["role"])))
         if "contacts" in counterpart:
             quoted = ", ".join(yaml_quote(c) for c in counterpart["contacts"])
             lines.append("    contacts: [ {} ]".format(quoted))

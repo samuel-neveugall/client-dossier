@@ -183,4 +183,64 @@ assert_eq 0 "$status7" 'init exits 0 with a matching --template-variant'
 assert_grep_e '^templates: en' "$d6.stdout"
 rm -rf "$d6" "$d6.stdout" "$d6.stderr"
 
+# Regression: a counterpart role containing a colon (a plain, common value —
+# e.g. French "Responsable : achats") must not corrupt dossier.yaml. Before
+# the fix, `role` was emitted unquoted while every other field went through
+# yaml_quote(), so a colon inside it broke the YAML mapping.
+d7=$(scratch_repo)
+status8=0
+python3 "$(init_py)" \
+  --target "$d7" \
+  --language en \
+  --counterpart 'Jane Doe|primary contact: EMEA|jane@acme.test' \
+  >"$d7.stdout" 2>"$d7.stderr" || status8=$?
+assert_eq 0 "$status8" 'init exits 0 with a colon in --counterpart role'
+if python3 -c "
+import sys, yaml
+with open(sys.argv[1]) as f:
+    data = yaml.safe_load(f)
+assert data['counterparts'][0]['role'] == 'primary contact: EMEA', data
+" "$d7/dossier.yaml" 2>"$d7.yamlerr"; then
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo "FAIL: expected '$d7/dossier.yaml' to be re-parsable with role containing ':'" >&2
+  cat "$d7.yamlerr" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+rm -rf "$d7" "$d7.stdout" "$d7.stderr" "$d7.yamlerr"
+
+# Regression: a field combining a double quote and a backslash must survive
+# yaml_quote()'s strip -> backslash-escape -> quote-escape order without the
+# backslash it inserts being re-escaped by the following quote pass. The
+# verification script is written to a file, not inlined, so bash's own
+# quote-escaping cannot interfere with the exact bytes being asserted on.
+d8=$(scratch_repo)
+status9=0
+python3 "$(init_py)" \
+  --target "$d8" \
+  --language en \
+  --counterpart 'Jane "The Fixer" Doe|VP "Ops" \ Sales|jane@acme.test' \
+  >"$d8.stdout" 2>"$d8.stderr" || status9=$?
+assert_eq 0 "$status9" 'init exits 0 with a quote+backslash in --counterpart fields'
+
+d8_check=$(mktemp)
+cat >"$d8_check" <<'PYEOF'
+import sys
+import yaml
+
+with open(sys.argv[1]) as f:
+    data = yaml.safe_load(f)
+c = data["counterparts"][0]
+assert c["name"] == 'Jane "The Fixer" Doe', c
+assert c["role"] == 'VP "Ops" \\ Sales', c
+PYEOF
+if python3 "$d8_check" "$d8/dossier.yaml" 2>"$d8.yamlerr"; then
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo "FAIL: expected '$d8/dossier.yaml' to be re-parsable with quote+backslash fields" >&2
+  cat "$d8.yamlerr" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+rm -rf "$d8" "$d8.stdout" "$d8.stderr" "$d8.yamlerr" "$d8_check"
+
 finish
