@@ -195,52 +195,117 @@ python3 "$(init_py)" \
   --counterpart 'Jane Doe|primary contact: EMEA|jane@acme.test' \
   >"$d7.stdout" 2>"$d7.stderr" || status8=$?
 assert_eq 0 "$status8" 'init exits 0 with a colon in --counterpart role'
-if python3 -c "
-import sys, yaml
-with open(sys.argv[1]) as f:
-    data = yaml.safe_load(f)
-assert data['counterparts'][0]['role'] == 'primary contact: EMEA', data
-" "$d7/dossier.yaml" 2>"$d7.yamlerr"; then
-  TESTS_PASSED=$((TESTS_PASSED + 1))
-else
-  echo "FAIL: expected '$d7/dossier.yaml' to be re-parsable with role containing ':'" >&2
-  cat "$d7.yamlerr" >&2
-  TESTS_FAILED=$((TESTS_FAILED + 1))
-fi
-rm -rf "$d7" "$d7.stdout" "$d7.stderr" "$d7.yamlerr"
+# Dependency-free check (CLAUDE.md forbids a PyYAML dependency in tests):
+# assert the exact byte-for-byte line yaml_quote() must produce. Before the
+# fix, `role` was emitted unquoted (`role: primary contact: EMEA`), a
+# different and broken literal -- so this line is red without the fix and
+# green with it.
+assert_grep '    role: "primary contact: EMEA"' "$d7/dossier.yaml"
+rm -rf "$d7" "$d7.stdout" "$d7.stderr"
 
-# Regression: a field combining a double quote and a backslash must survive
-# yaml_quote()'s strip -> backslash-escape -> quote-escape order without the
-# backslash it inserts being re-escaped by the following quote pass. The
-# verification script is written to a file, not inlined, so bash's own
-# quote-escaping cannot interfere with the exact bytes being asserted on.
+# Regression: a field combining a colon-space, a double quote, and a
+# backslash must survive yaml_quote()'s strip -> backslash-escape ->
+# quote-escape order without the backslash it inserts being re-escaped by
+# the following quote pass. The role below is deliberately *not* just
+# quote+backslash (the tour-1 version of this test): a plain YAML scalar
+# containing only `"` and `\` happens to re-parse to the same string
+# whether or not it was quoted, so that version stayed green even with the
+# quoting fix reverted -- it asserted re-parsed equality, not that quoting
+# had actually run. Adding a colon-space makes the unquoted form genuinely
+# different (and broken -- a second unquoted ':' inside the value), so this
+# byte-exact literal is red without the fix and green with it.
 d8=$(scratch_repo)
 status9=0
 python3 "$(init_py)" \
   --target "$d8" \
   --language en \
-  --counterpart 'Jane "The Fixer" Doe|VP "Ops" \ Sales|jane@acme.test' \
+  --counterpart 'Jane "The Fixer" Doe|VP: "Ops" \ Sales|jane@acme.test' \
   >"$d8.stdout" 2>"$d8.stderr" || status9=$?
-assert_eq 0 "$status9" 'init exits 0 with a quote+backslash in --counterpart fields'
-
-d8_check=$(mktemp)
-cat >"$d8_check" <<'PYEOF'
-import sys
-import yaml
-
-with open(sys.argv[1]) as f:
-    data = yaml.safe_load(f)
-c = data["counterparts"][0]
-assert c["name"] == 'Jane "The Fixer" Doe', c
-assert c["role"] == 'VP "Ops" \\ Sales', c
-PYEOF
-if python3 "$d8_check" "$d8/dossier.yaml" 2>"$d8.yamlerr"; then
+assert_eq 0 "$status9" 'init exits 0 with a colon+quote+backslash in --counterpart fields'
+# grep -F (fixed string), not assert_grep's BRE: the expected bytes contain
+# literal backslashes, whose meaning in a basic regular expression is
+# unreliable across grep implementations. Fixed-string matching is the only
+# byte-exact, dependency-free option here.
+if grep -qF -- '  - name: "Jane \"The Fixer\" Doe"' "$d8/dossier.yaml" \
+  && grep -qF -- '    role: "VP: \"Ops\" \\ Sales"' "$d8/dossier.yaml"; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
 else
-  echo "FAIL: expected '$d8/dossier.yaml' to be re-parsable with quote+backslash fields" >&2
-  cat "$d8.yamlerr" >&2
+  echo "FAIL: expected '$d8/dossier.yaml' to quote+escape name/role containing a colon, quote and backslash" >&2
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
-rm -rf "$d8" "$d8.stdout" "$d8.stderr" "$d8.yamlerr" "$d8_check"
+rm -rf "$d8" "$d8.stdout" "$d8.stderr"
+
+# Regression (correctif 4, tour 2): yaml_quote() strips control characters
+# below 0x20, including newline, before quoting -- untested until now (a
+# mutation deleting that filter survived every prior test in this suite). A
+# newline embedded in a counterpart name must not survive into the file: it
+# must not split the quoted scalar across lines, and it must not let text
+# after the newline be read as a new top-level YAML key.
+d9=$(scratch_repo)
+status10=0
+python3 "$(init_py)" \
+  --target "$d9" \
+  --language en \
+  --counterpart "$(printf 'Jane\ninjected: pwned')|contact" \
+  >"$d9.stdout" 2>"$d9.stderr" || status10=$?
+assert_eq 0 "$status10" 'init exits 0 with a newline in --counterpart name'
+assert_grep '  - name: "Janeinjected: pwned"' "$d9/dossier.yaml"
+assert_not_grep '^injected:' "$d9/dossier.yaml"
+rm -rf "$d9" "$d9.stdout" "$d9.stderr"
+
+# Regression (correctif 1, tour 2 -- the CAUSE): `language` and
+# `status_header` are CLI-fed free text that bypassed yaml_quote() entirely
+# (T-01-01). `language` had no argparse `choices=` (it cannot: language
+# codes are open-ended), so emit_scalar()'s allowlist is the only guard --
+# assert it actually quotes a colon and strips an embedded newline instead
+# of injecting a key.
+d10=$(scratch_repo)
+status11=0
+python3 "$(init_py)" \
+  --target "$d10" \
+  --language 'en: draft' \
+  >"$d10.stdout" 2>"$d10.stderr" || status11=$?
+assert_eq 0 "$status11" 'init exits 0 with a colon in --language'
+assert_grep '^language: "en: draft"$' "$d10/dossier.yaml"
+rm -rf "$d10" "$d10.stdout" "$d10.stderr"
+
+d11=$(scratch_repo)
+status12=0
+python3 "$(init_py)" \
+  --target "$d11" \
+  --language "$(printf 'en\ninjected: pwned')" \
+  >"$d11.stdout" 2>"$d11.stderr" || status12=$?
+assert_eq 0 "$status12" 'init exits 0 with a newline in --language'
+assert_grep '^language: "eninjected: pwned"$' "$d11/dossier.yaml"
+assert_not_grep '^injected:' "$d11/dossier.yaml"
+rm -rf "$d11" "$d11.stdout" "$d11.stderr"
+
+# `status_header` has a small, fixed, spec-documented value set (spec
+# Sec3.2: only "required" is ever shown), so it additionally gets an
+# argparse `choices=` allowlist -- structurally impossible to feed it
+# anything else, colon-injection or key-forging payload included.
+d12=$(scratch_repo)
+status13=0
+python3 "$(init_py)" \
+  --target "$d12" \
+  --status-header 'yes: no' \
+  >"$d12.stdout" 2>"$d12.stderr" || status13=$?
+assert_eq 2 "$status13" 'init rejects an unknown --status-header value'
+if [ -e "$d12/dossier.yaml" ]; then
+  echo "FAIL: expected no dossier.yaml written when --status-header is rejected" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+rm -rf "$d12" "$d12.stdout" "$d12.stderr"
+
+d13=$(scratch_repo)
+status14=0
+python3 "$(init_py)" \
+  --target "$d13" \
+  --status-header "$(printf 'required\nconsent_recorded: true')" \
+  >"$d13.stdout" 2>"$d13.stderr" || status14=$?
+assert_eq 2 "$status14" 'init rejects a --status-header value forging a second consent_recorded key'
+rm -rf "$d13" "$d13.stdout" "$d13.stderr"
 
 finish
