@@ -132,3 +132,8 @@ None - no external service configuration required.
 ---
 *Phase: 01-scaffold-templates*
 *Completed: 2026-09-16*
+
+## Self-Check: PASSED
+
+All 8 created files verified present on disk; all 4 commit hashes (`4b9d0d0`, `5747d48`,
+`5ccc137`, `6c3c0a6`) verified present in `git log --oneline --all`.
