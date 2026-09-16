@@ -81,4 +81,106 @@ assert_eq '' "$(diff -r "$d.snap" "$d" 2>&1)" 'second run changes nothing on dis
 
 rm -rf "$d" "$d.snap" "$d.stdout1" "$d.stderr1" "$d.stdout2" "$d.stderr2"
 
+# --- Plan 01-02: the full scaffold surface ---
+# The tests below fail until the eleven remaining templates exist and every
+# template is wired into TEMPLATE_MAP (Tasks 2 and 3). This is the RED gate
+# for those tasks.
+
+d4=$(scratch_repo)
+status5=0
+python3 "$(init_py)" \
+  --target "$d4" \
+  --language en \
+  --counterpart 'Acme Consulting|ordering party|Jane Doe' \
+  --counterpart 'Big Telco|end client' \
+  --confidential-name Acme \
+  --confidential-name 'Big Telco' \
+  >"$d4.stdout" 2>"$d4.stderr" || status5=$?
+assert_eq 0 "$status5" 'full-surface init exits 0 on an empty repo'
+
+# Seven living files: each has a dated `Last updated:` line (a real ISO
+# date, not the template token) and its own "Updated when" comment.
+for f in ACTORS HISTORY LEARNINGS TONE CHANNELS OPEN-QUESTIONS RELATIONSHIP; do
+  assert_file "$d4/dossier/$f.md"
+  assert_grep_e '^Last updated: [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$d4/dossier/$f.md"
+  assert_grep 'Updated when' "$d4/dossier/$f.md"
+done
+
+# Five more targets: the two knowledge stubs and the three folder READMEs.
+assert_file "$d4/knowledge/CONTEXT.md"
+assert_file "$d4/knowledge/DOCTRINE.md"
+assert_file "$d4/dossier/README.md"
+assert_file "$d4/sources/README.md"
+assert_file "$d4/outbound/README.md"
+
+# knowledge/DOCTRINE.md carries its two lists and the vocabulary section.
+assert_grep '^## What we say$' "$d4/knowledge/DOCTRINE.md"
+assert_grep '^## What we never say$' "$d4/knowledge/DOCTRINE.md"
+assert_grep '^## Vocabulary, one sentence each$' "$d4/knowledge/DOCTRINE.md"
+
+# outbound/README.md restates the status header field by field, plus the
+# naming rule and the three subfolders.
+assert_grep '^Status:' "$d4/outbound/README.md"
+assert_grep '^To:' "$d4/outbound/README.md"
+assert_grep '^Subject:' "$d4/outbound/README.md"
+assert_grep '^Deadline:' "$d4/outbound/README.md"
+assert_grep '^Written by:' "$d4/outbound/README.md"
+assert_grep '^Rules:' "$d4/outbound/README.md"
+assert_grep 'YYYY-MM-DD_slug' "$d4/outbound/README.md"
+assert_grep 'deliverables' "$d4/outbound/README.md"
+assert_grep 'mails' "$d4/outbound/README.md"
+assert_grep 'calls' "$d4/outbound/README.md"
+
+# Confidentiality: no counterpart name, not even the spec's fictional one,
+# reaches a file under outbound/, sources/ or dossier/ (spec §3.2; this is
+# the scaffold-time face of Phase 2's LINT-01 check 3). Case-insensitive;
+# assert_not_grep has no -i flag, so this is inlined rather than adding one
+# to lib.sh (out of this task's declared file scope).
+for target in "$d4/outbound/README.md" "$d4/sources/README.md" "$d4/dossier/README.md"; do
+  if grep -qi -- 'acme' "$target" 2>/dev/null; then
+    echo "FAIL: expected '$target' NOT to match /acme/i" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  else
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+  fi
+done
+
+# The three READMEs carry no living-file update line. Anchored, so prose or
+# an HTML comment mentioning the label elsewhere cannot satisfy it by
+# accident.
+assert_not_grep '^Last updated:' "$d4/outbound/README.md"
+assert_not_grep '^Last updated:' "$d4/sources/README.md"
+assert_not_grep '^Last updated:' "$d4/dossier/README.md"
+
+rm -rf "$d4" "$d4.stdout" "$d4.stderr"
+
+# Variant fallback (SCAF-07 / D-09): a language with no hand-maintained
+# variant scaffolds from templates/en/ and the report says so — the
+# mechanical handoff to the skill's translation step.
+d5=$(scratch_repo)
+status6=0
+python3 "$(init_py)" \
+  --target "$d5" \
+  --language es \
+  --counterpart 'Acme Consulting|ordering party|Jane Doe' \
+  >"$d5.stdout" 2>"$d5.stderr" || status6=$?
+assert_eq 0 "$status6" 'init exits 0 with an unlisted --language'
+assert_grep_e '^templates: en' "$d5.stdout"
+assert_grep '^language: es$' "$d5/dossier.yaml"
+rm -rf "$d5" "$d5.stdout" "$d5.stderr"
+
+# Variant hit: an explicit --template-variant matching --language uses that
+# variant and reports it the same way.
+d6=$(scratch_repo)
+status7=0
+python3 "$(init_py)" \
+  --target "$d6" \
+  --language en \
+  --template-variant en \
+  --counterpart 'Acme Consulting|ordering party|Jane Doe' \
+  >"$d6.stdout" 2>"$d6.stderr" || status7=$?
+assert_eq 0 "$status7" 'init exits 0 with a matching --template-variant'
+assert_grep_e '^templates: en' "$d6.stdout"
+rm -rf "$d6" "$d6.stdout" "$d6.stderr"
+
 finish
