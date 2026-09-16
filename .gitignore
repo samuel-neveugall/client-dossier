@@ -1,3 +1,13 @@
 # Local agent memory and session artefacts (VibeFlow lab memory, never shared)
 .claude/
 .DS_Store
+
+# Python bytecode from bundled skill scripts
+__pycache__/
+*.pyc
+
+# GSD engine runtime artefacts (per-session, not shared)
+.planning/DRIVER.lock
+.planning/DRIVER.lock.gen.*/
+.planning/milestone.lock
+.planning/state.json
