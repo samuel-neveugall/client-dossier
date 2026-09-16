@@ -33,28 +33,30 @@ separate concern, see section 11).
 ## 2. The logic, exactly as it exists today
 
 This section describes the method as observed in the origin repository, so that the plugin
-reproduces it faithfully and so that the generalisation in section 3 is traceable.
+reproduces it faithfully and so that the generalisation in section 3 is traceable. The origin
+repository used French folder and file names; they are given here under the English names the
+plugin uses, since the plugin ships English names only.
 
 ### 2.1 Four folders, four regimes
 
-| Folder (origin) | Regime | Rule |
+| Folder | Regime | Rule |
 |---|---|---|
 | `sources/` | Immutable | Documents received (brochures, internal notes, transcripts with their raw JSON, `pdftotext` extractions next to PDFs). Never modified, never corrected, even when a transcript is wrong. |
-| `client/` | Living | One fact per line, dated, with its source. A session that reads or writes a message, prepares a call or learns something updates the concerned file before handing back. Correct a line rather than add a contradictory one. |
-| `docs/` | Internal knowledge | The one-page context, the doctrine (what we say, what we never say, the vocabulary), dated decision logs (one decision per line, who carried it, source timestamp), a watch folder. |
-| `communication/` | Outbound | Everything addressed to the counterpart or prepared for them: deliverables (source file next to the rendered file, same name), mails (one file per message), calls (preparation, then minutes). Named `YYYY-MM-DD_slug`. Every file opens with a status header. Nothing leaves without a human. |
+| `dossier/` | Living | One fact per line, dated, with its source. A session that reads or writes a message, prepares a call or learns something updates the concerned file before handing back. Correct a line rather than add a contradictory one. |
+| `knowledge/` | Internal knowledge | The one-page context, the doctrine (what we say, what we never say, the vocabulary), dated decision logs (one decision per line, who carried it, source timestamp), a watch folder. |
+| `outbound/` | Outbound | Everything addressed to the counterpart or prepared for them: deliverables (source file next to the rendered file, same name), mails (one file per message), calls (preparation, then minutes). Named `YYYY-MM-DD_slug`. Every file opens with a status header. Nothing leaves without a human. |
 
 ### 2.2 The seven files of the living dossier
 
 | File | Holds | Updated when |
 |---|---|---|
-| `ACTEURS.md` (actors) | Who is who on every side: role, decision power, what they expect, their constraints, their stated principles. Grouped by side (ordering party, end client, us). | A new actor appears or a role becomes clearer. |
-| `HISTORIQUE.md` (history) | Chronology by day or milestone, each line sourced. Then two standing sections: **commitments in progress** (ours, theirs) and **upcoming** (dated deadlines). | After every call, mail or document sent. |
-| `APPRENTISSAGES.md` (learnings) | What the exchanges teach about the counterpart: how they speak and think (their words, their principles, what they react to), what they expect of a document, what the case teaches, known pitfalls. | An exchange reveals a new trait or contradicts an old one. |
-| `TON.md` (tone) | The voice in one sentence, what is established, what each exchange added, the structure of a long document and of a short message, and a **Refused** log where every reviewer comment on a draft is recorded with its date. | Every time a human reviews a draft. |
-| `CANAUX.md` (channels) | How we communicate: video and recording etiquette, documents, mail addresses, call habits, the repository itself and its confidentiality level. | A channel or an access changes. |
-| `QUESTIONS-OUVERTES.md` (open questions) | Three tables: answered (question, answer, source), still open on the counterpart side (question, why it matters, when to ask), and what we would ask the end client. | After every call. |
-| `RELATION.md` (relationship) | One-line status, a metrics table (duration, amount committed, contacts, deadlines, confidentiality), our view, their view as we reconstruct it, concrete improvements, sales opportunities ranked by probability, points to keep in mind. | At every milestone and at least weekly while the deal is open. |
+| `ACTORS.md` | Who is who on every side: role, decision power, what they expect, their constraints, their stated principles. Grouped by side (ordering party, end client, us). | A new actor appears or a role becomes clearer. |
+| `HISTORY.md` | Chronology by day or milestone, each line sourced. Then two standing sections: **commitments in progress** (ours, theirs) and **upcoming** (dated deadlines). | After every call, mail or document sent. |
+| `LEARNINGS.md` | What the exchanges teach about the counterpart: how they speak and think (their words, their principles, what they react to), what they expect of a document, what the case teaches, known pitfalls. | An exchange reveals a new trait or contradicts an old one. |
+| `TONE.md` | The voice in one sentence, what is established, what each exchange added, the structure of a long document and of a short message, and a **Refused** log where every reviewer comment on a draft is recorded with its date. | Every time a human reviews a draft. |
+| `CHANNELS.md` | How we communicate: video and recording etiquette, documents, mail addresses, call habits, the repository itself and its confidentiality level. | A channel or an access changes. |
+| `OPEN-QUESTIONS.md` | Three tables: answered (question, answer, source), still open on the counterpart side (question, why it matters, when to ask), and what we would ask the end client. | After every call. |
+| `RELATIONSHIP.md` | One-line status, a metrics table (duration, amount committed, contacts, deadlines, confidentiality), our view, their view as we reconstruct it, concrete improvements, sales opportunities ranked by probability, points to keep in mind. | At every milestone and at least weekly while the deal is open. |
 
 ### 2.3 The writing rules
 
@@ -106,10 +108,10 @@ reproduces it faithfully and so that the generalisation in section 3 is traceabl
 | Doctrine | What we say, what we never say, the vocabulary we use, checked before anything leaves. |
 | Decision | A dated internal choice with an owner and a source. |
 
-### 3.2 Layout (English defaults, overridable)
+### 3.2 Layout (fixed English names)
 
 ```
-dossier.yaml            config: counterparts, confidential names, language, folder names
+dossier.yaml            config: counterparts, confidential names, language
 sources/                immutable: received/, transcripts/ (+ raw/), extractions next to PDFs
 dossier/                living: ACTORS.md HISTORY.md LEARNINGS.md TONE.md CHANNELS.md
                         OPEN-QUESTIONS.md RELATIONSHIP.md README.md
@@ -117,8 +119,12 @@ knowledge/              CONTEXT.md DOCTRINE.md decisions/YYYY-MM-DD_slug.md watc
 outbound/               deliverables/ mails/ calls/  (files named YYYY-MM-DD_slug.*)
 ```
 
-Folder names are configurable so that an existing repository with other names (French
-names, for instance) adopts the plugin without moving anything:
+Folder and file names are fixed and English. They are not configurable: skills, hooks, the
+linter and the templates all rely on the same names, and a dossier must look the same in every
+repository so that any agent, on any harness, finds its way without reading a mapping. An
+existing repository with other names renames its folders and files to adopt the plugin
+(`dossier-init` offers to do the renames with `git mv`). The dossier content, headings included,
+stays in the configured language; only paths are English.
 
 ```yaml
 # dossier.yaml
@@ -132,19 +138,6 @@ counterparts:
     role: end client
 confidential_names: [ "Acme", "Big Telco" ]   # linter fails if found under outbound/
 consent_recorded: false           # flip to true with a source when written consent exists
-folders:
-  sources: sources
-  dossier: client
-  knowledge: docs
-  outbound: communication
-files:                            # optional, map canonical file keys to local names
-  actors: ACTEURS.md
-  history: HISTORIQUE.md
-  learnings: APPRENTISSAGES.md
-  tone: TON.md
-  channels: CANAUX.md
-  open_questions: QUESTIONS-OUVERTES.md
-  relationship: RELATION.md
 timestamps: "@mm:ss"              # transcript citation format
 date_format: "YYYY-MM-DD"
 status_header: required           # outbound files must open with a status block
@@ -225,22 +218,22 @@ written for triggering: they name the situations, not the features.
 - Triggers: any task in a repository that has a `dossier.yaml`, or any mention of a client,
   counterpart, prospect, partner relationship, a call to prepare or debrief, a message to
   write to someone outside the team.
-- Content: the layout resolved from config, the read-before-act table, the
+- Content: the layout, the read-before-act table, the
   update-before-handoff rule, the fact line, the status header, what the agent never does,
   and the one-sentence pointers to the other five skills.
 - Sets the rule that the agent writes in the dossier's language.
 
 **`dossier-init`**
 - Asks (or reads from arguments): counterpart names and roles, confidential names, language,
-  whether the repository already has folders to map.
+  whether the repository already has folders to rename.
 - Writes `dossier.yaml`, the folders, the seven living files from templates (each with a
   "Last updated" line and its "Updated when" rule in a comment), `knowledge/CONTEXT.md`,
   `knowledge/DOCTRINE.md` with the two lists (what we say, what we never say) to fill,
   `outbound/README.md`, `sources/README.md`.
 - Adds a short section to the repository's instructions file (`CLAUDE.md`, `AGENTS.md`)
   pointing to the protocol, so that a session without the plugin still finds the rules.
-- On an existing repository: detects the mapped folders, writes only what is missing, never
-  renames.
+- On an existing repository: detects folders that play the same role under other names,
+  proposes the `git mv` renames to the fixed English names, then writes only what is missing.
 
 **`dossier-ingest <path or URL>`**
 - Files the source under `sources/` with the `YYYY-MM-DD_slug` name, runs the text extraction
@@ -395,8 +388,9 @@ Baseline scenarios to record before writing each skill:
 5. Agent is asked to prepare tomorrow's call. Expected failure: writes "tomorrow", does not
    pull open questions, no "what we do not do" section.
 
-Mechanical tests (`tests/`): fixture repositories (one English default layout, one with
-French folder and file names mapped through config) and a shell test runner that runs
+Mechanical tests (`tests/`): fixture repositories (a clean layout, one with a French-language
+dossier content to check the relative-date and opinion-marker word lists) and a shell test
+runner that runs
 `lint.py` and asserts exit codes and messages. No test framework beyond bash and python3.
 
 Plugin-level: `claude plugin eval` suites for the trigger descriptions once the skills exist
@@ -453,16 +447,15 @@ sync beyond git, automatic sending of anything.
 
 1. Final name. `client-dossier` is the working name; `dossier` alone is shorter but generic
    on a marketplace search.
-2. Default folder names in English: `dossier/` versus `relationship/` for the living folder,
-   `outbound/` versus `communication/`. The spec uses `dossier/` and `outbound/`.
+2. Folder names: `dossier/` versus `relationship/` for the living folder, `outbound/` versus
+   `communication/`. The spec uses `dossier/` and `outbound/`. Whatever is chosen is fixed.
 3. Whether the Stop hook warning ships in v1 or waits for feedback (the spec ships it).
-4. Whether `dossier-init` should offer to adopt the origin repository's French names as a
-   preset (`--preset fr`), which would make retrofitting the existing engagement a one-liner.
 
 ## 12. Spec self-review
 
 - No placeholder: every skill, agent, hook and script has inputs, outputs and rules.
-- Consistency: folder names in section 3.2 match the linter, the hooks and the data flow.
+- Consistency: folder and file names are English everywhere (sections 2, 3.2, 4, 5) and match
+  the linter, the hooks and the data flow; nothing is remappable.
 - Scope: one implementation plan covers it; the plan will order init, lint, protocol skill,
   then ingest with the extractor, then draft with the reviewer, then call and status, then
   manifests and distribution.
