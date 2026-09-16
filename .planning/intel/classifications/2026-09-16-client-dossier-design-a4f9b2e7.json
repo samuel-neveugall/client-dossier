@@ -1,0 +1,33 @@
+{
+  "source_path": "/Users/samuel/Documents/dev/client-dossier/docs/superpowers/specs/2026-09-16-client-dossier-design.md",
+  "type": "SPEC",
+  "confidence": "high",
+  "manifest_override": false,
+  "title": "client-dossier: design spec",
+  "summary": "Design specification for client-dossier plugin that structures git repositories as external-party relationship management systems for coding agents.",
+  "scope": [
+    "client-dossier plugin",
+    "coding agents",
+    "relationship management",
+    "git repository structure",
+    "agent skills",
+    "dossier architecture",
+    "fact-extraction workflows",
+    "doctrine-review",
+    "linter specifications",
+    "plugin distribution"
+  ],
+  "cross_refs": [
+    ".claude-plugin/plugin.json",
+    ".codex-plugin/plugin.json",
+    ".agents/plugins/marketplace.json",
+    "skills/*/SKILL.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "locked": false,
+  "precedence": null
+}
