@@ -1,7 +1,8 @@
 # client-dossier: design spec
 
-Status: draft for review, 2026-09-16. Author: Samuel Neveu, drafted with Claude Code.
-Working name: `client-dossier`. Repository: `samuel-neveugall/client-dossier` (to create).
+Status: approved for implementation, 2026-09-16 (draft reviewed the same day; the decisions of
+section 11 are settled). Author: Samuel Neveu, drafted with Claude Code.
+Name: `client-dossier`. Repository: `samuel-neveugall/client-dossier` (to create).
 Language of the plugin: English. Language of the dossier content: whatever the user works in.
 
 ## 1. What this is
@@ -124,7 +125,18 @@ linter and the templates all rely on the same names, and a dossier must look the
 repository so that any agent, on any harness, finds its way without reading a mapping. An
 existing repository with other names renames its folders and files to adopt the plugin
 (`dossier-init` offers to do the renames with `git mv`). The dossier content, headings included,
-stays in the configured language; only paths are English.
+stays in the configured language; only paths and **protocol keywords** are English. Protocol
+keywords are the labels the linter and the skills look for: the `Last updated:` line of a
+living file, the field names of the status header (`Status:`, `To:`, `Subject:`, `Deadline:`,
+`Written by:`, `Rules:`) and the status values (`draft`, `reviewed by`, `sent`). They are
+never translated, for the same reason paths are not: a regex has to find them in every
+dossier, and a per-language table would have to be kept in sync between the templates and
+the linter. Section headings, example lines and everything the human reads are translated.
+
+Git does not track empty folders, so every leaf folder the scaffold creates and leaves
+empty (`sources/received/`, `sources/transcripts/raw/`, `knowledge/decisions/`,
+`knowledge/watch/`, `outbound/deliverables/`, `outbound/mails/`, `outbound/calls/`) gets a
+`.gitkeep`. The linter ignores `.gitkeep` files.
 
 ```yaml
 # dossier.yaml
@@ -137,11 +149,16 @@ counterparts:
   - name: "Big Telco"
     role: end client
 confidential_names: [ "Acme", "Big Telco" ]   # linter fails if found under outbound/
-consent_recorded: false           # flip to true with a source when written consent exists
+consent_recorded: false           # true only with consent_source filled in
+consent_source: ""                # e.g. "mail 2026-09-16 from Jane"; required when true
 timestamps: "@mm:ss"              # transcript citation format
 date_format: "YYYY-MM-DD"
 status_header: required           # outbound files must open with a status block
+staleness_days: 7                 # dossier-status flags living files older than this
 ```
+
+`consent_recorded: true` without a non-empty `consent_source` is a lint error: a consent
+without a source is an opinion, like any other unsourced line.
 
 The plugin locates a dossier by finding `dossier.yaml` in the working directory or a parent.
 A repository can hold several dossiers (one per counterpart) in subfolders, each with its own
@@ -156,12 +173,18 @@ Every outbound file opens with a status block, in the file's own comment syntax
 Status: draft | reviewed by <name> | sent <date time> by <name>
 To: <recipient>
 Subject: <subject>            (mails)
+Deadline: YYYY-MM-DD          (optional: when the draft has to be sent)
 Written by: <human or "agent session, YYYY-MM-DD">
 Rules: no confidential names; see knowledge/DOCTRINE.md
 ```
 
-The linter fails on an outbound file without a status block, and on a `sent` status without
-a date and a sender.
+Field names and status values are protocol keywords (English, fixed, see 3.2); the values
+after the colon are in the dossier's language. `Deadline:` is the single place
+`dossier-status` reads to find overdue drafts; the history line written by `dossier-draft`
+repeats the date for humans but is not parsed.
+
+The linter fails on an outbound file without a status block, on a `sent` status without
+a date and a sender, and on a `Deadline:` that is not an absolute date.
 
 ### 3.4 The fact line
 
@@ -198,10 +221,17 @@ client-dossier/
   scripts/
     lint.py                           mechanical checks (python3, no dependencies)
     extract-text.sh                   pdftotext wrapper, writes .txt next to the PDF
+    release.sh                        bumps the version in both manifests, tags
   templates/                          one file per living file, plus outbound headers, plus dossier.yaml
+  tests/                              fixture dossiers and the bash runner for lint.py
   docs/                               this spec, the protocol reference, the fact-line reference
   README.md  LICENSE  CHANGELOG.md
 ```
+
+`.claude-plugin/plugin.json` exists from the first commit that ships a skill, in its minimal
+form (name, version, description), so that the plugin loads locally with
+`claude --plugin-dir .` during development; the marketplace files and the Codex manifests
+complete it at distribution time.
 
 Principle: **skills carry the judgement, scripts carry the mechanics, hooks carry the
 reminders.** Anything a regex can check is in `lint.py`, not in prose. Anything that needs
@@ -226,10 +256,12 @@ written for triggering: they name the situations, not the features.
 **`dossier-init`**
 - Asks (or reads from arguments): counterpart names and roles, confidential names, language,
   whether the repository already has folders to rename.
-- Writes `dossier.yaml`, the folders, the seven living files from templates (each with a
-  "Last updated" line and its "Updated when" rule in a comment), `knowledge/CONTEXT.md`,
-  `knowledge/DOCTRINE.md` with the two lists (what we say, what we never say) to fill,
-  `outbound/README.md`, `sources/README.md`.
+- Writes `dossier.yaml`, the folders (with a `.gitkeep` in every empty leaf folder), the
+  seven living files from templates (each with a "Last updated" line and its "Updated when"
+  rule in a comment), `knowledge/CONTEXT.md`, `knowledge/DOCTRINE.md` with the two lists
+  (what we say, what we never say) to fill, and one README per top-level folder:
+  `dossier/README.md`, `sources/README.md`, `outbound/README.md` (the latter restates the
+  status header, the naming rule and what each of the three subfolders holds).
 - Adds a short section to the repository's instructions file (`CLAUDE.md`, `AGENTS.md`)
   pointing to the protocol, so that a session without the plugin still finds the rules.
 - On an existing repository: detects folders that play the same role under other names,
@@ -237,7 +269,9 @@ written for triggering: they name the situations, not the features.
 
 **`dossier-ingest <path or URL>`**
 - Files the source under `sources/` with the `YYYY-MM-DD_slug` name, runs the text extraction
-  for PDFs, keeps raw exports next to transcripts.
+  for PDFs (`extract-text.sh`, which needs `pdftotext` from poppler; when it is missing the
+  script exits with an install hint, the PDF is still filed and the skill reports that
+  extraction was skipped), keeps raw exports next to transcripts.
 - Dispatches `fact-extractor` on the source (one agent per source, so the long text stays
   out of the main context). Receives a proposal: lines grouped by target file, each with its
   locator.
@@ -254,7 +288,8 @@ written for triggering: they name the situations, not the features.
 - Dispatches `doctrine-reviewer` on the draft. Applies the findings or lists the ones it
   disagrees with.
 - Runs `lint.py` on the file.
-- Updates history: "draft written, to be sent by <human>, deadline <date>".
+- Writes the deadline, when there is one, in the `Deadline:` field of the status header, and
+  updates history: "draft written, to be sent by <human>, deadline <date>".
 - Never marks a draft as sent. The human edits the status line after sending; the next
   `dossier-status` picks it up.
 
@@ -270,8 +305,8 @@ written for triggering: they name the situations, not the features.
 **`dossier-status`**
 - Prints: the one-line status, commitments due with their dates, sources ingested but not
   reflected (a source newer than every living file), outbound drafts still marked draft past
-  their deadline, living files not updated for more than the configured staleness (7 days by
-  default), lint findings.
+  the `Deadline:` of their status header, living files not updated for more than
+  `staleness_days` (7 by default), lint findings.
 - Read-only. This is the "where are we" a human asks at the start of a session.
 
 ### 4.2 Agents
@@ -312,10 +347,12 @@ gets the same behaviour from prose.
 Python 3 standard library only. Reads `dossier.yaml` (a tiny YAML subset parser, or JSON as
 a fallback, to avoid a dependency). Checks:
 
-1. Every outbound file opens with a status block; a `sent` status has a date and a sender.
+1. Every outbound file opens with a status block; a `sent` status has a date and a sender;
+   a `Deadline:` field, when present, is an absolute date.
 2. Outbound file names match `YYYY-MM-DD_slug`.
-3. No confidential name appears under outbound, unless `consent_recorded: true`.
-4. Every living file has a "Last updated" line with an absolute date.
+3. No confidential name appears under outbound, unless `consent_recorded: true` with a
+   non-empty `consent_source`; `true` without a source is itself an error.
+4. Every living file has a `Last updated:` line (fixed English label) with an absolute date.
 5. No relative date words in the dossier and knowledge folders (a small per-language list:
    "tomorrow", "next week", "demain", "la semaine prochaine"), reported as warnings.
 6. Every bullet line in the living files ends with a source in parentheses; lines without
@@ -325,16 +362,21 @@ a fallback, to avoid a dependency). Checks:
    with the same stem.
 
 Exit code 1 on errors, 0 on warnings only. `dossier-lint` command and `dossier-status` call it.
+The linter looks for protocol keywords only (section 3.2); it never needs to know the
+dossier's language except for the two warning word lists of checks 5 and 6.
 
 ### 4.5 Templates
 
-One template per living file, containing: the title, the "Last updated" line, the "Updated
+One template per living file, containing: the title, the `Last updated:` line, the "Updated
 when" rule as a comment, the headings, and one example line in the fact format. Templates
-exist in English; `dossier-init` translates headings into the configured language at scaffold
-time (the skill does the translation, the template is the source of structure).
+exist in English; `dossier-init` translates the title, the headings, the comment and the
+example line into the configured language at scaffold time (the skill does the translation,
+the template is the source of structure). Protocol keywords (section 3.2) are left as they
+are.
 
-The outbound folder gets three README files (deliverables, mails, calls) restating the
-status header and the naming rule.
+Three README templates, one per top-level folder that needs one (`dossier/`, `sources/`,
+`outbound/`); the outbound README restates the status header, the naming rule and the role of
+its three subfolders. A `.gitkeep` template is not needed: the file is empty.
 
 ## 5. Data flow
 
@@ -362,8 +404,14 @@ call happens ──► dossier-call debrief ──► ingest transcript ──�
 - Two counterparts with the same first name: actors file disambiguates with the
   organisation; the skills always write "Name (Organisation)" on first mention in a file.
 - A draft must name the counterpart (consent recorded): the linter reads
-  `consent_recorded` and the source of the consent from config; the reviewer still flags the
+  `consent_recorded` and `consent_source` from config; the reviewer still flags the
   name as informational.
+- `pdftotext` is not installed: `extract-text.sh` exits non-zero with an install hint, the
+  PDF is filed anyway and `dossier-ingest` reports the extraction as skipped; the facts can be
+  extracted later by re-running the ingest on the filed PDF.
+- The plugin was installed as bare skills (no `scripts/`): the skills that call `lint.py` or
+  `extract-text.sh` check that the script exists first and, when it does not, say so and state
+  the rule the script would have checked, so the session still behaves.
 - Transcript timestamps absent (a mail thread, a PDF): locator becomes page, paragraph or
   the mail date and sender.
 - The harness has no subagents: the skills contain the inline procedure and say when the
@@ -388,10 +436,15 @@ Baseline scenarios to record before writing each skill:
 5. Agent is asked to prepare tomorrow's call. Expected failure: writes "tomorrow", does not
    pull open questions, no "what we do not do" section.
 
-Mechanical tests (`tests/`): fixture repositories (a clean layout, one with a French-language
-dossier content to check the relative-date and opinion-marker word lists) and a shell test
-runner that runs
-`lint.py` and asserts exit codes and messages. No test framework beyond bash and python3.
+Mechanical tests (`tests/`): fixture repositories (a clean layout that exits 0, one with
+French-language dossier content to check the relative-date and opinion-marker word lists, and
+error fixtures that together trigger every error-class check of section 4.4 at least once) and
+a shell test runner that runs `lint.py` and asserts exit codes and messages. No test framework
+beyond bash and python3.
+
+During development the plugin is loaded from the working copy with `claude --plugin-dir .`;
+this is how the skills, the hooks and the pressure scenarios are exercised before any
+marketplace exists.
 
 Plugin-level: `claude plugin eval` suites for the trigger descriptions once the skills exist
 (verify that "write to the client" triggers `dossier-draft` and not `dossier-ingest`).
@@ -409,7 +462,11 @@ The submission processes of the two official marketplaces have to be checked at 
 time; the repository layout above mirrors a plugin already published on both.
 
 Versioning: semver, `CHANGELOG.md`, a git tag per release. The version lives in both
-manifests; a release script bumps them together.
+manifests; `scripts/release.sh <version>` bumps them together, updates the changelog heading
+and creates the tag.
+
+The bare-skills path (third row) ships `skills/` only: no `scripts/`, no hooks, no agents.
+The skills are written for that case (section 6, last two items).
 
 License: MIT.
 
@@ -443,13 +500,25 @@ baseline scenarios recorded for each skill.
 Out: transcript fetchers for recording services, document rendering, a web UI, multi-user
 sync beyond git, automatic sending of anything.
 
-## 11. Open decisions for the author
+## 11. Decisions (settled 2026-09-16)
 
-1. Final name. `client-dossier` is the working name; `dossier` alone is shorter but generic
-   on a marketplace search.
-2. Folder names: `dossier/` versus `relationship/` for the living folder, `outbound/` versus
-   `communication/`. The spec uses `dossier/` and `outbound/`. Whatever is chosen is fixed.
-3. Whether the Stop hook warning ships in v1 or waits for feedback (the spec ships it).
+1. **Name: `client-dossier`.** The plugin is `client-dossier`, the entry skill is `dossier`;
+   the two names differ and read naturally together (`client-dossier@client-dossier`, skill
+   `dossier`). `dossier` alone was rejected as generic on a marketplace search.
+2. **Folder names: `dossier/` and `outbound/`.** `relationship/` and `communication/` were
+   rejected; the names are now fixed and hard-coded everywhere.
+3. **Stop hook: decided during Phase 3 planning.** The spec ships it by default; the decision
+   only affects that phase and is deferred to it.
+4. **Protocol keywords stay English.** The `Last updated:` label, the status-header field
+   names and the status values are never translated (section 3.2). Alternatives rejected: a
+   per-language label table in the linter (two places to keep in sync, breaks on an unlisted
+   language); an English machine-readable comment next to a translated label (two labels for
+   one fact).
+5. **Contradictions of the draft resolved** in favour of the smaller surface: one README per
+   top-level folder rather than one per outbound subfolder, plus `.gitkeep` files;
+   `staleness_days` added to `dossier.yaml`; `consent_source` added next to
+   `consent_recorded`; `Deadline:` added to the status header as the single place the
+   overdue-draft check reads.
 
 ## 12. Spec self-review
 
@@ -461,3 +530,7 @@ sync beyond git, automatic sending of anything.
   manifests and distribution.
 - Ambiguity resolved: "update before handing back" means the same session, before its final
   message; the Stop hook is the reminder, not the mechanism.
+- Second pass (2026-09-16): every value the linter reads has a home (`staleness_days`,
+  `consent_source`, `Deadline:`) and a fixed English spelling; every external dependency
+  (`pdftotext`, `scripts/` in a bare-skills install) has a stated fallback; the plugin can be
+  loaded and tested from the first skill onward (`--plugin-dir`).

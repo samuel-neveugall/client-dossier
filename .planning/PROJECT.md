@@ -2,7 +2,7 @@
 
 ## What This Is
 
-`client-dossier` (working name — final name is an open decision, see below) is a plugin for
+`client-dossier` is a plugin for
 coding agents (Claude Code first, then Codex, Cursor, Copilot CLI, Gemini CLI, OpenCode via
 the Agent Skills standard) that turns a git repository into the memory and workbench of a
 relationship with an external party: a client, partner, prospect, or intermediary. It
@@ -68,13 +68,17 @@ v1 scope, drawn from the design spec (full detail and IDs in REQUIREMENTS.md):
   English paths only while dossier *content* stays in whatever language `dossier.yaml`
   configures.
 - Bootstrapped 2026-09-16 via `gsd-ingest-docs` from a single SPEC document
-  (`docs/superpowers/specs/2026-09-16-client-dossier-design.md`, high confidence, not
-  locked). No ADRs or PRDs existed in this batch, so no locked decisions or discrete
-  requirement IDs were inherited — REQUIREMENTS.md derives its requirement IDs from the
-  SPEC's v1-scope and architecture sections instead.
-- A repository-root `CLAUDE.md` derived from this same spec was added this session
-  (excluded from the ingest batch itself, per orchestrator instruction).
-- No code exists yet. Next step: `/gsd-discuss-phase 1` (or `/gsd-plan-phase 1`).
+  (`docs/superpowers/specs/2026-09-16-client-dossier-design.md`). No ADRs or PRDs existed in
+  this batch, so no locked decisions or discrete requirement IDs were inherited —
+  REQUIREMENTS.md derives its requirement IDs from the SPEC's v1-scope and architecture
+  sections instead.
+- Spec reviewed and approved 2026-09-16 (status "approved for implementation"): the §11
+  decisions were settled, four internal contradictions resolved (README count, staleness
+  key, consent source, draft deadline), and the planning resynchronised (42 requirements).
+- A repository-root `CLAUDE.md` derived from this same spec exists and is kept in step with it.
+- No code exists yet. Next step: `/gsd-discuss-phase 1` then `/gsd-plan-phase 1`.
+- Development loop: `claude --plugin-dir .` loads the plugin from the working copy; a
+  minimal `.claude-plugin/plugin.json` exists from Phase 1 for that purpose.
 - Target runtimes: Claude Code first (full plugin: skills + agents + hooks + commands),
   Codex via `.codex-plugin/`, other harnesses (Cursor, Copilot CLI, Gemini CLI, OpenCode) via
   the plain Agent Skills standard (`skills/*/SKILL.md`), and any harness at all via a
@@ -84,22 +88,15 @@ v1 scope, drawn from the design spec (full detail and IDs in REQUIREMENTS.md):
   anything needing judgement lives in a skill; hooks never do work, they only inject a
   sentence or refuse a write.
 
-## Open Decisions (Unresolved — do not treat as locked)
+## Open Decisions
 
-The source spec explicitly leaves these open (§11); they must be settled before Phase 1
-hard-codes names into `dossier-init`, templates, and the linter, since folder/file names are
-fixed and not configurable per-repository once shipped:
+One remains, scoped to Phase 3 and decided at its planning with Samuel:
 
-1. **Final plugin name.** Working name `client-dossier`; `dossier` alone is shorter but
-   generic on a marketplace search. Affects: repo name, both manifests, marketplace listing.
-2. **Folder names.** `dossier/` vs `relationship/` for the living folder; `outbound/` vs
-   `communication/`. The spec's provisional default is `dossier/` and `outbound/`. Whatever
-   is chosen is fixed thereafter. Affects: Phase 1 (folder scaffold + templates), Phase 2
-   (linter path checks), and every skill's read/write paths.
-3. **Stop hook in v1.** Ship the Stop-hook warning now, or wait for user feedback before
-   adding it? The spec ships it (provisional default). Affects: Phase 3 scope only.
+- **Stop hook in v1.** Ship the Stop-hook warning now, or wait for user feedback before
+  adding it? The spec ships it (provisional default). Affects: Phase 3 scope only (PROTO-06).
 
-These are tracked here and in STATE.md, not in Key Decisions below — they are not yet made.
+The former decisions #1 (name) and #2 (folder names), plus the label-language question
+surfaced at review, are settled and listed in Key Decisions below.
 
 ## Constraints
 
@@ -110,8 +107,11 @@ These are tracked here and in STATE.md, not in Key Decisions below — they are 
 - **Fact-line format**: `- <fact, one sentence, absolute dates> (<source>, <locator>).` — one
   fact per line, always dated, always sourced or explicitly marked opinion/reconstructed.
 - **Status header**: every outbound file opens with a status block (`Status/To/Subject/
-  Written by/Rules`) in the file's comment syntax; a `sent` status requires a date and
-  sender.
+  Deadline/Written by/Rules`) in the file's comment syntax; a `sent` status requires a date
+  and sender; `Deadline:` is optional and must be an absolute date.
+- **Protocol keywords are English**: the `Last updated:` label, the status-header field names
+  and the status values are never translated; only headings, examples and content follow
+  `dossier.yaml`'s `language`. The linter greps the keywords.
 - **Agent never**: sends anything, modifies `sources/`, names a confidential party in
   outbound, promises what doctrine forbids, or leaves a stray `.claude/` in a subfolder.
 - **Linter**: Python 3 standard library only, no dependencies (tiny YAML-subset parser or
@@ -135,6 +135,12 @@ These are tracked here and in STATE.md, not in Key Decisions below — they are 
 | One thin router skill (`dossier`) plus five task skills, not one monolithic skill | Ingest/draft/call have different read sets and outputs; a single trigger description triggers poorly | — Pending |
 | Hooks enforce, they never perform work (inject a sentence or refuse a write) | Keeps mechanical enforcement separate from the judgement that lives in skills; a harness without hooks still works from skill prose alone | — Pending |
 | Document rendering pipeline excluded from v1 | Brand-specific and Chrome-specific; plugin only enforces source-next-to-rendered-file | — Pending |
+| Plugin named `client-dossier`, entry skill `dossier` | `dossier` alone is generic on a marketplace; the two names differ and read together | Settled 2026-09-16 |
+| Folders `dossier/` and `outbound/` (not `relationship/`, `communication/`) | Spec defaults kept; names now hard-coded everywhere | Settled 2026-09-16 |
+| Protocol keywords (`Last updated:`, status fields and values) stay English | A regex must find them in every dossier; a per-language table would have two places to keep in sync and would break on an unlisted language | Settled 2026-09-16 |
+| One README per top-level folder + `.gitkeep` in empty leaf folders (not one README per outbound subfolder) | Smaller surface; `.gitkeep` is what actually keeps empty folders through a clone | Settled 2026-09-16 |
+| `staleness_days`, `consent_source`, `Deadline:` added to the schema | Every value the linter or `dossier-status` reads needs a fixed home; a consent without a source is an opinion | Settled 2026-09-16 |
+| Local development via `claude --plugin-dir .` with a minimal manifest from Phase 1 | Skills and hooks must be exercisable long before the marketplace files of Phase 7 | Settled 2026-09-16 |
 
 ---
-*Last updated: 2026-09-16 after initial ingest-driven bootstrap*
+*Last updated: 2026-09-16 after the spec review*

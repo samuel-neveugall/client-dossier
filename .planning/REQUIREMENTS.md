@@ -17,36 +17,45 @@ synthesized-for-tracking, not verbatim spec text.
 ### Scaffold (dossier-init, templates, dossier.yaml)
 
 - [ ] **SCAF-01**: `dossier-init` writes `dossier.yaml` with version, language, counterparts
-      (name/role/contacts), confidential_names, consent_recorded, timestamps format,
-      date_format, and status_header setting
+      (name/role/contacts), confidential_names, consent_recorded, consent_source, timestamps
+      format, date_format, status_header setting, and staleness_days (default 7)
 - [ ] **SCAF-02**: `dossier-init` creates the four-folder layout (`sources/`, `dossier/`,
-      `knowledge/`, `outbound/`) with their documented subfolders
+      `knowledge/`, `outbound/`) with their documented subfolders, each empty leaf folder
+      holding a `.gitkeep` so the layout survives a git clone
 - [ ] **SCAF-03**: `dossier-init` scaffolds all seven living-dossier files from templates,
-      each pre-filled with a "Last updated" line and its "Updated when" rule as a comment
+      each pre-filled with a `Last updated:` line and its "Updated when" rule as a comment
 - [ ] **SCAF-04**: `dossier-init` creates `knowledge/CONTEXT.md`, `knowledge/DOCTRINE.md`
-      (with the "what we say" / "what we never say" lists to fill), `outbound/README.md`, and
-      `sources/README.md`
+      (with the "what we say" / "what we never say" lists to fill), and one README per
+      top-level folder that needs one: `dossier/README.md`, `sources/README.md`,
+      `outbound/README.md` (restating the status header, the naming rule and the role of the
+      three outbound subfolders)
 - [ ] **SCAF-05**: `dossier-init` adds a short protocol-pointer section to the repository's
       `CLAUDE.md`/`AGENTS.md`
 - [ ] **SCAF-06**: On an existing repository, `dossier-init` detects same-role folders under
       other names and proposes `git mv` renames to the fixed English names before writing
       what is missing
 - [ ] **SCAF-07**: Templates are authored once in English structure; `dossier-init`
-      translates headings into the configured language at scaffold time
+      translates title, headings, comments and example lines into the configured language at
+      scaffold time, and leaves protocol keywords (`Last updated:`, status-header field names
+      and values) in English
+- [ ] **SCAF-08**: A minimal `.claude-plugin/plugin.json` (name, version, description) exists
+      so that `claude --plugin-dir .` loads the plugin from the working copy during development
 
 ### Linter (scripts/lint.py, fixtures, bash test runner)
 
 - [ ] **LINT-01**: `scripts/lint.py` (Python 3 standard library only) implements all 8
       mechanical checks from the design spec — status block present and complete on
-      outbound files, outbound filenames match `YYYY-MM-DD_slug`, no confidential name
-      under `outbound/` unless `consent_recorded: true`, every living file has a "Last
-      updated" line with an absolute date, relative-date words flagged as warnings, bullet
+      outbound files (a `sent` status has a date and a sender, a `Deadline:` is an absolute
+      date), outbound filenames match `YYYY-MM-DD_slug`, no confidential name under
+      `outbound/` unless `consent_recorded: true` with a non-empty `consent_source` (true
+      without a source is an error), every living file has a `Last updated:` line (fixed
+      English label) with an absolute date, relative-date words flagged as warnings, bullet
       lines without a parenthetical source flagged as warnings, no `.claude/` folder below
       repo root, and rendered deliverables have their source file next to them — exiting 1
-      on any error and 0 on warnings-only
-- [ ] **LINT-02**: Fixture repositories exist for lint testing: a clean baseline layout and
-      a French-language dossier fixture exercising the relative-date and opinion-marker word
-      lists
+      on any error and 0 on warnings-only, ignoring `.gitkeep` files
+- [ ] **LINT-02**: Fixture repositories exist for lint testing: a clean baseline layout, a
+      French-language dossier fixture exercising the relative-date and opinion-marker word
+      lists, and error fixtures that together trigger every error-class check at least once
 - [ ] **LINT-03**: A bash test runner executes `lint.py` against the fixtures and asserts
       exit codes and messages, with no test framework beyond bash and python3
 
@@ -57,8 +66,8 @@ synthesized-for-tracking, not verbatim spec text.
       to someone outside the team, and is always loaded first
 - [ ] **PROTO-02**: The `dossier` skill's content covers the four-folder layout, the
       read-before-act/update-before-handoff table, the fact-line format, the status-header
-      format, the "what the agent never does" list, and one-sentence pointers to the other
-      five skills
+      format, the "what the agent never does" list, the "Name (Organisation)" rule on first
+      mention of a person in a file, and one-sentence pointers to the other five skills
 - [ ] **PROTO-03**: The `dossier` skill sets the rule that the agent writes dossier content
       in the language configured in `dossier.yaml`
 - [ ] **PROTO-04**: A SessionStart hook injects the protocol reminder ("this repository is a
@@ -72,12 +81,16 @@ synthesized-for-tracking, not verbatim spec text.
 - [ ] **PROTO-07**: The "fix the typo in the transcript" baseline pressure scenario is
       recorded RED (agent edits the source) before the protocol skill/hooks exist, and
       re-run GREEN (agent refuses and points to filing a dossier correction) after
+- [ ] **PROTO-08**: Every skill except `dossier-init` locates the nearest `dossier.yaml`
+      (working directory, then parents) and stops with a message when none is found; in a
+      repository holding several dossiers, the nearest one wins
 
 ### Ingest (dossier-ingest, fact-extractor agent, extract-text.sh)
 
 - [ ] **INGEST-01**: `dossier-ingest <path or URL>` files the source under `sources/` as
       `YYYY-MM-DD_slug`, runs `extract-text.sh` (pdftotext wrapper) for PDFs, and keeps raw
-      exports next to transcripts
+      exports next to transcripts; when `pdftotext` is missing the script exits with an
+      install hint, the PDF is still filed and the skill reports extraction as skipped
 - [ ] **INGEST-02**: `dossier-ingest` dispatches the `fact-extractor` agent and applies its
       proposal to the living files — appending under the right heading, correcting a
       contradicted line instead of adding a new one, updating "Last updated" — then reports
@@ -93,6 +106,9 @@ synthesized-for-tracking, not verbatim spec text.
 - [ ] **INGEST-05**: The "given a transcript, what did we learn" baseline pressure scenario
       is recorded RED (summary only in chat, nothing filed, no timestamps) before
       `dossier-ingest` exists, and re-run GREEN (facts filed with sourced timestamps) after
+- [ ] **INGEST-06**: `dossier-ingest` contains the inline extraction procedure for harnesses
+      without subagents, says when the main agent is doing the extractor's job itself, and
+      checks that `extract-text.sh` exists before calling it (bare-skills install)
 
 ### Draft (dossier-draft, doctrine-reviewer agent)
 
@@ -101,7 +117,8 @@ synthesized-for-tracking, not verbatim spec text.
       kind, then writes the draft under the right outbound folder with a complete status
       header, in the dossier's language, following the tone file's recorded structure
 - [ ] **DRAFT-02**: `dossier-draft` dispatches `doctrine-reviewer`, applies its findings or
-      explicitly lists disagreements, runs `lint.py` on the resulting file, and updates
+      explicitly lists disagreements, runs `lint.py` on the resulting file, writes the
+      deadline (when there is one) in the `Deadline:` field of the status header, and updates
       history with a commitment line — and never sets the draft's status to "sent"
 - [ ] **DRAFT-03**: The `doctrine-reviewer` agent (read-only) takes a draft path, the
       doctrine, the tone file (including the Refused log), and the confidential names, and
@@ -110,6 +127,10 @@ synthesized-for-tracking, not verbatim spec text.
 - [ ] **DRAFT-04**: The "write a quick reply to the client" baseline pressure scenario is
       recorded RED (writes inline, never reads tone, never updates history, may name the
       confidential party) before `dossier-draft` exists, and re-run GREEN after
+- [ ] **DRAFT-05**: `dossier-draft` contains the inline review procedure for harnesses
+      without subagents, says when the main agent is doing the reviewer's job itself, and
+      when `lint.py` is absent (bare-skills install) says so and states the rules it would
+      have checked
 
 ### Call & status (dossier-call, dossier-status)
 
@@ -123,8 +144,8 @@ synthesized-for-tracking, not verbatim spec text.
       updates `RELATIONSHIP.md` when the call is a milestone
 - [ ] **CALL-03**: `dossier-status` is read-only and prints the one-line status, commitments
       due with dates, sources ingested but not yet reflected in living files, outbound
-      drafts still marked draft past their deadline, living files stale beyond the
-      configured threshold (7 days default), and lint findings
+      drafts still marked draft past the `Deadline:` of their status header, living files
+      stale beyond `staleness_days` from `dossier.yaml` (7 by default), and lint findings
 - [ ] **CALL-04**: The "prepare tomorrow's call" baseline pressure scenario is recorded RED
       (writes "tomorrow", skips open questions, no "what we do not do" section) before
       `dossier-call` exists, and re-run GREEN after
@@ -140,16 +161,21 @@ synthesized-for-tracking, not verbatim spec text.
       the equivalent Codex CLI/app distribution path
 - [ ] **DIST-03**: `skills/*/SKILL.md` alone (no plugin installed) is installable on any
       Agent-Skills-standard harness (Cursor, Copilot CLI, Gemini CLI, OpenCode) via the
-      `skills` CLI or by copying the folder in
-- [ ] **DIST-04**: Thin slash commands exist under `commands/` for each of the six skills
-      (`dossier-init`, `dossier-ingest`, `dossier-draft`, `dossier-call`, `dossier-status`,
-      `dossier-lint`) and invoke the corresponding skill in Claude Code
+      `skills` CLI or by copying the folder in; the skills behave without `scripts/`, hooks
+      or agents (INGEST-06, DRAFT-05) and the README says what that install loses
+- [ ] **DIST-04**: Six thin slash commands exist under `commands/`: one per task skill
+      (`dossier-init`, `dossier-ingest`, `dossier-draft`, `dossier-call`, `dossier-status`)
+      invoking that skill, plus `dossier-lint` running `scripts/lint.py`; the `dossier`
+      protocol skill has no command (it is loaded, not invoked)
 - [ ] **DIST-05**: README documents installation for all four distribution targets
       (Claude Code, Codex, Agent-Skills-standard harnesses, plain `AGENTS.md`-only use),
       plus versioning (semver, `CHANGELOG.md`, git tag per release) and the MIT `LICENSE`
 - [ ] **DIST-06**: `claude plugin eval` suites verify the six skills' trigger descriptions —
       confirming, for example, that "write to the client" routes to `dossier-draft` and not
       `dossier-ingest`
+- [ ] **DIST-07**: `scripts/release.sh <version>` bumps the version in both manifests
+      (`.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`), updates the `CHANGELOG.md`
+      heading and creates the git tag, so the two versions never diverge
 
 ## v2 Requirements
 
@@ -177,6 +203,7 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | SCAF-05 | Phase 1 | Pending |
 | SCAF-06 | Phase 1 | Pending |
 | SCAF-07 | Phase 1 | Pending |
+| SCAF-08 | Phase 1 | Pending |
 | LINT-01 | Phase 2 | Pending |
 | LINT-02 | Phase 2 | Pending |
 | LINT-03 | Phase 2 | Pending |
@@ -187,15 +214,18 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | PROTO-05 | Phase 3 | Pending |
 | PROTO-06 | Phase 3 | Pending |
 | PROTO-07 | Phase 3 | Pending |
+| PROTO-08 | Phase 3 | Pending |
 | INGEST-01 | Phase 4 | Pending |
 | INGEST-02 | Phase 4 | Pending |
 | INGEST-03 | Phase 4 | Pending |
 | INGEST-04 | Phase 4 | Pending |
 | INGEST-05 | Phase 4 | Pending |
+| INGEST-06 | Phase 4 | Pending |
 | DRAFT-01 | Phase 5 | Pending |
 | DRAFT-02 | Phase 5 | Pending |
 | DRAFT-03 | Phase 5 | Pending |
 | DRAFT-04 | Phase 5 | Pending |
+| DRAFT-05 | Phase 5 | Pending |
 | CALL-01 | Phase 6 | Pending |
 | CALL-02 | Phase 6 | Pending |
 | CALL-03 | Phase 6 | Pending |
@@ -207,12 +237,15 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | DIST-04 | Phase 7 | Pending |
 | DIST-05 | Phase 7 | Pending |
 | DIST-06 | Phase 7 | Pending |
+| DIST-07 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 37 total
-- Mapped to phases: 37
+- v1 requirements: 42 total
+- Mapped to phases: 42
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-09-16*
-*Last updated: 2026-09-16 after initial roadmap creation*
+*Last updated: 2026-09-16 after the spec review (decisions §11 settled; SCAF-08, PROTO-08,
+INGEST-06, DRAFT-05, DIST-07 added; SCAF-01/02/04/07, LINT-01/02, PROTO-02, INGEST-01,
+DRAFT-02, CALL-03, DIST-03/04 amended)*

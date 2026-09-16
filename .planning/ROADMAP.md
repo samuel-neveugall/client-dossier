@@ -11,11 +11,13 @@ manifests, docs and distribution plumbing that make the plugin installable. Each
 one coherent, independently testable slice; nothing in a later phase is needed to verify an
 earlier one.
 
-**Before Phase 1 starts:** three naming decisions are still open (PROJECT.md § Open
-Decisions) — the final plugin name, `dossier/` vs `relationship/` and `outbound/` vs
-`communication/` for the two folders, and whether the Stop hook ships in v1. Folder names in
-particular are fixed once `dossier-init`, the templates, and the linter hard-code them in
-Phase 1 — resolve #1 and #2 before or during Phase 1 planning, not after.
+**Decisions settled 2026-09-16 (spec §11):** the plugin is `client-dossier`, the folders are
+`dossier/` and `outbound/`, protocol keywords (`Last updated:`, status-header fields and
+values) stay English and are never translated. The one remaining open point, whether the Stop
+hook ships in v1, is decided during Phase 3 planning with Samuel; the spec ships it by default.
+
+**Development loop:** the plugin is loaded from the working copy with `claude --plugin-dir .`
+from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 
 ## Phases
 
@@ -37,19 +39,22 @@ Phase 1 — resolve #1 and #2 before or during Phase 1 planning, not after.
 **Goal**: Running `dossier-init` turns any repository (empty or pre-existing) into a
 correctly laid-out dossier in one step.
 **Depends on**: Nothing (first phase)
-**Requirements**: SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05, SCAF-06, SCAF-07
+**Requirements**: SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05, SCAF-06, SCAF-07, SCAF-08
 **Success Criteria** (what must be TRUE):
-  1. Running `dossier-init` in an empty repo creates `dossier.yaml`, the four top-level
-     folders with their subfolders, and all seven living files pre-filled from templates
-     with a "Last updated" line and its "Updated when" comment.
+  1. With the plugin loaded via `claude --plugin-dir .`, running `dossier-init` in an empty
+     repo creates `dossier.yaml` (including `consent_source` and `staleness_days`), the four
+     top-level folders with their subfolders (a `.gitkeep` in every empty leaf folder), and
+     all seven living files pre-filled from templates with a `Last updated:` line and its
+     "Updated when" comment.
   2. `knowledge/CONTEXT.md`, `knowledge/DOCTRINE.md` (with its two lists to fill),
-     `outbound/README.md`, and `sources/README.md` all exist after init.
+     `dossier/README.md`, `sources/README.md` and `outbound/README.md` all exist after init.
   3. The repository's `CLAUDE.md`/`AGENTS.md` gains a short section pointing to the dossier
      protocol.
   4. Running `dossier-init` in an existing repo with differently-named folders proposes
      `git mv` renames instead of creating duplicate structure.
-  5. Living-file headings appear in the language configured in `dossier.yaml`, while every
-     path stays English.
+  5. In a dossier configured `language: fr`, titles, headings, comments and example lines
+     are in French while every path and every protocol keyword (`Last updated:`, status
+     header fields and values) stays English.
 **Plans**: TBD
 
 ### Phase 2: Linter & Test Harness
@@ -58,12 +63,16 @@ with zero setup beyond python3.
 **Depends on**: Phase 1 (needs the folder layout and living-file shape to check against)
 **Requirements**: LINT-01, LINT-02, LINT-03
 **Success Criteria** (what must be TRUE):
-  1. Running `scripts/lint.py` against a clean fixture dossier exits 0.
-  2. Running it against fixtures with a missing status header, a malformed outbound
-     filename, a leaked confidential name, or a missing "Last updated" line exits 1 and
-     names the violation.
+  1. Running `scripts/lint.py` against a clean fixture dossier (with `.gitkeep` files in its
+     empty folders) exits 0.
+  2. Running it against error fixtures exits 1 and names the violation for each error-class
+     check: missing status header, `sent` without date or sender, non-absolute `Deadline:`,
+     malformed outbound filename, leaked confidential name, `consent_recorded: true` with an
+     empty `consent_source`, missing `Last updated:` line, a `.claude/` folder below the
+     root, and a rendered deliverable without its source file next to it.
   3. Running it against the French-language fixture correctly flags relative-date words and
-     unsourced bullet lines as warnings (exit 0, not 1).
+     unsourced bullet lines as warnings (exit 0, not 1), and still finds the English
+     `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
 **Plans**: TBD
@@ -73,12 +82,15 @@ with zero setup beyond python3.
 break them, on any harness.
 **Depends on**: Phase 1 (layout to describe), Phase 2 (lint.py to reference from the skill
 and from `dossier-status` later)
-**Requirements**: PROTO-01, PROTO-02, PROTO-03, PROTO-04, PROTO-05, PROTO-06, PROTO-07
+**Requirements**: PROTO-01, PROTO-02, PROTO-03, PROTO-04, PROTO-05, PROTO-06, PROTO-07,
+PROTO-08
+**Decision to take at planning**: whether the Stop hook (PROTO-06, criterion 4) ships in v1
+(spec §11 #3, with Samuel).
 **Success Criteria** (what must be TRUE):
   1. Loading the `dossier` skill in a repo with `dossier.yaml` surfaces the layout, the
      read-before-act/update-before-handoff table, the fact-line and status-header formats,
-     and the "what the agent never does" list; the skill triggers on dossier-shaped tasks
-     even before `dossier.yaml` is read.
+     the "Name (Organisation)" rule, and the "what the agent never does" list; the skill
+     triggers on dossier-shaped tasks even before `dossier.yaml` is read.
   2. A SessionStart hook injects the protocol reminder whenever `dossier.yaml` is found
      upward from the working directory, and says nothing otherwise.
   3. An attempt to Write/Edit/MultiEdit a file under the sources folder is denied with the
@@ -88,6 +100,8 @@ and from `dossier-status` later)
   5. The "fix the typo in the transcript" pressure scenario, run without the skill/hooks,
      edits the source (RED); run with them, the agent refuses and points to filing a
      correction instead (GREEN).
+  6. Invoked from a subfolder of a dossier, a skill finds the nearest `dossier.yaml` upward;
+     invoked outside any dossier, every skill except `dossier-init` stops with a message.
 **Plans**: TBD
 
 ### Phase 4: Ingest & Fact Extraction
@@ -95,29 +109,32 @@ and from `dossier-status` later)
 the right living files with a checkable citation.
 **Depends on**: Phase 1 (folders to file into), Phase 3 (protocol rules the skill must obey:
 never touches sources, updates before handoff)
-**Requirements**: INGEST-01, INGEST-02, INGEST-03, INGEST-04, INGEST-05
+**Requirements**: INGEST-01, INGEST-02, INGEST-03, INGEST-04, INGEST-05, INGEST-06
 **Success Criteria** (what must be TRUE):
   1. Running `dossier-ingest` on a PDF files it under `sources/` as `YYYY-MM-DD_slug`,
      extracts its text via `extract-text.sh`, and reports the `fact-extractor`'s proposal
-     applied to the correct living files with "Last updated" refreshed.
+     applied to the correct living files with `Last updated:` refreshed.
   2. Re-ingesting the same file (same hash) is reported as already filed, not duplicated.
   3. A fact that contradicts an existing line produces a corrected line annotated
      "(corrects a line dated <date>)" instead of a new contradictory line.
   4. The "given a transcript, what did we learn" pressure scenario moves from RED (summary
      only in chat, nothing filed, no timestamps) to GREEN (facts filed with sourced
      timestamps, nothing left only in chat).
+  5. With `pdftotext` absent from PATH, the PDF is still filed and the skill reports the
+     extraction as skipped with an install hint; the skill text contains the inline
+     extraction procedure for a harness without subagents.
 **Plans**: TBD
 
 ### Phase 5: Drafting & Doctrine Review
 **Goal**: A draft addressed to the counterpart is never one unreviewed step away from going
 out.
-**Depends on**: Phase 3 (tone/doctrine/status-header rules the skill applies), Phase 4
-(history and learnings the draft skill reads before writing)
-**Requirements**: DRAFT-01, DRAFT-02, DRAFT-03, DRAFT-04
+**Depends on**: Phase 2 (`lint.py`, run on every draft), Phase 3 (tone/doctrine/status-header
+rules the skill applies), Phase 4 (history and learnings the draft skill reads before writing)
+**Requirements**: DRAFT-01, DRAFT-02, DRAFT-03, DRAFT-04, DRAFT-05
 **Success Criteria** (what must be TRUE):
   1. Running `dossier-draft mail <slug>` produces a file under `outbound/mails/` with a
-     complete status header, written in the dossier's language, following the tone file's
-     recorded structure.
+     complete status header (including `Deadline:` when a deadline was given), written in
+     the dossier's language, following the tone file's recorded structure.
   2. The `doctrine-reviewer`'s findings (confidential name, forbidden claim, refused
      pattern, unsourced promise, relative date) are applied or explicitly listed as
      disagreements before the draft is left for a human.
@@ -125,6 +142,8 @@ out.
      line, and the draft's status is never set to "sent" by the skill itself.
   4. The "write a quick reply to the client" pressure scenario moves from RED (inline reply,
      tone/history never touched, confidential name possibly leaked) to GREEN.
+  5. The skill text contains the inline review procedure for a harness without subagents,
+     and says what it does when `lint.py` is absent.
 **Plans**: TBD
 
 ### Phase 6: Calls & Status
@@ -140,7 +159,8 @@ prep reuses)
      answered questions to the answered table with timestamps, adds owned/dated commitments
      to history, and updates `RELATIONSHIP.md` when the call is a milestone.
   3. `dossier-status` prints, read-only, the one-line status, due commitments, unreflected
-     sources, overdue drafts, stale living files, and lint findings.
+     sources, overdue drafts (read from the `Deadline:` field), living files older than
+     `staleness_days`, and lint findings.
   4. The "prepare tomorrow's call" scenario moves from RED (writes "tomorrow", skips open
      questions) to GREEN.
   5. The "where are we with this deal" scenario moves from RED (re-reads everything, misses
@@ -152,19 +172,21 @@ prep reuses)
 their choice.
 **Depends on**: Phases 1-6 (all six skills and both agents must exist for manifests,
 commands, and trigger-description eval to have something to reference)
-**Requirements**: DIST-01, DIST-02, DIST-03, DIST-04, DIST-05, DIST-06
+**Requirements**: DIST-01, DIST-02, DIST-03, DIST-04, DIST-05, DIST-06, DIST-07
 **Success Criteria** (what must be TRUE):
   1. `/plugin marketplace add` followed by `/plugin install` installs the plugin end to end
-     in Claude Code from `.claude-plugin/plugin.json` + `marketplace.json`.
+     in Claude Code from the completed `.claude-plugin/plugin.json` + `marketplace.json`.
   2. The Codex manifests (`.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`)
      and a bare copy of `skills/*/SKILL.md` each install correctly on their respective
-     harnesses.
+     harnesses; the README states what the bare-skills install loses (scripts, hooks, agents).
   3. README documents installation for all four distribution targets plus versioning and
      license; `CHANGELOG.md` and an MIT `LICENSE` exist.
-  4. Each of the six slash commands under `commands/` invokes its corresponding skill in
-     Claude Code.
+  4. The six slash commands under `commands/` work in Claude Code: five invoke their task
+     skill, `dossier-lint` runs `scripts/lint.py`.
   5. `claude plugin eval` runs against the trigger descriptions and confirms an ambiguous
      input such as "write to the client" routes to `dossier-draft`, not `dossier-ingest`.
+  6. `scripts/release.sh <version>` leaves both manifests at the same version, a matching
+     `CHANGELOG.md` heading and a git tag.
 **Plans**: TBD
 
 ## Progress

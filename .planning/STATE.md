@@ -25,9 +25,9 @@ human and a doctrine check.
 Phase: 1 of 7 (Scaffold & Templates)
 Plan: none yet — phase not planned
 Status: Ready to plan
-Last activity: 2026-09-16 — project bootstrapped via `gsd-ingest-docs` from
-`docs/superpowers/specs/2026-09-16-client-dossier-design.md`; ROADMAP.md and REQUIREMENTS.md
-created; repo-root CLAUDE.md added this session. No code written yet.
+Last activity: 2026-09-16 — spec reviewed and approved (§11 decisions settled, four
+contradictions resolved); REQUIREMENTS.md (42 reqs), ROADMAP.md, PROJECT.md and CLAUDE.md
+resynchronised with it. No code written yet.
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -67,12 +67,11 @@ None yet.
 
 ### Blockers/Concerns
 
-- **Open naming decisions (PROJECT.md § Open Decisions) must be settled before or during
-  Phase 1 planning**: (1) final plugin name (`client-dossier` vs `dossier` vs other), (2)
-  `dossier/` vs `relationship/` and `outbound/` vs `communication/` folder names — fixed
-  once Phase 1 hard-codes them into `dossier-init`, templates, and the Phase 2 linter, (3)
-  whether the Stop hook ships in v1 (Phase 3 scope). None of these are locked; do not assume
-  the spec's provisional defaults without confirming with the user.
+- None blocking Phase 1. Naming decisions settled 2026-09-16 (PROJECT.md Key Decisions).
+- **Phase 3 planning must decide** whether the Stop hook ships in v1 (spec §11 #3), with
+  Samuel — not unilaterally.
+- `pdftotext` (poppler) is an external dependency of Phase 4 with a defined fallback; check
+  it is installed on the dev machine before Phase 4.
 
 ## Deferred Items
 
@@ -83,7 +82,6 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-09-16
-Stopped at: ROADMAP.md, REQUIREMENTS.md, PROJECT.md, STATE.md written from ingested spec;
-awaiting roadmap approval.
-Resume file: None — next step is `/gsd-discuss-phase 1` (or `/gsd-plan-phase 1`), after the
-open naming decisions above are resolved.
+Stopped at: spec approved and planning resynchronised; roadmap approved by Samuel
+(2026-09-16).
+Resume file: None — next step is `/gsd-discuss-phase 1` then `/gsd-plan-phase 1`.

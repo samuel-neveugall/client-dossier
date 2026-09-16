@@ -1,0 +1,3 @@
+# Local agent memory and session artefacts (VibeFlow lab memory, never shared)
+.claude/
+.DS_Store
