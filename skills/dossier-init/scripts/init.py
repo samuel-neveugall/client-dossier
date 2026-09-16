@@ -75,6 +75,24 @@ TEMPLATE_MAP = {
 # The line a rendered living-file template carries before substitution.
 _LAST_UPDATED_RE = re.compile(r"^(Last updated:[ \t]*)YYYY-MM-DD[ \t]*$", re.MULTILINE)
 
+# The two marker comments delimiting the protocol-pointer section this
+# script upserts into AGENTS.md and CLAUDE.md (D-16, SCAF-05). Anchors, not
+# prose: every future run and every future revision of the pointer body
+# keys off these two exact strings, so they live here once, as module-level
+# constants, and nowhere else in this file.
+MARKER_START = "<!-- client-dossier:start -->"
+MARKER_END = "<!-- client-dossier:end -->"
+
+
+class MarkerSectionError(Exception):
+    """The target's marker pair is ambiguous or malformed.
+
+    Raised instead of guessing: a start marker with no end (or two of
+    either), or an end marker before a start, could mean the span was hand-
+    edited into an unrecognisable shape. Guessing where it begins or ends
+    risks deleting a person's own instructions file.
+    """
+
 
 def yaml_quote(value):
     """Return a double-quoted YAML scalar, safe for any user-supplied string.
@@ -160,15 +178,27 @@ def under_root(root, path):
     return os.path.commonpath([resolved_root, resolved_path]) == resolved_root
 
 
-def resolve_template_dir(templates_root, language, variant):
+def resolve_template_dir(templates_root, language, variant, required_names):
     """Decide which templates/<name>/ directory to scaffold from (D-09).
 
+    `required_names` lists the template filenames that must all be present
+    as regular files under a candidate directory for it to count as usable.
+    A directory that merely exists but is missing one of them -- a variant
+    translated file by file, or (in this repository, mid-phase) a sibling
+    plan's templates not yet landed on this branch -- is treated exactly
+    like a variant that does not exist at all, and falls back the same way.
+    This is what lets one function resolve both the twelve-file scaffold
+    body and the single-file AGENTS-pointer.md pointer independently from
+    the same --language/--template-variant pair, without ever splicing two
+    languages into one written file.
+
     - an explicit `variant` wins outright. If `templates_root/<variant>/`
-      does not exist (or would resolve outside `templates_root`), the
-      caller must report the name on stderr and exit before writing
-      anything -- this function signals that case by returning `None` as
-      the first element.
-    - otherwise, if `templates_root/<language>/` exists, use it.
+      does not exist (or would resolve outside `templates_root`), or is
+      missing any name in `required_names`, the caller must report the
+      name on stderr and exit before writing anything -- this function
+      signals that case by returning `None` as the first element.
+    - otherwise, if `templates_root/<language>/` exists and holds every
+      name in `required_names`, use it.
     - otherwise fall back to `templates_root/en/`, and say so: the caller
       prints the fallback note as part of the `templates: <variant>`
       report line, which is the mechanical handoff to the skill's
@@ -176,14 +206,26 @@ def resolve_template_dir(templates_root, language, variant):
 
     Returns (path_or_none, report_variant, fallback_note_or_none).
     """
+
+    def has_all_required(candidate_dir):
+        return all((candidate_dir / name).is_file() for name in required_names)
+
     if variant:
         variant_dir = templates_root / variant
-        if not under_root(templates_root, variant_dir) or not variant_dir.is_dir():
+        if (
+            not under_root(templates_root, variant_dir)
+            or not variant_dir.is_dir()
+            or not has_all_required(variant_dir)
+        ):
             return None, variant, None
         return variant_dir, variant, None
 
     language_dir = templates_root / language
-    if under_root(templates_root, language_dir) and language_dir.is_dir():
+    if (
+        under_root(templates_root, language_dir)
+        and language_dir.is_dir()
+        and has_all_required(language_dir)
+    ):
         return language_dir, language, None
 
     fallback_note = (
@@ -208,6 +250,80 @@ def write_if_missing(path, text):
     with open(path, "w", encoding="utf-8") as handle:
         handle.write(text)
     return "created"
+
+
+def upsert_marker_section(path, body):
+    """Create, append, or in-place-update the marker-delimited section at `path`.
+
+    Returns "created", "appended", "updated", or "unchanged". This is the
+    one write path in this script that does not go through
+    write_if_missing(), and that is deliberate: `path` may already exist
+    without the section, so "skip because it exists" (D-08's rule
+    everywhere else) would silently do nothing here (RESEARCH Pitfall 7).
+
+    - target absent -> "created": the file is written containing the start
+      marker, the body, the end marker, and nothing else.
+    - target exists, zero of each marker -> "appended": the block is added
+      after the existing content, separated by one blank line; every
+      pre-existing byte is preserved.
+    - target exists, exactly one of each marker, start before end ->
+      "updated" (or "unchanged" when the new text is byte-identical to the
+      old, which is what makes a second identical run a no-op): only the
+      span from the start marker through the end marker inclusive is
+      replaced; the text before and after is preserved byte for byte.
+    - any other marker count, or an end marker before a start marker ->
+      raises MarkerSectionError naming `path`, having written nothing to
+      it. Guessing where an ambiguous section begins or ends could delete
+      a person's own instructions.
+    """
+    block = MARKER_START + "\n" + body.strip() + "\n" + MARKER_END + "\n"
+
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as handle:
+            existing = handle.read()
+    else:
+        existing = None
+
+    if existing is None:
+        new_text = block
+        result = "created"
+    else:
+        start_count = existing.count(MARKER_START)
+        end_count = existing.count(MARKER_END)
+
+        if start_count == 0 and end_count == 0:
+            new_text = existing + "\n" + block
+            result = "appended"
+        elif start_count == 1 and end_count == 1:
+            start_index = existing.index(MARKER_START)
+            end_index = existing.index(MARKER_END)
+            if end_index < start_index:
+                raise MarkerSectionError(
+                    "{}: end marker appears before start marker".format(path)
+                )
+            span_end = end_index + len(MARKER_END)
+            # Consume a single trailing newline after the end marker, if
+            # present, so re-splicing does not grow a blank line on every
+            # update.
+            if span_end < len(existing) and existing[span_end] == "\n":
+                span_end += 1
+            new_text = existing[:start_index] + block + existing[span_end:]
+            result = "updated"
+        else:
+            raise MarkerSectionError(
+                "{}: ambiguous marker section ({} start, {} end) -- refusing "
+                "to guess where it begins or ends".format(path, start_count, end_count)
+            )
+
+        if new_text == existing:
+            return "unchanged"
+
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(new_text)
+    return result
 
 
 def build_parser():
@@ -252,10 +368,14 @@ def main(argv=None):
         return 1
 
     # Resolve the template variant before any write, so an unknown
-    # --template-variant aborts having written nothing (T-01-10).
+    # --template-variant aborts having written nothing (T-01-10). Required
+    # against the twelve-file scaffold body specifically -- the pointer
+    # (read further down, after these are written) resolves independently
+    # against its own single file, so one incomplete variant never forces
+    # the other artifact into the wrong language.
     templates_root = Path(__file__).resolve().parent.parent / "templates"
     templates_dir, report_variant, fallback_note = resolve_template_dir(
-        templates_root, args.language, args.template_variant
+        templates_root, args.language, args.template_variant, tuple(TEMPLATE_MAP.keys())
     )
     if templates_dir is None:
         print(
@@ -324,6 +444,51 @@ def main(argv=None):
 
     for status, relative_path in results:
         print("{}: {}".format(status, relative_path))
+
+    # Protocol pointer (SCAF-05, D-16): AGENTS.md always, CLAUDE.md only
+    # when it already exists, both marker-delimited via
+    # upsert_marker_section() so a re-run updates the section in place
+    # rather than duplicating it. Resolved against its own single required
+    # file -- see the comment on the call above.
+    pointer_dir, _pointer_variant, _pointer_fallback_note = resolve_template_dir(
+        templates_root, args.language, args.template_variant, ("AGENTS-pointer.md",)
+    )
+    if pointer_dir is None:
+        print(
+            "error: unknown --template-variant {!r}: {} is missing AGENTS-pointer.md".format(
+                args.template_variant, templates_root / args.template_variant
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    with open(pointer_dir / "AGENTS-pointer.md", "r", encoding="utf-8") as handle:
+        pointer_body = render_template(handle.read(), today)
+
+    agents_md_path = os.path.join(target_root, "AGENTS.md")
+    if not under_root(target_root, agents_md_path):
+        print("error: refusing to write {} outside the target root".format(agents_md_path), file=sys.stderr)
+        return 1
+    try:
+        agents_result = upsert_marker_section(agents_md_path, pointer_body)
+    except MarkerSectionError as exc:
+        print("error: {}".format(exc), file=sys.stderr)
+        return 1
+    print("pointer: {} AGENTS.md".format(agents_result))
+
+    claude_md_path = os.path.join(target_root, "CLAUDE.md")
+    if not under_root(target_root, claude_md_path):
+        print("error: refusing to write {} outside the target root".format(claude_md_path), file=sys.stderr)
+        return 1
+    if os.path.exists(claude_md_path):
+        try:
+            claude_result = upsert_marker_section(claude_md_path, pointer_body)
+        except MarkerSectionError as exc:
+            print("error: {}".format(exc), file=sys.stderr)
+            return 1
+        print("pointer: {} CLAUDE.md".format(claude_result))
+    else:
+        print("pointer: skipped CLAUDE.md (absent)")
 
     created_count = sum(1 for status, _ in results if status == "created")
     kept_count = sum(1 for status, _ in results if status == "kept")
