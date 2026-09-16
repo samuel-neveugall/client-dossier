@@ -4,10 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## State of the repository
 
-Spec-only. The single source of truth is `docs/superpowers/specs/2026-09-16-client-dossier-design.md`
-(status: approved for implementation, 2026-09-16). No code, manifest, script or test exists yet.
-Read the spec before any work; when this file and the spec disagree, the spec wins and this
-file must be updated. Planning lives in `.planning/` (GSD): ROADMAP, REQUIREMENTS, STATE.
+The single source of truth is `docs/superpowers/specs/2026-09-16-client-dossier-design.md`
+(status: approved for implementation, 2026-09-16). Phase 1 (scaffold-templates) has landed a
+`dossier-init` skill with its bundled script and templates, a minimal `.claude-plugin/plugin.json`,
+and a bash test suite under `tests/`. Read the spec before any work; when this file and the spec
+disagree, the spec wins and this file must be updated. Planning lives in `.planning/` (GSD):
+ROADMAP, REQUIREMENTS, STATE.
 
 Language: the plugin (skills, agents, scripts, docs, commit messages) is written in English.
 Dossier *content* produced by the plugin is in the language configured in `dossier.yaml`.
@@ -46,7 +48,13 @@ Division of responsibility, which decides where any new behaviour goes:
   (situations, not features).
 - **Scripts carry mechanics.** Anything a regex can check belongs in `scripts/lint.py`, not in
   skill prose. `lint.py` is Python 3 standard library only (tiny YAML-subset parser, JSON
-  fallback); exit 1 on errors, 0 on warnings only.
+  fallback); exit 1 on errors, 0 on warnings only. A skill's own *private* mechanics and
+  resources are bundled inside its own folder instead: `skills/dossier-init/scripts/init.py`
+  and `skills/dossier-init/templates/{en,fr}/`, referenced from `SKILL.md` as
+  `${CLAUDE_SKILL_DIR}/…`, never by a relative path. A script shared by several skills stays at
+  the repository-root `scripts/`, which is the rule that keeps `lint.py` where it is — see D-05
+  and D-06 of `.planning/phases/01-scaffold-templates/01-CONTEXT.md`; spec §4's tree was amended
+  in Phase 1 to match. Scripts target **Python 3.8 or newer**, standard library only.
 - **Hooks carry reminders** (`hooks/hooks.json`): SessionStart injects a pointer when a
   `dossier.yaml` is found upward, PreToolUse denies writes under `sources/`, Stop warns (never
   blocks) when outbound/sources changed without the dossier. Hooks never do work, and every rule
@@ -92,7 +100,9 @@ status → manifests and distribution.
   minimal `.claude-plugin/plugin.json` exists from Phase 1 for that purpose; the full
   manifests come in Phase 7.
 
-No build, lint or test commands exist yet; add them here as they are created.
+Commands that exist today: `bash tests/run.sh` (the full test suite), `claude plugin validate . --strict`
+(the manifest), and `claude --plugin-dir .` (load the plugin from the working copy during
+development). Add more here as they are created.
 
 ## Decisions (spec §11, settled 2026-09-16)
 
