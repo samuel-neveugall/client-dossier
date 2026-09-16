@@ -186,3 +186,12 @@ None - no external service configuration required.
 ---
 *Phase: 01-scaffold-templates*
 *Completed: 2026-09-16*
+
+## Self-Check: PASSED
+
+All 4 created/modified files verified present on disk: `tests/fixtures/make-adopt-fixture.sh`,
+`tests/golden/adopt-proposal.txt`, `tests/test-init-adopt.sh` (all created);
+`skills/dossier-init/scripts/init.py` verified modified. Both task commit hashes (`653dc35`,
+`c0d2059`) verified present via `git cat-file -e <hash>`. Commit count measured against
+`plan_head_before` (`fc107add`) at SUMMARY-write time (before this docs commit):
+`git rev-list --count fc107add..c0d2059` = 2, matching `actuals.commits`.
