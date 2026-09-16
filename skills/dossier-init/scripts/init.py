@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+# vibeflow:allow-large-file -- mechanics-tier scaffold script; grew past the
+# 300-line guard when plan 01-02 wired the eleven remaining templates and
+# resolve_template_dir(). Splitting deferred: TEMPLATE_MAP, the write loop
+# and the variant resolution are one cohesive scaffold pass (plan 01-01's
+# established pattern). Tracked in 01-02-SUMMARY.md and .planning/WINDOWS.md.
 """Scaffold a client-dossier repository.
 
 Mechanics tier only (spec principle: "skills carry the judgement, scripts
@@ -49,9 +54,22 @@ GITKEEP_LEAVES = (
 )
 
 # Ordered mapping: bundled template filename -> target path under the
-# dossier root. This task fills in one row; plan 01-02 fills in the rest.
+# dossier root. Order matches spec Sec3.2 scaffold order, so the report
+# reads top-down: the seven living files, the two knowledge stubs, then
+# the three folder READMEs (each renamed to README.md at its target).
 TEMPLATE_MAP = {
     "ACTORS.md": "dossier/ACTORS.md",
+    "HISTORY.md": "dossier/HISTORY.md",
+    "LEARNINGS.md": "dossier/LEARNINGS.md",
+    "TONE.md": "dossier/TONE.md",
+    "CHANNELS.md": "dossier/CHANNELS.md",
+    "OPEN-QUESTIONS.md": "dossier/OPEN-QUESTIONS.md",
+    "RELATIONSHIP.md": "dossier/RELATIONSHIP.md",
+    "CONTEXT.md": "knowledge/CONTEXT.md",
+    "DOCTRINE.md": "knowledge/DOCTRINE.md",
+    "README-dossier.md": "dossier/README.md",
+    "README-sources.md": "sources/README.md",
+    "README-outbound.md": "outbound/README.md",
 }
 
 # The line a rendered living-file template carries before substitution.
@@ -142,6 +160,39 @@ def under_root(root, path):
     return os.path.commonpath([resolved_root, resolved_path]) == resolved_root
 
 
+def resolve_template_dir(templates_root, language, variant):
+    """Decide which templates/<name>/ directory to scaffold from (D-09).
+
+    - an explicit `variant` wins outright. If `templates_root/<variant>/`
+      does not exist (or would resolve outside `templates_root`), the
+      caller must report the name on stderr and exit before writing
+      anything -- this function signals that case by returning `None` as
+      the first element.
+    - otherwise, if `templates_root/<language>/` exists, use it.
+    - otherwise fall back to `templates_root/en/`, and say so: the caller
+      prints the fallback note as part of the `templates: <variant>`
+      report line, which is the mechanical handoff to the skill's
+      translation step (SCAF-07) -- this script never translates anything.
+
+    Returns (path_or_none, report_variant, fallback_note_or_none).
+    """
+    if variant:
+        variant_dir = templates_root / variant
+        if not under_root(templates_root, variant_dir) or not variant_dir.is_dir():
+            return None, variant, None
+        return variant_dir, variant, None
+
+    language_dir = templates_root / language
+    if under_root(templates_root, language_dir) and language_dir.is_dir():
+        return language_dir, language, None
+
+    fallback_note = (
+        "requested language {!r} has no template variant; scaffolded from "
+        "templates/en/ -- translate the created files".format(language)
+    )
+    return templates_root / "en", "en", fallback_note
+
+
 def write_if_missing(path, text):
     """Write `text` to `path` only if it does not already exist.
 
@@ -165,6 +216,11 @@ def build_parser():
     )
     parser.add_argument("--target", default=".", help="Path to the repository to scaffold.")
     parser.add_argument("--language", default="en", help="Dossier content language code.")
+    parser.add_argument(
+        "--template-variant",
+        default=None,
+        help="Force a specific templates/<name>/ directory, overriding --language resolution.",
+    )
     parser.add_argument(
         "--counterpart",
         action="append",
@@ -194,6 +250,26 @@ def main(argv=None):
     if not os.path.isdir(target_root):
         print("error: --target {!r} is not a directory".format(args.target), file=sys.stderr)
         return 1
+
+    # Resolve the template variant before any write, so an unknown
+    # --template-variant aborts having written nothing (T-01-10).
+    templates_root = Path(__file__).resolve().parent.parent / "templates"
+    templates_dir, report_variant, fallback_note = resolve_template_dir(
+        templates_root, args.language, args.template_variant
+    )
+    if templates_dir is None:
+        print(
+            "error: unknown --template-variant {!r}: {} does not exist".format(
+                args.template_variant, templates_root / args.template_variant
+            ),
+            file=sys.stderr,
+        )
+        return 1
+
+    if fallback_note:
+        print("templates: {} ({})".format(report_variant, fallback_note))
+    else:
+        print("templates: {}".format(report_variant))
 
     results = []
 
@@ -233,7 +309,6 @@ def main(argv=None):
     results.append((status, "dossier.yaml"))
 
     today = datetime.date.today().isoformat()
-    templates_dir = Path(__file__).resolve().parent.parent / "templates" / args.language
 
     for template_name, target_rel in TEMPLATE_MAP.items():
         template_path = templates_dir / template_name
