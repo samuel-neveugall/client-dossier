@@ -58,29 +58,37 @@ correctly laid-out dossier in one step.
   5. In a dossier configured `language: fr`, titles, headings, comments and example lines
      are in French while every path and every protocol keyword (`Last updated:`, status
      header fields and values) stays English.
-**Plans**: 6 plans
+**Plans**: 6 plans (all executed; phase implementation complete and mechanically verified —
+see note below)
 
 Plans:
 **Wave 1**
 
-- [ ] 01-01-PLAN.md — tracer: `init.py` scaffolds an empty repo (config, folders, `.gitkeep`, one living file) behind a loadable plugin manifest
+- [x] 01-01-PLAN.md — tracer: `init.py` scaffolds an empty repo (config, folders, `.gitkeep`, one living file) behind a loadable plugin manifest
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — the eleven remaining English templates, the full template map and language-variant resolution
+- [x] 01-02-PLAN.md — the eleven remaining English templates, the full template map and language-variant resolution
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — the French template variant, English keywords intact
-- [ ] 01-04-PLAN.md — the marker-delimited protocol pointer in `AGENTS.md` and `CLAUDE.md`
+- [x] 01-03-PLAN.md — the French template variant, English keywords intact
+- [x] 01-04-PLAN.md — the marker-delimited protocol pointer in `AGENTS.md` and `CLAUDE.md`
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 01-05-PLAN.md — adoption: rename detection and the read-only `git mv` proposal
+- [x] 01-05-PLAN.md — adoption: rename detection and the read-only `git mv` proposal
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 01-06-PLAN.md — the skill's judgement body, plus the spec §4 and `CLAUDE.md` amendments
+- [x] 01-06-PLAN.md — the skill's judgement body, plus the spec §4 and `CLAUDE.md` amendments
+
+**Status note (2026-09-16):** all 6 plans executed; independent acceptance re-verification
+found SCAF-01…08 (8/8) and the phase's 5 ROADMAP success criteria (5/5) reproduced after 3
+rounds of review/fix, including SCAF-06 replayed against the real origin repository under the
+confidentiality protocol. Threat T-01-01 closed, confidentiality guarantee D-13 confirmed, no
+safety regression. Phase is **not** marked complete: `human_verify_mode: end-of-phase` still
+requires a live human recette before closure.
 
 ### Phase 2: Linter & Test Harness
 
@@ -88,6 +96,22 @@ Plans:
 with zero setup beyond python3.
 **Depends on**: Phase 1 (needs the folder layout and living-file shape to check against)
 **Requirements**: LINT-01, LINT-02, LINT-03
+**Carried-over debt from Phase 1** (found during the Phase 1 review loop, deferred rather than
+fixed in a 4th correction round — resolve when writing `lint.py`'s YAML-subset parser, so
+producer and consumer are aligned in one move):
+
+  - **(a) YAML 1.1 reserved words.** `init.py`'s `_SAFE_PLAIN_SCALAR_RE`
+    (`^[A-Za-z][A-Za-z0-9_-]*$`) lets `yes`, `no`, `on`, `off`, `true`, `false`, `null`, `y`,
+    `n` through unquoted. Concretely: `no` is the ISO 639-1 code for Norwegian, so
+    `--language no` writes `language: no`, which a strict YAML parser reads back as boolean
+    `False`, not the string `"no"`. Not a vulnerability (no key injection possible;
+    `consent_recorded` is out of reach) — a typing fidelity gap. Either tighten the producer's
+    allowlist or have `lint.py`'s parser read these fields as strings regardless of spelling.
+  - **(b) Regex anchoring.** Same regex: Python's `$` also matches just before a trailing
+    `\n`, where `\Z` (or `re.fullmatch`) would be strict. A value ending in a newline passes
+    the allowlist and leaves a blank line in the file. No key injection — cosmetic, but a real
+    bypass of the guard. One-line fix, bundle with (a).
+
 **Success Criteria** (what must be TRUE):
 
   1. Running `scripts/lint.py` against a clean fixture dossier (with `.gitkeep` files in its
@@ -233,7 +257,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Scaffold & Templates | 0/6 | Planned | - |
+| 1. Scaffold & Templates | 6/6 | Implemented, verified — closure pending human recette | - |
 | 2. Linter & Test Harness | 0/TBD | Not started | - |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |

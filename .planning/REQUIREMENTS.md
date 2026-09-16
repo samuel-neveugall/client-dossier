@@ -16,29 +16,29 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Scaffold (dossier-init, templates, dossier.yaml)
 
-- [ ] **SCAF-01**: `dossier-init` writes `dossier.yaml` with version, language, counterparts
+- [x] **SCAF-01**: `dossier-init` writes `dossier.yaml` with version, language, counterparts
       (name/role/contacts), confidential_names, consent_recorded, consent_source, timestamps
       format, date_format, status_header setting, and staleness_days (default 7)
-- [ ] **SCAF-02**: `dossier-init` creates the four-folder layout (`sources/`, `dossier/`,
+- [x] **SCAF-02**: `dossier-init` creates the four-folder layout (`sources/`, `dossier/`,
       `knowledge/`, `outbound/`) with their documented subfolders, each empty leaf folder
       holding a `.gitkeep` so the layout survives a git clone
-- [ ] **SCAF-03**: `dossier-init` scaffolds all seven living-dossier files from templates,
+- [x] **SCAF-03**: `dossier-init` scaffolds all seven living-dossier files from templates,
       each pre-filled with a `Last updated:` line and its "Updated when" rule as a comment
-- [ ] **SCAF-04**: `dossier-init` creates `knowledge/CONTEXT.md`, `knowledge/DOCTRINE.md`
+- [x] **SCAF-04**: `dossier-init` creates `knowledge/CONTEXT.md`, `knowledge/DOCTRINE.md`
       (with the "what we say" / "what we never say" lists to fill), and one README per
       top-level folder that needs one: `dossier/README.md`, `sources/README.md`,
       `outbound/README.md` (restating the status header, the naming rule and the role of the
       three outbound subfolders)
-- [ ] **SCAF-05**: `dossier-init` adds a short protocol-pointer section to the repository's
+- [x] **SCAF-05**: `dossier-init` adds a short protocol-pointer section to the repository's
       `CLAUDE.md`/`AGENTS.md`
-- [ ] **SCAF-06**: On an existing repository, `dossier-init` detects same-role folders under
+- [x] **SCAF-06**: On an existing repository, `dossier-init` detects same-role folders under
       other names and proposes `git mv` renames to the fixed English names before writing
       what is missing
-- [ ] **SCAF-07**: Templates are authored once in English structure; `dossier-init`
+- [x] **SCAF-07**: Templates are authored once in English structure; `dossier-init`
       translates title, headings, comments and example lines into the configured language at
       scaffold time, and leaves protocol keywords (`Last updated:`, status-header field names
       and values) in English
-- [ ] **SCAF-08**: A minimal `.claude-plugin/plugin.json` (name, version, description) exists
+- [x] **SCAF-08**: A minimal `.claude-plugin/plugin.json` (name, version, description) exists
       so that `claude --plugin-dir .` loads the plugin from the working copy during development
 
 ### Linter (scripts/lint.py, fixtures, bash test runner)
@@ -196,14 +196,14 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCAF-01 | Phase 1 | Pending |
-| SCAF-02 | Phase 1 | Pending |
-| SCAF-03 | Phase 1 | Pending |
-| SCAF-04 | Phase 1 | Pending |
-| SCAF-05 | Phase 1 | Pending |
-| SCAF-06 | Phase 1 | Pending |
-| SCAF-07 | Phase 1 | Pending |
-| SCAF-08 | Phase 1 | Pending |
+| SCAF-01 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-02 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-03 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-04 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-05 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-06 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-07 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-08 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
 | LINT-01 | Phase 2 | Pending |
 | LINT-02 | Phase 2 | Pending |
 | LINT-03 | Phase 2 | Pending |
