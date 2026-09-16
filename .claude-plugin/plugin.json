@@ -1,0 +1,5 @@
+{
+  "name": "client-dossier",
+  "description": "Turns a git repository into the memory and workbench of a relationship with an external party: immutable sources, a living dossier where every fact is dated and sourced, and an outbound folder where only a human sends a doctrine-checked draft.",
+  "version": "0.1.0"
+}
