@@ -145,7 +145,8 @@ the identical procedure, stated completely enough to reproduce it without the sc
   given), `confidential_names`, `consent_recorded`, `consent_source`, `timestamps`,
   `date_format`, `status_header`, `staleness_days`.
 - Create the twelve files below, each opened with today's date on its `Last updated:` line
-  (the two knowledge stubs carry no such line), from the chosen template variant, translating
+  (the two knowledge stubs and the three READMEs carry no such line), from the chosen template
+  variant, translating
   as step 5 says when the variant is not hand-maintained:
   - `dossier/ACTORS.md`, `dossier/HISTORY.md`, `dossier/LEARNINGS.md`, `dossier/TONE.md`,
     `dossier/CHANNELS.md`, `dossier/OPEN-QUESTIONS.md`, `dossier/RELATIONSHIP.md`
