@@ -205,7 +205,15 @@ client-dossier/
   .agents/plugins/marketplace.json    Codex marketplace listing
   skills/
     dossier/SKILL.md                  the protocol: layout, read-before-act, update-before-handoff
-    dossier-init/SKILL.md             scaffold a dossier
+    dossier-init/                     scaffold a dossier
+      SKILL.md                        judgement: the grouped question, language inference, rename proposal
+      scripts/
+        init.py                       mechanics tier, referenced as ${CLAUDE_SKILL_DIR}/scripts/init.py
+      templates/
+        en/                           twelve template files (seven living files, two knowledge
+                                       stubs, three folder READMEs) plus AGENTS-pointer.md, the
+                                       protocol-pointer body upserted into AGENTS.md/CLAUDE.md
+        fr/                           the same thirteen files, French headings, English protocol keywords
     dossier-ingest/SKILL.md           file a source, extract facts into the living files
     dossier-draft/SKILL.md            write an outbound message or document
     dossier-call/SKILL.md             prepare a call, debrief a call
@@ -222,7 +230,6 @@ client-dossier/
     lint.py                           mechanical checks (python3, no dependencies)
     extract-text.sh                   pdftotext wrapper, writes .txt next to the PDF
     release.sh                        bumps the version in both manifests, tags
-  templates/                          one file per living file, plus outbound headers, plus dossier.yaml
   tests/                              fixture dossiers and the bash runner for lint.py
   docs/                               this spec, the protocol reference, the fact-line reference
   README.md  LICENSE  CHANGELOG.md
@@ -232,6 +239,15 @@ client-dossier/
 form (name, version, description), so that the plugin loads locally with
 `claude --plugin-dir .` during development; the marketplace files and the Codex manifests
 complete it at distribution time.
+
+A skill's own directory may bundle its own `scripts/` and other resources under the Agent
+Skills standard, and that is where a skill's *private* mechanics and assets live — `dossier-init`
+above is the only skill that needs any today. A script shared by several skills, such as
+`lint.py`, stays at the repository-root `scripts/` instead. A bundled resource is referenced
+from `SKILL.md` as `${CLAUDE_SKILL_DIR}/…`, never by a relative path, because a skill's working
+directory at invocation is the user's dossier repository, not the plugin. `dossier.yaml` is
+emitted by `init.py` from the block in section 3.2 rather than copied from a template file,
+which is why no `dossier.yaml` template appears in the tree above.
 
 Principle: **skills carry the judgement, scripts carry the mechanics, hooks carry the
 reminders.** Anything a regex can check is in `lint.py`, not in prose. Anything that needs
