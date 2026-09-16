@@ -22,6 +22,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 ## Phases
 
 **Phase Numbering:**
+
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
@@ -36,11 +37,13 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 ## Phase Details
 
 ### Phase 1: Scaffold & Templates
+
 **Goal**: Running `dossier-init` turns any repository (empty or pre-existing) into a
 correctly laid-out dossier in one step.
 **Depends on**: Nothing (first phase)
 **Requirements**: SCAF-01, SCAF-02, SCAF-03, SCAF-04, SCAF-05, SCAF-06, SCAF-07, SCAF-08
 **Success Criteria** (what must be TRUE):
+
   1. With the plugin loaded via `claude --plugin-dir .`, running `dossier-init` in an empty
      repo creates `dossier.yaml` (including `consent_source` and `staleness_days`), the four
      top-level folders with their subfolders (a `.gitkeep` in every empty leaf folder), and
@@ -58,19 +61,35 @@ correctly laid-out dossier in one step.
 **Plans**: 6 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 01-01-PLAN.md — tracer: `init.py` scaffolds an empty repo (config, folders, `.gitkeep`, one living file) behind a loadable plugin manifest
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 01-02-PLAN.md — the eleven remaining English templates, the full template map and language-variant resolution
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 01-03-PLAN.md — the French template variant, English keywords intact
 - [ ] 01-04-PLAN.md — the marker-delimited protocol pointer in `AGENTS.md` and `CLAUDE.md`
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 01-05-PLAN.md — adoption: rename detection and the read-only `git mv` proposal
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 01-06-PLAN.md — the skill's judgement body, plus the spec §4 and `CLAUDE.md` amendments
 
 ### Phase 2: Linter & Test Harness
+
 **Goal**: Anyone (human or agent) can mechanically verify a dossier obeys the plugin's rules
 with zero setup beyond python3.
 **Depends on**: Phase 1 (needs the folder layout and living-file shape to check against)
 **Requirements**: LINT-01, LINT-02, LINT-03
 **Success Criteria** (what must be TRUE):
+
   1. Running `scripts/lint.py` against a clean fixture dossier (with `.gitkeep` files in its
      empty folders) exits 0.
   2. Running it against error fixtures exits 1 and names the violation for each error-class
@@ -86,6 +105,7 @@ with zero setup beyond python3.
 **Plans**: TBD
 
 ### Phase 3: Protocol Skill & Hooks
+
 **Goal**: Every session in a dossier repository is told the rules before it has a chance to
 break them, on any harness.
 **Depends on**: Phase 1 (layout to describe), Phase 2 (lint.py to reference from the skill
@@ -95,6 +115,7 @@ PROTO-08
 **Decision to take at planning**: whether the Stop hook (PROTO-06, criterion 4) ships in v1
 (spec §11 #3, with Samuel).
 **Success Criteria** (what must be TRUE):
+
   1. Loading the `dossier` skill in a repo with `dossier.yaml` surfaces the layout, the
      read-before-act/update-before-handoff table, the fact-line and status-header formats,
      the "Name (Organisation)" rule, and the "what the agent never does" list; the skill
@@ -113,12 +134,14 @@ PROTO-08
 **Plans**: TBD
 
 ### Phase 4: Ingest & Fact Extraction
+
 **Goal**: Any source that arrives gets filed exactly once, immutably, and its facts land in
 the right living files with a checkable citation.
 **Depends on**: Phase 1 (folders to file into), Phase 3 (protocol rules the skill must obey:
 never touches sources, updates before handoff)
 **Requirements**: INGEST-01, INGEST-02, INGEST-03, INGEST-04, INGEST-05, INGEST-06
 **Success Criteria** (what must be TRUE):
+
   1. Running `dossier-ingest` on a PDF files it under `sources/` as `YYYY-MM-DD_slug`,
      extracts its text via `extract-text.sh`, and reports the `fact-extractor`'s proposal
      applied to the correct living files with `Last updated:` refreshed.
@@ -134,12 +157,14 @@ never touches sources, updates before handoff)
 **Plans**: TBD
 
 ### Phase 5: Drafting & Doctrine Review
+
 **Goal**: A draft addressed to the counterpart is never one unreviewed step away from going
 out.
 **Depends on**: Phase 2 (`lint.py`, run on every draft), Phase 3 (tone/doctrine/status-header
 rules the skill applies), Phase 4 (history and learnings the draft skill reads before writing)
 **Requirements**: DRAFT-01, DRAFT-02, DRAFT-03, DRAFT-04, DRAFT-05
 **Success Criteria** (what must be TRUE):
+
   1. Running `dossier-draft mail <slug>` produces a file under `outbound/mails/` with a
      complete status header (including `Deadline:` when a deadline was given), written in
      the dossier's language, following the tone file's recorded structure.
@@ -155,11 +180,13 @@ rules the skill applies), Phase 4 (history and learnings the draft skill reads b
 **Plans**: TBD
 
 ### Phase 6: Calls & Status
+
 **Goal**: A human always knows what's due, and walks into every call already prepared.
 **Depends on**: Phase 4 (ingest, used by call debrief), Phase 5 (outbound conventions call
 prep reuses)
 **Requirements**: CALL-01, CALL-02, CALL-03, CALL-04, CALL-05
 **Success Criteria** (what must be TRUE):
+
   1. `dossier-call prepare <date> <slug>` produces a call file with context, objectives, a
      timed agenda, a "what we do not do" section, and open questions ordered by urgency,
      with an empty minutes section.
@@ -176,12 +203,14 @@ prep reuses)
 **Plans**: TBD
 
 ### Phase 7: Manifests, Docs & Distribution
+
 **Goal**: Someone outside this repository can install and trust the plugin on the harness of
 their choice.
 **Depends on**: Phases 1-6 (all six skills and both agents must exist for manifests,
 commands, and trigger-description eval to have something to reference)
 **Requirements**: DIST-01, DIST-02, DIST-03, DIST-04, DIST-05, DIST-06, DIST-07
 **Success Criteria** (what must be TRUE):
+
   1. `/plugin marketplace add` followed by `/plugin install` installs the plugin end to end
      in Claude Code from the completed `.claude-plugin/plugin.json` + `marketplace.json`.
   2. The Codex manifests (`.codex-plugin/plugin.json`, `.agents/plugins/marketplace.json`)
