@@ -19,6 +19,8 @@ import argparse
 import datetime
 import os
 import re
+import shlex
+import subprocess
 import sys
 from pathlib import Path
 
@@ -82,6 +84,87 @@ _LAST_UPDATED_RE = re.compile(r"^(Last updated:[ \t]*)YYYY-MM-DD[ \t]*$", re.MUL
 # constants, and nowhere else in this file.
 MARKER_START = "<!-- client-dossier:start -->"
 MARKER_END = "<!-- client-dossier:end -->"
+
+# One-way adoption table (SCAF-06, D-14): used once by propose_renames()
+# below, at init time, and never as a runtime name mapping (CLAUDE.md C-3
+# -- fixed English names everywhere else). Every key is matched
+# case-insensitively; every emitted value is the fixed English literal,
+# verbatim. Three groups, looked up in that order:
+#
+# - "top": the four top-level roles, matched against an immediate
+#   subdirectory of the repository root.
+# - "child_dir": subdirectory names, matched only one level inside a
+#   directory that "top" already mapped -- includes the fixed English name
+#   as its own key (e.g. "calls" -> "calls", "received" -> "received") so
+#   an already-correctly-named child recurses to "nothing to propose"
+#   rather than falling through to the sources-only ignored rule or (for
+#   any other mapped parent) being silently skipped.
+# - "child_file": living-file names, matched only one level inside a
+#   directory that "top" already mapped. Deliberately has no self-mapping
+#   entries: a file already carrying its fixed English name (or any file
+#   with no role, such as README.md) is not in this table, so the lookup
+#   misses and propose_renames() emits nothing for it (D-14's "a proposal
+#   only ever contains work to do").
+RENAME_TABLE = {
+    "top": {
+        "dossier": "dossier",
+        "client": "dossier",
+        "relation": "dossier",
+        "relationship": "dossier",
+        "knowledge": "knowledge",
+        "docs": "knowledge",
+        "connaissance": "knowledge",
+        "connaissances": "knowledge",
+        "outbound": "outbound",
+        "communication": "outbound",
+        "sortant": "outbound",
+        "sources": "sources",
+    },
+    "child_dir": {
+        "appels": "calls",
+        "calls": "calls",
+        "livrables": "deliverables",
+        "deliverables": "deliverables",
+        "mails": "mails",
+        "veille": "watch",
+        "watch": "watch",
+        "decisions": "decisions",
+        "transcripts": "transcripts",
+        "raw": "raw",
+        # Not in D-14's own enumeration, but required for the same reason
+        # every other already-correct child is listed here: without a
+        # self-mapping entry, a freshly scaffolded sources/received/
+        # (spec Sec3.2's own fixed name, created by FOLDERS above) would
+        # fall through to the sources-only "unmapped subfolder" ignored
+        # rule on a re-run, contradicting D-08's idempotence guarantee.
+        "received": "received",
+    },
+    "child_file": {
+        "acteurs.md": "ACTORS.md",
+        "apprentissages.md": "LEARNINGS.md",
+        "canaux.md": "CHANNELS.md",
+        "historique.md": "HISTORY.md",
+        "questions-ouvertes.md": "OPEN-QUESTIONS.md",
+        "relation.md": "RELATIONSHIP.md",
+        "ton.md": "TONE.md",
+        "contexte.md": "CONTEXT.md",
+    },
+}
+
+# The living-file content hint (D-14): a directory whose name matches
+# nothing in RENAME_TABLE["top"] but that holds at least two of these
+# names (either language) looks like a dossier/ that was never renamed
+# into the table -- reported as a "candidate:" line for a human to
+# confirm, never proposed outright.
+LIVING_FILE_HINT_NAMES = frozenset(
+    name.lower()
+    for name in (
+        "ACTEURS.md", "APPRENTISSAGES.md", "CANAUX.md", "HISTORIQUE.md",
+        "QUESTIONS-OUVERTES.md", "RELATION.md", "TON.md",
+        "ACTORS.md", "LEARNINGS.md", "CHANNELS.md", "HISTORY.md",
+        "OPEN-QUESTIONS.md", "RELATIONSHIP.md", "TONE.md",
+    )
+)
 
 
 class MarkerSectionError(Exception):
@@ -326,6 +409,249 @@ def upsert_marker_section(path, body):
     return result
 
 
+def _git_repo_available(root):
+    """True when `git` is on PATH and `root` is inside a git work tree.
+
+    Never raises: a missing `git` binary or a non-repository target is a
+    fact about the environment, not a bug to crash on (CLAUDE.md C-8).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", root, "rev-parse", "--is-inside-work-tree"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (FileNotFoundError, OSError):
+        return False
+    return result.returncode == 0 and result.stdout.strip() == b"true"
+
+
+def _git_tracked(root, relpath):
+    """True when `git ls-files` finds a tracked path matching `relpath`.
+
+    Run through subprocess.run() with an argument list and shell=False --
+    never a shell string (T-01-22). `relpath` is passed after `--` so a
+    name that happens to start with `-` is never read as an option.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "-C", root, "ls-files", "--error-unmatch", "--", relpath],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+    except (FileNotFoundError, OSError):
+        return False
+    return result.returncode == 0
+
+
+def _content_hint_role(dir_path):
+    """Return "dossier" when `dir_path` holds >=2 known living-file names.
+
+    The only content hint D-14 defines. Returns None on a listing error
+    (e.g. a directory that vanished or is unreadable between the parent
+    scan and this call) rather than raising.
+    """
+    try:
+        names = os.listdir(dir_path)
+    except OSError:
+        return None
+    hits = sum(1 for name in names if name.lower() in LIVING_FILE_HINT_NAMES)
+    return "dossier" if hits >= 2 else None
+
+
+def propose_renames(root):
+    """Build the read-only `--propose-renames` report for `root` (SCAF-06).
+
+    Pure inspection: reads the filesystem and runs `git`, and never writes,
+    creates or moves anything (T-01-24). Returns the full report as one
+    string, newline-terminated, ready to print verbatim.
+
+    For each immediate subdirectory of `root` (dotfiles/dirs such as `.git`
+    skipped outright -- never a rename candidate):
+
+    - resolve it with os.path.realpath; a result outside the resolved root
+      becomes an "unsafe:" entry and nothing else is done with it
+      (T-01-23; RESEARCH/CONTEXT symlink-escape case).
+    - look its name up in RENAME_TABLE["top"] (case-insensitive). A hit
+      that already equals its target emits nothing for the directory
+      itself but still recurses into it; a hit that differs is a rename
+      candidate.
+    - a miss is examined for the living-file content hint: >=2 hits
+      becomes a "candidate:" entry (reported for a human to confirm,
+      never proposed); no hint becomes an "ignored:" entry with the
+      no-role reason.
+    - inside a directory the top-level table mapped, apply
+      RENAME_TABLE["child_dir"] and RENAME_TABLE["child_file"] to its
+      immediate children, one level deep. A child directory the table
+      does not name becomes an "ignored:" entry naming the spec-layout
+      reason only when the mapped parent is "sources" (RESEARCH DISC-1,
+      decided in 01-05-PLAN.md's Deviations, not D-14's own enumeration);
+      inside any other mapped parent, an unmapped child (directory or
+      file) is silently skipped -- exactly like DOCTRINE.md or README.md,
+      which already carry their fixed English names and so are not in
+      RENAME_TABLE["child_file"] at all.
+    - every rename candidate (top-level or child) is probed with
+      `git ls-files --error-unmatch` before being proposed; untracked
+      moves the entry to the untracked section instead, arrow kept, with
+      the history warning appended (T-01-25, RESEARCH Pitfall 6, O-2).
+      When `git` itself is unusable against `root`, every candidate that
+      would otherwise be a rename is treated as untracked instead, and a
+      single note says so once, rather than probing (and failing) once
+      per candidate.
+
+    Path composition follows the proposal's own execution order: a child
+    path is printed against its parent's *new* name, not the name still on
+    disk, so the printed list can be applied top to bottom (the docstring
+    on the "knowledge/veille" case in tests/golden/adopt-proposal.txt is
+    the worked example). `git` is always probed against the real on-disk
+    relative path, which is tracked under the *old* name until the rename
+    actually runs.
+
+    Every printed path passes through shlex.quote() (T-01-22): the mode
+    never builds a shell string itself, but this proposal is what the
+    skill will later splice into a `git mv -- <old> <new>` call.
+
+    Emission order: the summary line, then "rename:" (grouped by top-level
+    candidate in lexicographic order of the *original* name, the top-level
+    line first in its group, children sorted lexicographically after it),
+    then "untracked:", then "unsafe:", then "candidate:", then "ignored:"
+    -- each of those last four sorted lexicographically. This is the
+    entire acceptance surface of tests/golden/adopt-proposal.txt: two runs
+    on the same tree must produce identical bytes.
+    """
+    resolved_root = os.path.realpath(root)
+    git_ok = _git_repo_available(resolved_root)
+
+    top_table = RENAME_TABLE["top"]
+    child_dir_table = RENAME_TABLE["child_dir"]
+    child_file_table = RENAME_TABLE["child_file"]
+
+    renames = []  # (group_key, rank, subkey, old, new) -- rank 0 = the top-level line itself
+    untracked = []  # (old, new)
+    unsafe = []  # (name,)
+    candidates = []  # (name, role)
+    ignored = []  # (old, reason)
+    git_unusable_noted = [False]
+
+    def propose_or_untrack(disk_relpath, old, new, group_key, rank, subkey):
+        tracked = git_ok and _git_tracked(resolved_root, disk_relpath)
+        if tracked:
+            renames.append((group_key, rank, subkey, old, new))
+        else:
+            if not git_ok and not git_unusable_noted[0]:
+                git_unusable_noted[0] = True
+            untracked.append((old, new))
+
+    try:
+        top_entries = sorted(os.listdir(resolved_root))
+    except OSError:
+        top_entries = []
+
+    for name in top_entries:
+        if name.startswith("."):
+            # Never a dossier role, and this is what keeps .git itself out
+            # of the scan -- it is not a rename candidate under any table.
+            continue
+
+        disk_path = os.path.join(resolved_root, name)
+        if not os.path.isdir(disk_path):
+            continue
+
+        real_child = os.path.realpath(disk_path)
+        if not under_root(resolved_root, real_child):
+            unsafe.append(name)
+            continue
+
+        target = top_table.get(name.lower())
+        if target is None:
+            role = _content_hint_role(disk_path)
+            if role:
+                candidates.append((name, role))
+            else:
+                ignored.append((name, "no dossier role"))
+            continue
+
+        if target != name:
+            propose_or_untrack(name, name, target, name, 0, "")
+
+        try:
+            child_names = sorted(os.listdir(disk_path))
+        except OSError:
+            child_names = []
+
+        for child_name in child_names:
+            child_disk_path = os.path.join(disk_path, child_name)
+            child_disk_relpath = os.path.join(name, child_name)
+            printed_old = "{}/{}".format(target, child_name)
+
+            if os.path.isdir(child_disk_path):
+                real_grandchild = os.path.realpath(child_disk_path)
+                if not under_root(resolved_root, real_grandchild):
+                    unsafe.append(printed_old)
+                    continue
+                child_target = child_dir_table.get(child_name.lower())
+                if child_target is None:
+                    if target == "sources":
+                        ignored.append((
+                            printed_old,
+                            "source subfolders are never renamed; "
+                            "sources/received/ is created empty",
+                        ))
+                    continue
+                if child_target == child_name:
+                    continue
+                printed_new = "{}/{}".format(target, child_target)
+                propose_or_untrack(
+                    child_disk_relpath, printed_old, printed_new, name, 1, child_name
+                )
+            else:
+                file_target = child_file_table.get(child_name.lower())
+                if file_target is None:
+                    continue
+                printed_new = "{}/{}".format(target, file_target)
+                propose_or_untrack(
+                    child_disk_relpath, printed_old, printed_new, name, 1, child_name
+                )
+
+    renames.sort(key=lambda item: (item[0], item[1], item[2]))
+    untracked.sort(key=lambda item: item[0])
+    unsafe.sort()
+    candidates.sort(key=lambda item: item[0])
+    ignored.sort(key=lambda item: item[0])
+
+    lines = [
+        "propose-renames: {} proposed, {} untracked, {} unsafe, {} ignored".format(
+            len(renames), len(untracked), len(unsafe), len(ignored)
+        )
+    ]
+    if git_unusable_noted[0]:
+        lines.append(
+            "note: git is unavailable or {} is not a repository -- every "
+            "rename candidate is reported as untracked".format(shlex.quote(root))
+        )
+    for _group, _rank, _subkey, old, new in renames:
+        lines.append("rename: {} -> {}".format(shlex.quote(old), shlex.quote(new)))
+    for old, new in untracked:
+        lines.append(
+            "untracked: {} -> {} (not tracked by git - would be moved with "
+            "plain mv, history not preserved)".format(shlex.quote(old), shlex.quote(new))
+        )
+    for name in unsafe:
+        lines.append(
+            "unsafe: {} (resolves outside the repository root; refusing to "
+            "propose a rename)".format(shlex.quote(name))
+        )
+    for name, role in candidates:
+        lines.append(
+            "candidate: {} -> {} (holds known {} files; confirm before "
+            "renaming)".format(shlex.quote(name), role, role)
+        )
+    for old, reason in ignored:
+        lines.append("ignored: {} ({})".format(shlex.quote(old), reason))
+
+    return "\n".join(lines) + "\n"
+
+
 def build_parser():
     parser = argparse.ArgumentParser(
         description="Scaffold a client-dossier repository (mechanics tier; never interactive)."
@@ -356,6 +682,15 @@ def build_parser():
     parser.add_argument("--date-format", default="YYYY-MM-DD")
     parser.add_argument("--status-header", default="required")
     parser.add_argument("--staleness-days", type=int, default=7)
+    parser.add_argument(
+        "--propose-renames",
+        action="store_true",
+        help=(
+            "Print a read-only adoption rename proposal for --target and exit "
+            "(SCAF-06, D-14/D-15); writes nothing, even combined with a "
+            "scaffolding flag."
+        ),
+    )
     return parser
 
 
@@ -366,6 +701,14 @@ def main(argv=None):
     if not os.path.isdir(target_root):
         print("error: --target {!r} is not a directory".format(args.target), file=sys.stderr)
         return 1
+
+    # --propose-renames is a read-only mode: it returns before any write
+    # path below runs, even when combined with a scaffolding flag (D-15 --
+    # the skill executes git mv only after a human confirms; this script
+    # never executes it and never writes here).
+    if args.propose_renames:
+        sys.stdout.write(propose_renames(target_root))
+        return 0
 
     # Resolve the template variant before any write, so an unknown
     # --template-variant aborts having written nothing (T-01-10). Required
