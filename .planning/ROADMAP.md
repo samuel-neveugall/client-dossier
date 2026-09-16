@@ -55,7 +55,15 @@ correctly laid-out dossier in one step.
   5. In a dossier configured `language: fr`, titles, headings, comments and example lines
      are in French while every path and every protocol keyword (`Last updated:`, status
      header fields and values) stays English.
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — tracer: `init.py` scaffolds an empty repo (config, folders, `.gitkeep`, one living file) behind a loadable plugin manifest
+- [ ] 01-02-PLAN.md — the eleven remaining English templates, the full template map and language-variant resolution
+- [ ] 01-03-PLAN.md — the French template variant, English keywords intact
+- [ ] 01-04-PLAN.md — the marker-delimited protocol pointer in `AGENTS.md` and `CLAUDE.md`
+- [ ] 01-05-PLAN.md — adoption: rename detection and the read-only `git mv` proposal
+- [ ] 01-06-PLAN.md — the skill's judgement body, plus the spec §4 and `CLAUDE.md` amendments
 
 ### Phase 2: Linter & Test Harness
 **Goal**: Anyone (human or agent) can mechanically verify a dossier obeys the plugin's rules
@@ -196,7 +204,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Scaffold & Templates | 0/TBD | Not started | - |
+| 1. Scaffold & Templates | 0/6 | Planned | - |
 | 2. Linter & Test Harness | 0/TBD | Not started | - |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
