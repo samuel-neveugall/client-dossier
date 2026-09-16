@@ -1,0 +1,18 @@
+propose-renames: 13 proposed, 1 untracked, 0 unsafe, 3 ignored
+rename: client -> dossier
+rename: dossier/ACTEURS.md -> dossier/ACTORS.md
+rename: dossier/APPRENTISSAGES.md -> dossier/LEARNINGS.md
+rename: dossier/CANAUX.md -> dossier/CHANNELS.md
+rename: dossier/HISTORIQUE.md -> dossier/HISTORY.md
+rename: dossier/QUESTIONS-OUVERTES.md -> dossier/OPEN-QUESTIONS.md
+rename: dossier/RELATION.md -> dossier/RELATIONSHIP.md
+rename: dossier/TON.md -> dossier/TONE.md
+rename: communication -> outbound
+rename: outbound/appels -> outbound/calls
+rename: outbound/livrables -> outbound/deliverables
+rename: docs -> knowledge
+rename: knowledge/CONTEXTE.md -> knowledge/CONTEXT.md
+untracked: knowledge/veille -> knowledge/watch (not tracked by git - would be moved with plain mv, history not preserved)
+ignored: pipeline (no dossier role)
+ignored: sources/internes (source subfolders are never renamed; sources/received/ is created empty)
+ignored: sources/plaquette (source subfolders are never renamed; sources/received/ is created empty)
