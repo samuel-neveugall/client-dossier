@@ -189,6 +189,40 @@ def yaml_quote(value):
     return '"' + cleaned + '"'
 
 
+# T-01-01 requires every scalar fed by user input to pass through
+# yaml_quote() -- but round 2 of security review found two CLI-fed fields
+# (`language`, `status_header`) that were emitted as bare, unquoted plain
+# scalars instead. The narrow fix (quote those two lines) treats the
+# symptom; the actual cause is that render_dossier_yaml() had two ways to
+# emit a scalar -- quoted (yaml_quote(), used everywhere else) and raw
+# (str.format() straight onto the line) -- and nothing stopped a future
+# field from picking the wrong one.
+#
+# emit_scalar() removes that second way for values whose nominal shape is a
+# short bare identifier (a language code, `required`): it emits the value
+# unquoted -- byte-identical to today's output -- only when it matches
+# _SAFE_PLAIN_SCALAR_RE (letters/digits/underscore/hyphen, first character a
+# letter); anything else, including every injection payload demonstrated
+# against `--language`/`--status-header` this round, falls through to
+# yaml_quote() instead of ever reaching the file unescaped. This is an
+# allowlist, not a blocklist: a value needs no denylist of "dangerous"
+# characters to be rejected into the quoted path, it just needs to not look
+# like a bare identifier.
+_SAFE_PLAIN_SCALAR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
+
+
+def emit_scalar(key, value):
+    """Return `key: value`, safe for any user-supplied string in `value`.
+
+    Emits an unquoted YAML plain scalar when `value` matches
+    _SAFE_PLAIN_SCALAR_RE (preserving today's nominal output byte for byte),
+    otherwise routes through yaml_quote() -- the same escaping every other
+    free-text field in this file already goes through.
+    """
+    text = value if _SAFE_PLAIN_SCALAR_RE.match(value) else yaml_quote(value)
+    return "{}: {}".format(key, text)
+
+
 def parse_counterpart(spec):
     """Parse `NAME|ROLE|CONTACT;CONTACT` into a dict.
 
@@ -217,7 +251,7 @@ def render_dossier_yaml(cfg):
     dossier.yaml is Phase 2's problem, with the tiny YAML-subset parser the
     spec already prescribes.
     """
-    lines = ["# dossier.yaml", "version: 1", "language: {}".format(cfg["language"]), "counterparts:"]
+    lines = ["# dossier.yaml", "version: 1", emit_scalar("language", cfg["language"]), "counterparts:"]
 
     for counterpart in cfg["counterparts"]:
         lines.append("  - name: {}".format(yaml_quote(counterpart["name"])))
@@ -238,7 +272,7 @@ def render_dossier_yaml(cfg):
     lines.append("consent_source: {}".format(yaml_quote(cfg["consent_source"])))
     lines.append("timestamps: {}".format(yaml_quote(cfg["timestamps"])))
     lines.append("date_format: {}".format(yaml_quote(cfg["date_format"])))
-    lines.append("status_header: {}".format(cfg["status_header"]))
+    lines.append(emit_scalar("status_header", cfg["status_header"]))
     lines.append("staleness_days: {}".format(cfg["staleness_days"]))
 
     return "\n".join(lines) + "\n"
@@ -680,7 +714,11 @@ def build_parser():
     parser.add_argument("--consent-source", default="")
     parser.add_argument("--timestamps", default="@mm:ss")
     parser.add_argument("--date-format", default="YYYY-MM-DD")
-    parser.add_argument("--status-header", default="required")
+    # "required" is the only value spec Sec3.2 ever documents for this key;
+    # constraining it here is a second, independent line of defense next to
+    # emit_scalar()'s allowlist -- it never touches the non-interactive
+    # contract, since the default already is the sole allowed choice.
+    parser.add_argument("--status-header", default="required", choices=["required"])
     parser.add_argument("--staleness-days", type=int, default=7)
     parser.add_argument(
         "--propose-renames",
