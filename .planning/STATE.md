@@ -4,16 +4,16 @@ current_phase: 02
 current_phase_name: Linter & Test Harness
 status: ready-to-plan
 stopped_at: Phase 2 context gathered
-last_updated: "2026-09-17T10:08:12.531Z"
+last_updated: "2026-09-17T11:17:54.350Z"
 last_activity: 2026-09-17
 last_activity_desc: Phase 01 closed (human recette passed); Phase 02 ready to plan
-state_head: 5947c3d6cf821beb74e5f2b2cb83d376436ea1c1
+state_head: 0e6c0ec2f67ebbb6d7b526db9dcaa3ed5b62e3dc
 progress:
   total_phases: 7
   completed_phases: 1
-  total_plans: 6
+  total_plans: 12
   completed_plans: 6
-  percent: 14
+  percent: 0
 ---
 
 # Project State
@@ -29,7 +29,7 @@ human and a doctrine check.
 
 ## Current Position
 
-Phase: 02 (Linter & Test Harness) — NOT PLANNED
+Phase: 02 (Linter & Test Harness) — READY TO EXECUTE
 Plan: none yet
 Status: Phase 1 closed 2026-09-17 after the human recette (conversational scaffold,
 idempotent re-run, adoption confirm/decline — all passed in live `--plugin-dir` sessions,
@@ -41,7 +41,7 @@ independently, including SCAF-06 replayed against the real origin repository und
 confidentiality protocol. REQUIREMENTS.md (42 reqs), ROADMAP.md, PROJECT.md and CLAUDE.md
 resynchronised with the delivered code.
 
-Progress: [█░░░░░░░░░] 14%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
