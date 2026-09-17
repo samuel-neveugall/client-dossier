@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 01
-current_phase_name: Scaffold & Templates
-status: verified-pending-human-gate
-stopped_at: Phase 1 implemented and mechanically verified (3 review/fix rounds); closure blocked on human recette (human_verify_mode end-of-phase)
-last_updated: "2026-09-16T17:28:46.535Z"
-last_activity: 2026-09-16
-last_activity_desc: Phase 01 all 6 plans executed and independently re-verified
+current_phase: 02
+current_phase_name: Linter & Test Harness
+status: ready-to-plan
+stopped_at: Phase 1 closed after human recette; Phase 2 not yet planned
+last_updated: "2026-09-17T09:00:00.000Z"
+last_activity: 2026-09-17
+last_activity_desc: Phase 01 closed (human recette passed); Phase 02 ready to plan
 state_head: dbb711e
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
   completed_plans: 6
-  percent: 100
+  percent: 14
 ---
 
 # Project State
@@ -25,22 +25,23 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 01 — Scaffold & Templates (implemented, verified, awaiting human
-recette to close)
+**Current focus:** Phase 02 — Linter & Test Harness (ready to plan)
 
 ## Current Position
 
-Phase: 01 (Scaffold & Templates) — IMPLEMENTED, VERIFIED, NOT CLOSED
-Plan: 6 of 6 executed
-Status: All 6 plans executed and mechanically verified; phase closure gated on a human
-recette in a live session (`human_verify_mode: end-of-phase`) — not yet performed
-Last activity: 2026-09-16 — independent acceptance re-verification passed after 3
+Phase: 02 (Linter & Test Harness) — NOT PLANNED
+Plan: none yet
+Status: Phase 1 closed 2026-09-17 after the human recette (conversational scaffold,
+idempotent re-run, adoption confirm/decline — all passed in live `--plugin-dir` sessions,
+recorded in `01-VERIFICATION.md`). Phase 2 is next; its plan must absorb debts (a) and (b)
+listed in the ROADMAP.
+Last activity: 2026-09-17 — Phase 1 closed. Before that, 2026-09-16 — independent acceptance re-verification passed after 3
 review/fix rounds; SCAF-01…08 (8/8) and the 5 ROADMAP success criteria reproduced
 independently, including SCAF-06 replayed against the real origin repository under the
 confidentiality protocol. REQUIREMENTS.md (42 reqs), ROADMAP.md, PROJECT.md and CLAUDE.md
 resynchronised with the delivered code.
 
-Progress: [█░░░░░░░░░] 6/6 Phase 1 plans complete (0/7 phases closed)
+Progress: [█░░░░░░░░░] 1/7 phases closed
 
 ## Performance Metrics
 
@@ -60,7 +61,7 @@ Progress: [█░░░░░░░░░] 6/6 Phase 1 plans complete (0/7 phase
 
 - Last 5 plans: 01-02, 01-03, 01-04, 01-05, 01-06 — all landed, all passed final
   acceptance re-verification
-- Trend: on track; phase closure blocked only on the human gate, not on remaining work
+- Trend: on track; Phase 1 closed on the human gate 2026-09-17
 
 *Updated after each plan completion*
 

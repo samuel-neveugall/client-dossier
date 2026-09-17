@@ -198,3 +198,54 @@ Requirements Coverage note above) — not gaps in what the phase goal required t
 
 _Verified: 2026-09-16_
 _Verifier: Claude (gsd-verifier)_
+
+---
+
+## Human Verification — Results (2026-09-17)
+
+Both live checks were run on 2026-09-17 through `claude -p --plugin-dir .` sessions resumed
+turn by turn (`--session-id` / `--resume`) in throwaway repositories under the session
+scratchpad, with the human answers scripted as the second turn. Nothing was committed by the
+skill in any run; every repository was inspected with `git status` after each turn.
+
+### 1. Conversational scaffold — PASS
+
+- Empty repo holding only a French `CLAUDE.md`. Prompt: "Mets en place un dossier pour ce
+  client." Turn 1: exactly one grouped question (counterparts + role + contacts, language),
+  French proposed as default from the conversation and the repository, nothing written,
+  adoption scan reported empty.
+- Turn 2 (answer: Acme Conseil, client; Marie Dupont, directrice produit, contact; French):
+  20 files created, `dossier.yaml` with the ten keys in order, `confidential_names` derived
+  with short forms (`Acme`, `Dupont`), `.gitkeep` in the seven leaf folders, `AGENTS.md`
+  created, marker section appended to the existing `CLAUDE.md`. French headings, English
+  paths and `Last updated:` label. Working tree left uncommitted.
+- Turn 3 (re-run): reports nothing missing, no file created or modified, settings reused
+  without asking again. Working tree unchanged (6 status entries before and after).
+
+### 2. Adoption rename — confirm PASS, decline PASS
+
+Two fresh copies of `tests/fixtures/make-adopt-fixture.sh` output.
+
+- Both turn 1s printed the proposal matching `tests/golden/adopt-proposal.txt` (13 renames in
+  order, `docs/veille` reported untracked, `pipeline/` and the two `sources/` subfolders
+  ignored), asked one explicit confirmation plus a separate question for the untracked
+  folder, and wrote nothing (`git status`: only the pre-existing untracked `docs/veille/`).
+- Copy A, confirm: the 13 `git mv` ran top to bottom (all staged as renames, contents
+  identical), `docs/veille` moved with plain `mv` after separate consent, then the missing
+  pieces were completed (`dossier.yaml`, `sources/README.md`, seven `.gitkeep`, `AGENTS.md`,
+  `CLAUDE.md` section); the 11 pre-existing files were kept byte-for-byte (`placeholder`).
+  Commit count unchanged (1).
+- Copy B, decline: nothing renamed, moved or created; tree identical to the fixture.
+
+### Observations (non-blocking)
+
+- Copy B's session described `docs/veille/` as a nested git repository with its own `.git/`.
+  It is not (it holds a single `README.md`); the behaviour was still correct. Worth a
+  clarifying sentence on the `untracked:` line in SKILL.md step 4 when the skill is next
+  touched.
+- With identical `placeholder` contents, `git status` pairs some renames arbitrarily
+  (cosmetic, a fixture artefact); the session noticed and explained it.
+- `allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/init.py *)` was not exercised as a
+  permission gate: runs used `--dangerously-skip-permissions`. The interpolation question
+  (open point 2 of the mission report) stays open.
+

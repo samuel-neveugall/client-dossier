@@ -196,14 +196,14 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SCAF-01 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
-| SCAF-02 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
-| SCAF-03 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
-| SCAF-04 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
-| SCAF-05 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
-| SCAF-06 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
-| SCAF-07 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
-| SCAF-08 | Phase 1 | Implemented, verified — phase closure pending human sign-off |
+| SCAF-01 | Phase 1 | Complete (closed 2026-09-17) |
+| SCAF-02 | Phase 1 | Complete (closed 2026-09-17) |
+| SCAF-03 | Phase 1 | Complete (closed 2026-09-17) |
+| SCAF-04 | Phase 1 | Complete (closed 2026-09-17) |
+| SCAF-05 | Phase 1 | Complete (closed 2026-09-17) |
+| SCAF-06 | Phase 1 | Complete (closed 2026-09-17) |
+| SCAF-07 | Phase 1 | Complete (closed 2026-09-17) |
+| SCAF-08 | Phase 1 | Complete (closed 2026-09-17) |
 | LINT-01 | Phase 2 | Pending |
 | LINT-02 | Phase 2 | Pending |
 | LINT-03 | Phase 2 | Pending |

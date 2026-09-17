@@ -26,7 +26,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Scaffold & Templates** - `dossier-init` scaffolds a full dossier repo from `dossier.yaml` and templates
+- [x] **Phase 1: Scaffold & Templates** - `dossier-init` scaffolds a full dossier repo from `dossier.yaml` and templates
 - [ ] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures
 - [ ] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
 - [ ] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts
@@ -87,8 +87,9 @@ Plans:
 found SCAF-01…08 (8/8) and the phase's 5 ROADMAP success criteria (5/5) reproduced after 3
 rounds of review/fix, including SCAF-06 replayed against the real origin repository under the
 confidentiality protocol. Threat T-01-01 closed, confidentiality guarantee D-13 confirmed, no
-safety regression. Phase is **not** marked complete: `human_verify_mode: end-of-phase` still
-requires a live human recette before closure.
+safety regression. Human recette run on 2026-09-17 (live `--plugin-dir` sessions: conversational scaffold,
+idempotent re-run, adoption confirm and decline) — all passed, see
+`01-VERIFICATION.md` §Human Verification — Results. **Phase 1 closed 2026-09-17.**
 
 ### Phase 2: Linter & Test Harness
 
