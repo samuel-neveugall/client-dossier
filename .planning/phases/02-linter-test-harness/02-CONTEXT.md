@@ -170,14 +170,55 @@ French fixtures; LINT-03 is `tests/test-lint.sh` asserting exit codes and messag
   spelling**: `language: no` is the string `"no"` (Norwegian), never boolean `False`. This is
   the consumer-side half of the Phase 1 carried-over debt (a). Only `consent_recorded` is read
   as a boolean and only `staleness_days` as an integer. — **Reversibility:** reversible.
-- **D-24 (open, do not settle in planning):** whether the **producer** side is also tightened
-  (`init.py`'s `_SAFE_PLAIN_SCALAR_RE` allowlist for YAML 1.1 reserved words, debt (a); and
-  `$` → `\Z`/`re.fullmatch`, debt (b)) is **a decision in progress, arbitrated by the
-  manager** — a producer-vs-consumer panel is running in parallel. The planner must not choose
-  it unilaterally; D-23 stands either way, the two fixes are compatible. If the arbitration
-  lands producer-side, debt (b) is a one-line change in `init.py` and should ride along in the
-  same phase, as the ROADMAP asks ("resolve when writing `lint.py`'s YAML-subset parser, so
-  producer and consumer are aligned in one move").
+- **D-24 (SETTLED 2026-09-17 by the mission manager — supersedes the "open" wording this
+  entry carried at context-gathering time).** A research panel compared four options
+  (producer-only hardening / consumer-only chain reading / both with implicit YAML 1.2
+  resolution / per-field schema). **Retained: option D — per-field typing in `lint.py` (a
+  schema) plus a minimal typographic hardening of the producer**, because it concentrates
+  typing in ONE place (the `lint.py` schema), leaves the producer a pure serialisation rule,
+  and stays robust to a `dossier.yaml` written by hand, by Codex, or by a bare-skills harness.
+  The rule, verbatim:
+
+  1. **Parser (`lint.py`)** — always returns **raw strings** (plus lists/dicts for structure):
+     unquoting of `"…"`/`'…'`, flow sequences `[ a, b ]`, block sequences of mappings
+     (`counterparts`), stripping of `#` comments **quote-aware** (spec §3.2 shows end-of-line
+     comments). **No** implicit int/bool/null/float/date conversion at the scalar level.
+  2. **Per-field schema, above the parser**:
+     - `version` → int (`re.fullmatch(r"[-+]?[0-9]+")`), must equal `1`, otherwise the error
+       "dossier.yaml unreadable".
+     - `language`, `consent_source`, `timestamps`, `date_format`, `status_header`,
+       `counterparts[].name|role`, `counterparts[].contacts[]`, `confidential_names[]` →
+       **str verbatim**, whatever the spelling (`no` stays `"no"` — this is the consumer-side
+       fix of debt (a)).
+     - `staleness_days` → int via `re.fullmatch(r"[-+]?[0-9]+")` on the raw scalar; absent →
+       default 7; present and not an integer, or ≤ 0 → an error naming the field.
+     - `consent_recorded` → bool, **only** an unquoted YAML 1.2 Core Schema scalar:
+       `true|True|TRUE` → true, `false|False|FALSE` → false; absent → false;
+       `yes|no|on|off|y|n|1|0` or any quoted form (`"true"`) → **error**
+       "consent_recorded must be an unquoted boolean: true or false". **Never** a silent
+       coercion to true — this field is the gate that disables the confidential-name leak
+       check under `outbound/`; every ambiguity resolves on the strict side.
+  3. **Producer (`init.py`)** — a serialisation rule, not typing: `_SAFE_PLAIN_SCALAR_RE`
+     moves to `re.fullmatch` (debt (b)), and a scalar whose casefold belongs to
+     `{y, n, yes, no, on, off, true, false, null, ~}` is routed to `yaml_quote()` (debt (a)).
+     Expected output: `--language no` → `language: "no"`; `en`, `fr`, `es`, `required` stay
+     unquoted, byte-for-byte identical to today. `consent_recorded` is still emitted unquoted
+     `true`/`false`, `staleness_days` as a bare integer.
+  4. **New tests the plan must provide**: `^language: "no"$` after `--language no`; no blank
+     line after a value ending in `\n`; a round-trip `init.py` → `lint.py`'s parser asserting
+     `language == "no"`; error fixtures `consent_recorded: yes` and `consent_recorded: "true"`
+     (exit 1, message naming the field); fixture `consent_recorded: true` +
+     `consent_source: ""` (exit 1).
+
+  **Measured regression cost on Phase 1** (by the panel): `emit_scalar()` has only 2 call
+  sites (`init.py` ~l.254 `language`, ~l.275 `status_header`), and no assertion in
+  `tests/test-init-empty.sh`, `tests/test-init-fr.sh` nor the golden
+  `tests/golden/adopt-proposal.txt` bears on a reserved word — ~4 lines of production code
+  plus 2-3 new tests, 0 golden to regenerate. The plan must nevertheless carry an explicit
+  task "the Phase 1 suite stays green" (`bash tests/run.sh`).
+
+  — **Reversibility:** the producer half is a one-line-scale change; the schema half becomes
+  the typing contract every later consumer reads `dossier.yaml` through.
 - **D-25:** JSON fallback (spec §4.4) = **the same fixed filename**. The root marker stays
   `dossier.yaml` and only `dossier.yaml`, because every other component locates a dossier by
   that name (spec §3.2, fixed non-configurable names); if its content starts with `{` it is
