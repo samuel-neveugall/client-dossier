@@ -234,8 +234,21 @@ French fixtures; LINT-03 is `tests/test-lint.sh` asserting exit codes and messag
   existing `init_py()`, and lint-specific assertion helpers built on the existing
   `TESTS_PASSED`/`TESTS_FAILED`/`finish()` machinery. No existing helper changes signature or
   behaviour; the five Phase 1 test files must keep passing untouched.
-- **D-28:** Fixtures live under `tests/fixtures/lint/`. Two are **committed static trees**,
-  because they are the readable reference and criteria 1 and 3 assert on them:
+- **D-28 (AMENDED 2026-09-17 by the mission manager — arbitration of the D-28 / D-31
+  tension surfaced in `02-01-PLAN.md` § "Deviation from locked decision D-28"; the original
+  wording is preserved below).** The two decisions are not jointly satisfiable in their literal
+  form: git tracks no empty directory, so a committed scaffold silently loses
+  `sources/transcripts/` and stops being byte-for-byte what `init.py` produces. **Retained:
+  D-31's purpose wins — `tests/fixtures/lint/clean/` is NOT committed**, it is materialised at
+  test time from a real `init.py` run, so ROADMAP criterion 1 keeps asserting something about
+  the scaffolder instead of degrading into a tautology about a hand-maintained tree.
+  `tests/fixtures/lint/fr/` stays committed exactly as D-28 says. D-28's own purpose — a
+  readable reference — is carried instead by that French tree and by
+  `tests/fixtures/make-lint-fixtures.sh`, whose header must document the clean layout it
+  builds. This is a manager arbitration, not a human decision: Samuel can reverse it with the
+  scoped edit already written in `02-01-PLAN.md` (no replan, no wave moves).
+  *Original wording:* Fixtures live under `tests/fixtures/lint/`. Two are **committed static
+  trees**, because they are the readable reference and criteria 1 and 3 assert on them:
   `tests/fixtures/lint/clean/` (a full layout with `.gitkeep` in every empty leaf → exit 0,
   zero findings) and `tests/fixtures/lint/fr/` (French content, `language: fr`, deliberately
   containing relative-date words and unsourced bullets → exit 0 with W1/W2 raised, and the
