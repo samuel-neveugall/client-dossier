@@ -127,7 +127,37 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — tracer: `lint.py` finds the root, parses `dossier.yaml` through a
+  quotedness-preserving schema, walks the tree, runs E7, reports, and returns 0/1/2 — with the
+  bash harness, the fixture generator and the config gate (E6, C1, C0) around it
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — the five outbound error classes: status block (E1, E2, E3), filename
+  convention (E4), confidential-name leak in text and in filename (E5), plus the consent gate
+  and the README exemption boundary
+- [ ] 02-03-PLAN.md — producer hardening (Phase 1 debts (a) and (b)): reserved YAML spellings
+  quoted, the plain-scalar allowlist anchored end to end, with the Phase 1 suite proven green
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-04-PLAN.md — E8 and E9, the fixture generator's stated contract, and the nine-class
+  positive-plus-negative isolation sweep
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 02-05-PLAN.md — the two warning classes W1 and W2, the single `LANGUAGE_WORDS` data
+  block, and the committed French fixture (criterion 3)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 02-06-PLAN.md — the zero-findings acceptance test in both languages, the
+  producer/consumer round trip, and the commands recorded in `CLAUDE.md`
 
 ### Phase 3: Protocol Skill & Hooks
 
@@ -259,7 +289,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
-| 2. Linter & Test Harness | 0/TBD | Not started | - |
+| 2. Linter & Test Harness | 0/6 | Planned, not started | - |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
