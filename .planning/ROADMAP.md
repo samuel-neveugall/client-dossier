@@ -258,7 +258,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Scaffold & Templates | 6/6 | Implemented, verified — closure pending human recette | - |
+| 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
 | 2. Linter & Test Harness | 0/TBD | Not started | - |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
