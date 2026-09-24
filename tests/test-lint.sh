@@ -391,6 +391,16 @@ for case_name in gate-dup gate-consent-dup gate-consent-dup-rev gate-json-dup ga
 done
 assert_lint "$FIXTURES/gate-consent-dup-rev" 1 'gate-consent-dup-rev: exits 1'
 assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-consent-dup-rev: the [C1] names consent_recorded'
+# --- Unicode line breaks inside a name drop no name (CR-02) ---
+# The producer strips them; the consumer splits lines on \n and \r only.
+for sep in '\342\200\250' '\342\200\251' '\302\205'; do
+  assert_eq 0 "$(grep -c -F -- "$(printf "$sep")" "$FIXTURES/linebreak-name/dossier.yaml")" \
+    "linebreak-name: init.py writes no raw Unicode line break into dossier.yaml ($sep)"
+done
+assert_lint "$FIXTURES/linebreak-name" 1 'linebreak-name: init.py -> lint.py round trip, the leak of Beta exits 1'
+assert_only E5 'linebreak-name: only [E5] fires, the names line was read whole'
+assert_lint "$FIXTURES/linebreak-yaml" 1 'linebreak-yaml: a U+2028 inside a quoted name still reads the line'
+assert_only E5 'linebreak-yaml: only [E5] fires, no [C0] or [C1] for a split line'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

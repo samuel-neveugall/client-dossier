@@ -510,6 +510,25 @@ write_file "$parent/gate-json-dup/dossier.yaml" '{
 }
 '
 write_file "$parent/gate-json-dup/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
+# str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
+# and the producer do not. A name holding one must neither reach
+# dossier.yaml raw (producer side) nor split the names line in two, dropping
+# every name on it (consumer side). Built from bytes: bash 3.2 has no \u.
+LS="$(printf '\342\200\250')"
+PS="$(printf '\342\200\251')"
+NEL="$(printf '\302\205')"
+make_named_case linebreak-name --confidential-name "Acme${LS}Corp" \
+  --confidential-name "Big${PS}Telco" --confidential-name "Sam${NEL}Co" --confidential-name Beta
+write_file "$parent/linebreak-name/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Beta asked for the audit.
+"
+make_case linebreak-yaml
+replace_line "$parent/linebreak-yaml/dossier.yaml" 'confidential_names: []' \
+  "confidential_names: [ \"Acme${LS}Corp\", \"Sam${NEL}Co\", \"Beta\" ]"
+write_file "$parent/linebreak-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Beta asked for the audit.
+"
 # --- e5-readme: E5, a confidential name in the exempt outbound/README.md (Q-5) ---
 # README.md is exempt from E1-E4 only: a leaked name is a leak wherever it sits.
 # e5-readme-nonames is the same edit with no configured name -- clean, which

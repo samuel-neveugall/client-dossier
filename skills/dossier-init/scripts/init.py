@@ -177,14 +177,22 @@ class MarkerSectionError(Exception):
     """
 
 
+# NEL, LINE SEPARATOR, PARAGRAPH SEPARATOR: what str.splitlines() breaks on
+# beyond the C0 controls yaml_quote() already strips (CR-02).
+_UNICODE_LINE_BREAKS = frozenset((chr(0x85), chr(0x2028), chr(0x2029)))
+
+
 def yaml_quote(value):
     """Return a double-quoted YAML scalar, safe for any user-supplied string.
 
-    Strips every character below 0x20 (newlines included), then escapes
-    backslashes and double quotes -- in that order, so a backslash inserted
-    by the first escape is never re-escaped by the second.
+    Strips every character below 0x20 (newlines included) and the three
+    Unicode line breaks U+0085, U+2028 and U+2029 (a Word manual line break
+    pasted into an argument is U+2028; a reader splitting lines the Python
+    way would cut the scalar in two), then escapes backslashes and double
+    quotes -- in that order, so a backslash inserted by the first escape is
+    never re-escaped by the second.
     """
-    cleaned = "".join(ch for ch in value if ord(ch) >= 0x20)
+    cleaned = "".join(ch for ch in value if ord(ch) >= 0x20 and ch not in _UNICODE_LINE_BREAKS)
     cleaned = cleaned.replace("\\", "\\\\").replace('"', '\\"')
     return '"' + cleaned + '"'
 

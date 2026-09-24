@@ -449,6 +449,17 @@ def _owning_key(body, previous):
     return match.group(1) if match is not None else previous
 
 
+def yaml_lines(text):
+    """dossier.yaml's lines, split on \\r\\n, \\r and \\n only (CR-02).
+
+    Never str.splitlines(): it also breaks on U+0085, U+2028 and U+2029,
+    which YAML 1.2 and the producer treat as ordinary characters. Split
+    there, a quoted name holding one cuts its line in two and every name on
+    the line is lost.
+    """
+    return text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
+
 def parse_yaml_subset(text, skipped=None):
     """Parse the dossier.yaml subset into Scalar / Seq / Map values.
 
@@ -471,7 +482,7 @@ def parse_yaml_subset(text, skipped=None):
     item = None
     item_indent = -1
     owner = None
-    for number, raw in enumerate(text.splitlines(), 1):
+    for number, raw in enumerate(yaml_lines(text), 1):
         line = strip_comment(raw)
         body = line.strip()
         if not body or body in ("---", "..."):
