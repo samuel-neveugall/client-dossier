@@ -24,25 +24,67 @@
 # (sources/transcripts/ holds only raw/ -- no .gitkeep of its own, which is
 # exactly why a committed copy of this tree would drift: git drops it.)
 #
-# Creates one throwaway parent under `mktemp -d`, writes one subdirectory per
-# case named after what it triggers, and echoes the parent's path. Installs
-# no trap: the caller cleans up. Injections use python3, never in-place
-# stream editing (not portable between BSD and GNU, P-11), and fail loudly
-# when the line to change is not found, so a fixture never silently ships
-# without its violation.
+# CONTRACT (mirrors fixtures/make-adopt-fixture.sh):
+#
+#   in    $1, the path of a clean dossier tree: an existing directory that
+#         holds a dossier.yaml. It is only ever read, never written.
+#   out   one line on stdout, the path of a throwaway parent directory, as
+#         the very last statement. Inside it, one subdirectory per case,
+#         named after the identifier or the behaviour it exercises (`e1` ...
+#         `e9`, `claude-at-root`, `consent-ok`, ...), each holding exactly
+#         one injected violation or none at all for a clean control. Cases
+#         are addressed by name only: no assertion depends on the order they
+#         are built in, and two cases never share a tree.
+#   side  creates that one parent and writes nowhere else -- nothing
+#         relative to the caller's working directory. Installs no cleanup
+#         handler: the caller owns the removal, as tests/test-lint.sh does.
+#   fail  an absent, empty, non-directory or non-dossier $1 exits 2 with a
+#         message on stderr BEFORE anything is created, so an empty input
+#         can never become a set of empty trees the suite would lint clean.
+#
+# Case trees come into existence through exactly two helpers, both keyed by
+# name: make_case (a copy of the clean tree) and make_named_case (a fresh
+# init.py scaffold, for a case whose dossier.yaml needs producer flags).
+# Injections use printf, a here-document or a short python3 block, never
+# in-place stream editing (not portable between BSD and GNU, P-11), and fail
+# loudly when the line to change is not found, so a fixture never silently
+# ships without its violation. Bash 3.2 dialect only (P-10): no associative
+# arrays, no read-file-into-array builtin, no case-folding expansion, no
+# recursive glob.
+#
+# Every name inside a fixture (Acme, Jane Doe, Sam, Societe Exemple) is an
+# invented placeholder; nothing here comes from a real engagement.
 set -eu
 
-if [ "$#" -ne 1 ] || [ ! -d "$1" ] || [ ! -f "$1/dossier.yaml" ]; then
+usage() {
+  echo "make-lint-fixtures.sh: $1" >&2
   echo "usage: make-lint-fixtures.sh CLEAN_DOSSIER_DIR" >&2
   exit 2
-fi
+}
+
+# The guard runs before the parent is created: a refused call leaves nothing.
+[ "$#" -eq 1 ] || usage "expected exactly one argument, got $#"
+[ -n "$1" ] || usage "the clean dossier path is empty"
+[ -d "$1" ] || usage "not a directory: $1"
+[ -f "$1/dossier.yaml" ] || usage "not a dossier (no dossier.yaml): $1"
 
 clean="$1"
 parent="$(mktemp -d)"
 INIT_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/skills/dossier-init/scripts/init.py"
 
-# make_case NAME — a fresh copy of the clean tree at "$parent/NAME".
+# claim_case NAME — refuse a name already built, so two cases can never
+# share (and silently merge) one tree.
+claim_case() {
+  if [ -e "$parent/$1" ]; then
+    echo "make-lint-fixtures.sh: case '$1' is built twice" >&2
+    exit 1
+  fi
+}
+
+# make_case NAME — a fresh copy of the clean tree at "$parent/NAME". Echoes
+# nothing: a case is addressed by its name, never by what a helper printed.
 make_case() {
+  claim_case "$1"
   cp -R "$clean" "$parent/$1"
 }
 
@@ -309,6 +351,7 @@ write_file "$parent/binary-ok/outbound/deliverables/2026-09-17_audit.md" "$GOOD_
 make_named_case() {
   local name="$1"
   shift
+  claim_case "$name"
   mkdir -p "$parent/$name"
   python3 "$INIT_PY" --target "$parent/$name" --language en "$@" >/dev/null
 }

@@ -20,7 +20,11 @@ CLEAN=""
 FIXTURES=""
 EMPTY=""
 READONLY=""
-trap 'rm -rf "$CLEAN" "$FIXTURES" "$EMPTY" "$READONLY"' EXIT
+GEN_TMP=""
+# The one cleanup for everything this file creates, the generator's parent
+# included: the generator installs no handler of its own, so a failed
+# assertion anywhere below still leaks nothing.
+trap 'rm -rf "$CLEAN" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
 # fires and every other one stays silent.
@@ -75,18 +79,54 @@ for ident in $ALL_IDS; do
   assert_no_finding "$ident" 'clean: no finding at all'
 done
 
-# --- The fixture generator refuses to run without a clean tree ---
-gen_status=0
-bash "$FIXTURE_SCRIPT" >/dev/null 2>&1 || gen_status=$?
-if [ "$gen_status" -ne 0 ]; then
-  TESTS_PASSED=$((TESTS_PASSED + 1))
-else
-  echo "FAIL: make-lint-fixtures.sh with no argument exited 0" >&2
-  TESTS_FAILED=$((TESTS_FAILED + 1))
-fi
+# --- The fixture generator's contract (LINT-02, D-29) ---
+# An absent, empty, non-directory or non-dossier argument is refused with a
+# message on stderr, and refused BEFORE anything is created. The generator's
+# only way to create anything is its one `mktemp -d`, so every refused run
+# below puts a logging mktemp shim first on PATH and the log must stay
+# empty. (TMPDIR cannot be used for this: macOS mktemp -d ignores it.)
+# Without the guard, an empty input would become a set of empty trees -- and
+# an empty tree lints as "no dossier", never as the violation the case was
+# meant to carry.
+GEN_TMP="$(mktemp -d)"
+mkdir "$GEN_TMP/bin"
+printf '#!/bin/sh\necho "mktemp $*" >>"%s/mktemp.log"\nexit 1\n' "$GEN_TMP" >"$GEN_TMP/bin/mktemp"
+chmod +x "$GEN_TMP/bin/mktemp"
+: >"$GEN_TMP/mktemp.log"
+not_a_file="$GEN_TMP/does-not-exist"
+not_a_dossier="$GEN_TMP/not-a-dossier"
+mkdir "$not_a_dossier"
 
-FIXTURES="$(bash "$FIXTURE_SCRIPT" "$CLEAN")"
+# gen_refuses LABEL [ARG...] — the generator exits non-zero and says why.
+gen_refuses() {
+  local label="$1" status=0 err
+  shift
+  err="$(PATH="$GEN_TMP/bin:$PATH" bash "$FIXTURE_SCRIPT" "$@" 2>&1 >/dev/null)" || status=$?
+  if [ "$status" -ne 0 ] && [ -n "$err" ]; then
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+  else
+    echo "FAIL: generator: $label (exit $status, stderr '$err')" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  fi
+}
+gen_refuses 'no argument is refused'
+gen_refuses 'an empty argument is refused' ''
+gen_refuses 'a path that does not exist is refused' "$not_a_file"
+gen_refuses 'a directory with no dossier.yaml is refused' "$not_a_dossier"
+gen_refuses 'two arguments are refused' "$CLEAN" "$CLEAN"
+assert_eq '' "$(cat "$GEN_TMP/mktemp.log")" 'generator: a refused run never reached mktemp, so created nothing'
+# The shim is live: the same PATH does reach it once the guard passes.
+PATH="$GEN_TMP/bin:$PATH" bash "$FIXTURE_SCRIPT" "$CLEAN" >/dev/null 2>&1 || true
+assert_grep '^mktemp -d' "$GEN_TMP/mktemp.log"
+
+gen_out="$(bash "$FIXTURE_SCRIPT" "$CLEAN")"
+assert_eq 1 "$(printf '%s\n' "$gen_out" | wc -l | tr -d ' ')" 'generator: a successful run prints exactly one line'
+FIXTURES="$gen_out"
 assert_dir "$FIXTURES"
+# Addressed by name: each of the nine error classes has its own case tree.
+for ident in e1 e2 e3 e4 e5 e6 e7 e8 e9; do
+  assert_dir "$FIXTURES/$ident"
+done
 
 # --- E7: a living file lost its Last updated: line (D-13) ---
 assert_lint "$FIXTURES/e7" 1 'e7: exits 1'
