@@ -135,6 +135,11 @@ DEFAULT_STALENESS_DAYS = 7
 TRUE_SCALARS = frozenset(("true", "True", "TRUE"))
 FALSE_SCALARS = frozenset(("false", "False", "FALSE"))
 
+# The YAML 1.2 Core Schema null spellings. consent_source is still read as a
+# verbatim string (D-24.2), but for the consent gate alone an UNQUOTED null
+# means "no value" -- the "true without a source" of spec Sec3.2 (WR-02).
+NULL_SCALARS = frozenset(("null", "Null", "NULL", "~"))
+
 # ===========================================================================
 # LANGUAGE DATA -- the only place this file knows the dossier's language.
 #
@@ -720,8 +725,25 @@ def apply_schema(raw, findings):
                                       DEFAULT_STALENESS_DAYS, minimum=1)
     # Where E6 points: the source line when present, else the flag's line.
     source = raw.get("consent_source")
+    config["consent_source_empty"] = source_is_empty(source)
     config["consent_line"] = _line_of(source if source is not None else raw.get("consent_recorded"))
     return config
+
+
+def source_is_empty(value):
+    """True when a raw consent_source names no source at all (WR-02, D-24).
+
+    Absent, not a single string, blank, an unquoted YAML null (`null`, `~`),
+    or text with no letter and no digit (`-`, `?`, `...`): each is the
+    "true without a source" the spec calls a lint error, and every ambiguity
+    of this gate resolves on the strict side.
+    """
+    if not isinstance(value, Scalar):
+        return True
+    text = value.text.strip()
+    if text == "" or (not value.quoted and text in NULL_SCALARS):
+        return True
+    return not any(ch.isalnum() for ch in text)
 
 
 def consent_is_recorded(config):
@@ -734,7 +756,7 @@ def consent_is_recorded(config):
     """
     if config.get("gate_damaged"):
         return False
-    return config["consent_recorded"] and config["consent_source"].strip() != ""
+    return config["consent_recorded"] and not config["consent_source_empty"]
 
 
 def load_config(path, findings):
@@ -1144,10 +1166,10 @@ def check_confidential_names(root, tree, config, findings):
 
 
 def check_consent_source(root, tree, config, findings):
-    """E6: consent_recorded true with an empty or absent consent_source (D-12)."""
-    if config["consent_recorded"] and config["consent_source"].strip() == "":
+    """E6: consent_recorded true with an empty, absent or null consent_source (D-12, WR-02)."""
+    if config["consent_recorded"] and config["consent_source_empty"]:
         findings.append(Finding(CONFIG_NAME, config["consent_line"], ERROR, "E6",
-                                "consent_recorded: true with an empty consent_source "
+                                "consent_recorded: true with an empty or null consent_source "
                                 "(a consent without a source is an opinion)"))
 
 

@@ -424,6 +424,15 @@ assert_lint "$FIXTURES/gate-sq-names" 1 "gate-sq-names: [ 'O''Brien, Jr', Acme ]
 assert_only E5 'gate-sq-names: only [E5] fires, the names line is not skipped'
 assert_lint "$FIXTURES/gate-sq-source" 0 "gate-sq-source: a sourced consent written 'it''s # ok' exits 0"
 assert_clean 'gate-sq-source: the source is read whole, the leak check suppressed'
+# --- A null, ~ or letterless consent_source is no source (WR-02, spec Sec3.2) ---
+for case_name in source-null source-tilde source-punct; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: exits 1"
+  assert_finding E6 "$case_name: consent recorded without a real source is [E6]"
+  assert_finding E5 "$case_name: and it does not suppress the leak check"
+  for ident in E1 E2 E3 E4 E7 E8 E9 C1 C0 W1 W2; do
+    assert_no_finding "$ident" "$case_name: nothing but [E6] and [E5]"
+  done
+done
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

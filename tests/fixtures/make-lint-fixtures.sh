@@ -518,6 +518,16 @@ make_named_case gate-sq-source --confidential-name Acme --consent-recorded true 
 replace_line "$parent/gate-sq-source/dossier.yaml" 'consent_source: "placeholder"' \
   "consent_source: 'mail 2026-09-16 from Jane: it''s # ok'"
 write_file "$parent/gate-sq-source/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- source-null / source-tilde / source-punct: a consent_source that is no source (WR-02) ---
+# YAML reads an unquoted null or ~ as "no value", and a value with no letter
+# or digit names nobody: each is the "true without a source" of spec Sec3.2,
+# so E6 fires and the leak check stays armed.
+for pair in 'source-null:null' 'source-tilde:~' 'source-punct:"-"'; do
+  case_name="${pair%%:*}"
+  make_named_case "$case_name" --confidential-name Acme --consent-recorded true --consent-source 'placeholder'
+  replace_line "$parent/$case_name/dossier.yaml" 'consent_source: "placeholder"' "consent_source: ${pair#*:}"
+  write_file "$parent/$case_name/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+done
 # --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
 # str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
 # and the producer do not. A name holding one must neither reach
