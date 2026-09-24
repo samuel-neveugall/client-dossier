@@ -127,7 +127,7 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: 5/6 plans executed
+**Plans**: 6/6 plans executed
 
 Plans:
 **Wave 1**
@@ -156,7 +156,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 02-06-PLAN.md — the zero-findings acceptance test in both languages, the
+- [x] 02-06-PLAN.md — the zero-findings acceptance test in both languages, the
   producer/consumer round trip, and the commands recorded in `CLAUDE.md`
 
 ### Phase 3: Protocol Skill & Hooks
@@ -289,7 +289,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
-| 2. Linter & Test Harness | 5/6 | In Progress|  |
+| 2. Linter & Test Harness | 6/6 | In Progress|  |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |

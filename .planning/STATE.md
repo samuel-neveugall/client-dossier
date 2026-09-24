@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Linter & Test Harness
 status: executing
-stopped_at: Completed 02-05-PLAN.md
-last_updated: "2026-09-24T20:12:27.616Z"
+stopped_at: Completed 02-06-PLAN.md
+last_updated: "2026-09-24T20:17:08.097Z"
 last_activity: 2026-09-24
 last_activity_desc: Phase 02 execution started
-state_head: 4b370f100de01cad85f87e054d2a07d83c51be15
+state_head: 87c5f26c4011c530e36047422254c879a7f73ef1
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 14
 ---
 
@@ -73,6 +73,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase 02 P03 | 3min | 2 tasks | 2 files |
 | Phase 02 P04 | 6min | 3 tasks | 3 files |
 | Phase 02 P05 | 6min | 3 tasks | 25 files |
+| Phase 02 P06 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,8 @@ mission, now validated by the phase's own delivery:
 - [Phase 02]: 02-04: generator refusal is proven with a logging mktemp shim on PATH, because macOS mktemp -d ignores TMPDIR
 - [Phase 02]: 02-05: W1/W2 keep the uniform check(root, tree, config, findings) signature; an unlisted language skips both W1 and W2 with one info: line (D-20)
 - [Phase 02]: 02-05: D-28 as amended applied -- tests/fixtures/lint/fr/ is the only committed lint fixture; a test asserts no tests/fixtures/lint/clean/ is tracked
+- [Phase 02]: 02-06: round-trip test matches ^info: language 'no' exactly (the info line always contains 'no word list')
+- [Phase 02]: 02-06: lint.py file-size window recorded as WINDOWS row 4; single file kept, split is a Phase 7 conversation
 
 ### Pending Todos
 
@@ -163,6 +166,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-09-24T20:12:27.593Z
-Stopped at: Completed 02-05-PLAN.md
+Last session: 2026-09-24T20:17:08.077Z
+Stopped at: Completed 02-06-PLAN.md
 Resume file: None

@@ -43,7 +43,7 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Linter (scripts/lint.py, fixtures, bash test runner)
 
-- [ ] **LINT-01**: `scripts/lint.py` (Python 3 standard library only) implements all 8
+- [x] **LINT-01**: `scripts/lint.py` (Python 3 standard library only) implements all 8
       mechanical checks from the design spec — status block present and complete on
       outbound files (a `sent` status has a date and a sender, a `Deadline:` is an absolute
       date), outbound filenames match `YYYY-MM-DD_slug`, no confidential name under
@@ -53,10 +53,10 @@ synthesized-for-tracking, not verbatim spec text.
       lines without a parenthetical source flagged as warnings, no `.claude/` folder below
       repo root, and rendered deliverables have their source file next to them — exiting 1
       on any error and 0 on warnings-only, ignoring `.gitkeep` files
-- [ ] **LINT-02**: Fixture repositories exist for lint testing: a clean baseline layout, a
+- [x] **LINT-02**: Fixture repositories exist for lint testing: a clean baseline layout, a
       French-language dossier fixture exercising the relative-date and opinion-marker word
       lists, and error fixtures that together trigger every error-class check at least once
-- [ ] **LINT-03**: A bash test runner executes `lint.py` against the fixtures and asserts
+- [x] **LINT-03**: A bash test runner executes `lint.py` against the fixtures and asserts
       exit codes and messages, with no test framework beyond bash and python3
 
 ### Protocol skill `dossier` + hooks
@@ -204,9 +204,9 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | SCAF-06 | Phase 1 | Complete (closed 2026-09-17) |
 | SCAF-07 | Phase 1 | Complete (closed 2026-09-17) |
 | SCAF-08 | Phase 1 | Complete (closed 2026-09-17) |
-| LINT-01 | Phase 2 | Pending |
-| LINT-02 | Phase 2 | Pending |
-| LINT-03 | Phase 2 | Pending |
+| LINT-01 | Phase 2 | Complete |
+| LINT-02 | Phase 2 | Complete |
+| LINT-03 | Phase 2 | Complete |
 | PROTO-01 | Phase 3 | Pending |
 | PROTO-02 | Phase 3 | Pending |
 | PROTO-03 | Phase 3 | Pending |
@@ -240,6 +240,7 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | DIST-07 | Phase 7 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 42 total
 - Mapped to phases: 42
 - Unmapped: 0 ✓
