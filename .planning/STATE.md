@@ -2,11 +2,11 @@
 gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Linter & Test Harness
-status: executing
-stopped_at: Completed 02-06-PLAN.md
+status: verifying
+stopped_at: Phase 2 executed and verified (4/4 criteria); human recette pending (02-UAT.md)
 last_updated: "2026-09-24T20:17:08.097Z"
 last_activity: 2026-09-24
-last_activity_desc: Phase 02 execution started
+last_activity_desc: Phase 02 executed (6/6 plans), 3 review iterations, verification human_needed
 state_head: 87c5f26c4011c530e36047422254c879a7f73ef1
 progress:
   total_phases: 7
@@ -29,17 +29,16 @@ human and a doctrine check.
 
 ## Current Position
 
-Phase: 02 (Linter & Test Harness) — EXECUTING
-Plan: 6 of 6 (02-01 … 02-05 complete; 02-06 next)
-Status: 02-05 added the two prose warnings -- W1 (relative-date words in `dossier/` and
-`knowledge/`, boundary-matched from the single `LANGUAGE_WORDS` block) and W2 (bullets with no
-parenthetical source in the seven living files, with a multi-line HTML-comment tracker and
-opinion markers) -- and committed `tests/fixtures/lint/fr/`, which exits 0 with both warnings
-and no error (ROADMAP criterion 3). An unlisted language skips both with one `info:` line.
-Both clean scaffolds stay at 0/0; `tests/test-lint.sh` has 675 assertions; `bash tests/run.sh`
-reports 6 files, 0 failed. LINT-01..03 stay Pending until 02-06 (zero-findings acceptance,
-D-24.4 round trip, commands and file-size window) lands.
-Last activity: 2026-09-24 — 02-05 executed (3 tasks, 3 commits).
+Phase: 02 (Linter & Test Harness) — EXECUTED, VERIFIED, AWAITING HUMAN RECETTE
+Plan: 6 of 6 complete (02-01 … 02-06)
+Status: all six plans landed on 2026-09-24. `02-VERIFICATION.md` reports `human_needed` with the
+four ROADMAP criteria and both Phase 1 debts verified independently (`bash tests/run.sh`:
+6 files, 0 failed; `tests/test-lint.sh`: 1290 assertions). The code review ran its full
+3-iteration budget (`02-REVIEW.iter1.md`, `02-REVIEW.iter2.md`, `02-REVIEW.md`): 12 then 7
+findings fixed with regression tests (`02-REVIEW-FIX.iter1.md`, `02-REVIEW-FIX.md`);
+iteration 3 found 3 older critical paths plus 4 warnings, kept as tracked debt below.
+The phase is NOT marked complete: `02-UAT.md` holds four items for Samuel.
+Last activity: 2026-09-24 — phase 2 execution, review/fix loop, verification.
 
 Progress: [█░░░░░░░░░] 14%
 
@@ -139,7 +138,9 @@ mission, now validated by the phase's own delivery:
 
 ### Pending Todos
 
-- **Phase 2 execution** — plans 02-01…02-06 are ready; awaiting Samuel's go.
+- **Phase 2 recette** — `/gsd-verify-work 02` walks the four items of `02-UAT.md`: three
+  design calls taken by the fixer (D-FIX-8 narrows locked D-22; D-FIX-9/10 near-miss key
+  threshold; D-FIX-3 broadened name matching) and the fate of the iteration-3 residuals.
 - **Validate the planning assumptions** A-01…A-06 (`02-CONTEXT.md` § Assumptions) and Q-1…Q-6
   (`02-01-PLAN.md`) at the end-of-phase recette; none of them blocks execution.
 - **Review two manager arbitrations** taken with Samuel offline: D-24 (typing strategy) and
@@ -163,9 +164,10 @@ mission, now validated by the phase's own delivery:
 |----------|------|--------|-------------|-----------|
 | Debt (Phase 1 → Phase 2) | (a) YAML 1.1 reserved words: `init.py`'s `_SAFE_PLAIN_SCALAR_RE` lets `yes/no/on/off/true/false/null/y/n` through unquoted; `--language no` writes `language: no`, read back as boolean `False` by a strict YAML parser. Not a vulnerability (no key injection; `consent_recorded` unreachable) — a typing-fidelity gap. Fix when writing `lint.py`'s YAML-subset parser, aligning producer and consumer in one move. | Resolved — 02-03 (`bd2ecd2`): `_YAML_RESERVED_SCALARS` routes reserved spellings to `yaml_quote()`; pinned by `tests/test-init-empty.sh` d14. Round-trip through the lint parser still due in 02-06 | 2026-09-16 (Phase 1 review, round 3) | v1 |
 | Debt (Phase 1 → Phase 2) | (b) Regex anchoring: same regex's `$` also matches just before a trailing `\n` (vs. `\Z`/`re.fullmatch`); a value ending in a newline passes the allowlist and leaves a blank line. No key injection — cosmetic guard bypass. One-line fix, bundle with (a). | Resolved — 02-03 (`bd2ecd2`): `emit_scalar` uses `fullmatch`; pinned by `tests/test-init-empty.sh` d15 | 2026-09-16 (Phase 1 review, round 3) | v1 |
+| Debt (Phase 2 review, iteration 3) | Three reproduced fail-open paths of the confidentiality gate (E5), each letting a confidential name under `outbound/` pass with exit 0; none introduced by the fix rounds: CR-01 `Outbound/` on a case-insensitive filesystem escapes every outbound check; CR-02 zero-width/BOM/soft-hyphen characters in a name survive `init.py` and defeat the text match; CR-03 HTML entities in an outbound `.html` hide names. Plus WR-01 (near-miss rule rejects legitimate extra keys like `consent_scope`), WR-02 (two untested lines), WR-03 (unreadable dir or `.git/` under `outbound/` skipped silently), WR-04 (name wrapped across `> ` quoted lines). Details: `02-REVIEW.md`. | Open — review budget spent; Samuel decides (UAT item 4) between a gap-closure round and deferral | 2026-09-24 (Phase 2 review, iteration 3) | v1 |
 
 ## Session Continuity
 
 Last session: 2026-09-24T20:17:08.077Z
-Stopped at: Completed 02-06-PLAN.md
-Resume file: None
+Stopped at: Phase 2 verified (human_needed); recette pending
+Resume file: .planning/phases/02-linter-test-harness/02-UAT.md
