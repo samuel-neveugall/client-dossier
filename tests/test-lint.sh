@@ -235,6 +235,46 @@ assert_lint "$CLEAN" 0 'clean: still exits 0'
 assert_no_finding C1 'clean: no [C1]'
 assert_no_finding C0 'clean: no [C0]'
 
+# --- E1: an outbound file with no status block in its first 10 lines (D-07) ---
+assert_lint "$FIXTURES/e1" 1 'e1: exits 1'
+assert_only E1 'e1: only [E1] fires'
+assert_out_line '^outbound/mails/2026-09-17_relance\.md:0: ERROR \[E1\] ' 'e1: reported at line 0 of the mail'
+assert_last_line '1 error(s), 0 warning(s)' 'e1: exactly one error'
+
+# --- E2: an incomplete status value (D-08) ---
+assert_lint "$FIXTURES/e2" 1 'e2: sent without a sender exits 1'
+assert_only E2 'e2: only [E2] fires'
+assert_out_line '^outbound/mails/2026-09-17_relance\.md:1: ERROR \[E2\] ' 'e2: reported at the Status: line'
+assert_lint "$FIXTURES/e2-reviewed" 1 'e2-reviewed: reviewed by with no name exits 1'
+assert_only E2 'e2-reviewed: only [E2] fires'
+
+# --- E3: a Deadline that is not an absolute, real date (D-09) ---
+assert_lint "$FIXTURES/e3" 1 'e3: a relative Deadline exits 1'
+assert_only E3 'e3: only [E3] fires'
+assert_out_line '^outbound/mails/2026-09-17_relance\.md:4: ERROR \[E3\] ' 'e3: reported at the Deadline: line'
+assert_lint "$FIXTURES/e3-baddate" 1 'e3-baddate: Deadline 2026-13-45 exits 1'
+assert_only E3 'e3-baddate: the calendar is validated, not just the shape'
+
+# --- E1 on an incomplete header: Subject: is required under mails/ only (A-02) ---
+assert_lint "$FIXTURES/mail-no-subject" 1 'mail-no-subject: exits 1'
+assert_only E1 'mail-no-subject: only [E1] fires'
+assert_out_line 'ERROR \[E1\] .*Subject:' 'mail-no-subject: the [E1] line names the missing Subject:'
+assert_lint "$FIXTURES/calls-no-subject" 0 'calls-no-subject: the same file under calls/ exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'calls-no-subject: zero findings'
+
+# --- Negatives: well-formed headers, a binary deliverable, the shipped README ---
+assert_lint "$FIXTURES/header-ok" 0 'header-ok: well-formed headers in three comment syntaxes exit 0'
+assert_last_line '0 error(s), 0 warning(s)' 'header-ok: zero findings, the quoted header below line 10 ignored'
+assert_lint "$FIXTURES/binary-ok" 0 'binary-ok: a .pdf beside its .md exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'binary-ok: a binary raises none of E1-E3'
+# The regression guard for the D-06 exemption: outbound/README.md quotes the
+# status header verbatim, placeholders included (P-01).
+assert_grep '^Deadline: YYYY-MM-DD' "$CLEAN/outbound/README.md"
+assert_lint "$CLEAN" 0 'clean: outbound/README.md is exempt from E1-E3'
+for ident in E1 E2 E3; do
+  assert_no_finding "$ident" 'clean: the shipped outbound README raises no header finding'
+done
+
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"
 assert_lint "$EMPTY" 2 'no dossier: exits 2'

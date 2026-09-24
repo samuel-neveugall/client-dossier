@@ -86,6 +86,16 @@ OUTBOUND_SUBS = ("deliverables", "mails", "calls")
 EXEMPT_BASENAMES = frozenset((".gitkeep", "README.md"))
 GITKEEP = ".gitkeep"
 
+# Rendered binaries carry no text header, so they are outside E1-E3 (D-07,
+# A-06). Compared lowercased. An unlisted binary is not a crash either: it
+# reaches read_text_safe(), fails to decode and is reported as unreadable.
+# E5 is not extension-scoped: a binary's filename is still searched (P-07).
+BINARY_EXTS = frozenset((
+    ".pdf", ".docx",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp",
+    ".odt", ".pptx", ".xlsx",
+))
+
 # Never descended into (D-03's other half: sub-dossiers are pruned too).
 PRUNED_DIRS = frozenset((".git",))
 
@@ -94,6 +104,12 @@ MAX_READ_BYTES = 5000000
 
 # The status header must sit within the first N lines (D-07).
 STATUS_HEADER_WINDOW = 10
+
+# The fields a status header must carry to be complete (A-02). Subject: is
+# required under outbound/mails/ only; Deadline: and Rules: stay optional, so
+# the linter cannot become the reason a legitimate draft is rejected.
+REQUIRED_FIELDS = ("Status", "To", "Written by")
+MAIL_REQUIRED_FIELDS = REQUIRED_FIELDS + ("Subject",)
 
 # Schema defaults (spec Sec3.2, D-24.2, Q-3).
 SUPPORTED_VERSION = 1
@@ -119,6 +135,30 @@ _KEY_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*):(?:[ \t]+(.*))?")
 _INT_RE = re.compile(r"[-+]?[0-9]+")
 _LAST_UPDATED_RE = re.compile(r"^[ \t]*Last updated:[ \t]*(.*)$")
 _DATE_PREFIX_RE = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})(?![0-9])")
+
+# An absolute date, whole value: YYYY-MM-DD with ASCII digits only ([0-9],
+# never \d, which also accepts other scripts' digits). Shape only: the
+# calendar is is_absolute_date()'s job.
+_DATE_RE = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})")
+
+# One status-header line, whatever the comment syntax around it (D-07,
+# Pattern 4). Only non-alphanumeric characters may precede the field name
+# (`<!-- `, `# `, `// `, indentation), so a prose line such as "Reply To: x"
+# is not a header line; a trailing HTML comment closer is dropped from the
+# value. Built from PROTOCOL_FIELDS: no per-language label table exists.
+_FIELD_RE = re.compile(
+    r"[^A-Za-z0-9]*?\b(" + "|".join(re.escape(field) for field in PROTOCOL_FIELDS)
+    + r"):[ \t]*(.*?)[ \t]*(?:-->)?[ \t]*"
+)
+
+# The three valid status values (D-08). `reviewed by` and `sent ... by` need
+# a non-empty name; `sent` needs an absolute date, optionally a time.
+_STATUS_REVIEWED_RE = re.compile(r"reviewed by[ \t]+\S.*")
+_STATUS_SENT_RE = re.compile(
+    r"sent[ \t]+([0-9]{4}-[0-9]{2}-[0-9]{2})"
+    r"(?:[ \t]+(?:[01]?[0-9]|2[0-3]):[0-5][0-9](?::[0-5][0-9])?)?"
+    r"[ \t]+by[ \t]+\S.*"
+)
 
 # A quote only opens a quoted scalar at the start of a token, so the
 # apostrophe in a plain `role: it's fine` does not swallow a trailing comment.
@@ -712,10 +752,105 @@ def _is_real_date(year, month, day):
     return True
 
 
+def is_absolute_date(text):
+    """True when TEXT is exactly YYYY-MM-DD and a real calendar date (D-09).
+
+    The calendar is the standard library's, never a month-length table, so
+    2026-13-45 and 2026-02-30 are rejected. Shared by E2 (the sent date), E3
+    (Deadline:) and E4 (the filename date).
+    """
+    match = _DATE_RE.fullmatch(text)
+    return match is not None and _is_real_date(*match.groups())
+
+
+def outbound_files(tree):
+    """Every walked file under outbound/, in walk order (`.gitkeep` already gone)."""
+    prefix = OUTBOUND_DIR + "/"
+    return [rel for rel in tree.files if rel.startswith(prefix)]
+
+
+def _is_header_target(rel):
+    """E1-E3 scope (D-07): outbound files minus exempt basenames and binaries."""
+    name = rel.rsplit("/", 1)[-1]
+    if name in EXEMPT_BASENAMES:  # D-06: outbound/README.md quotes the header verbatim
+        return False
+    return os.path.splitext(name)[1].lower() not in BINARY_EXTS
+
+
 # ---------------------------------------------------------------------------
 # CHECKS -- in identifier order. Each takes (root, tree, config, findings).
-# E1-E5, E8, E9, W1 and W2 land in plans 02-02, 02-04 and 02-05.
+# E4 and E5 land later in 02-02; E8, E9, W1 and W2 in plans 02-04 and 02-05.
 # ---------------------------------------------------------------------------
+
+
+def read_status_header(text):
+    """{field: (line, value)} from the first STATUS_HEADER_WINDOW lines.
+
+    First occurrence of each field wins, and nothing below the window is
+    read, so a mail body quoting an older header cannot fire (P-06).
+    """
+    header = {}
+    for number, line in enumerate(text.splitlines()[:STATUS_HEADER_WINDOW], 1):
+        match = _FIELD_RE.fullmatch(line)
+        if match is not None and match.group(1) not in header:
+            header[match.group(1)] = (number, match.group(2))
+    return header
+
+
+def _status_problem(value):
+    """None when VALUE is a valid status (D-08), else the E2 message."""
+    if value == "draft" or _STATUS_REVIEWED_RE.fullmatch(value):
+        return None
+    if value.startswith("reviewed by") or value == "reviewed":
+        return "reviewed by status without a name"
+    if value == "sent" or value.startswith(("sent ", "sent\t")):
+        match = _STATUS_SENT_RE.fullmatch(value)
+        if match is not None and is_absolute_date(match.group(1)):
+            return None
+        return "sent status without an absolute date or a sender (sent YYYY-MM-DD [HH:MM] by <name>)"
+    return "status must be draft, reviewed by <name>, or sent YYYY-MM-DD [HH:MM] by <name>"
+
+
+def check_outbound_headers(root, tree, config, findings):
+    """E1, E2, E3: the status block every outbound file opens with (D-07..D-09).
+
+    E1: no recognised field in the first STATUS_HEADER_WINDOW lines (line 0),
+    or a required field missing or empty (at the first header line). E2: an
+    incomplete status value. E3: a Deadline: that is not an absolute, real
+    date. The field names are grepped in English in every dossier (spec
+    Sec3.2); there is no per-format parser and no per-language label table.
+    """
+    for rel in outbound_files(tree):
+        if not _is_header_target(rel):
+            continue
+        text = read_text_safe(os.path.join(root, *rel.split("/")))
+        if text is None:
+            findings.append(Finding(rel, 0, ERROR, "E1",
+                                    "outbound file cannot be read (symlink, over 5 MB, or not UTF-8), "
+                                    "so it has no readable status header"))
+            continue
+        header = read_status_header(text)
+        if not header:
+            findings.append(Finding(rel, 0, ERROR, "E1",
+                                    "no status header in the first {} lines".format(STATUS_HEADER_WINDOW)))
+            continue
+        required = MAIL_REQUIRED_FIELDS if rel.startswith(OUTBOUND_DIR + "/mails/") else REQUIRED_FIELDS
+        missing = [field for field in required
+                   if field not in header or (field != "Status" and header[field][1] == "")]
+        if missing:
+            first_line = min(line for line, _value in header.values())
+            findings.append(Finding(rel, first_line, ERROR, "E1", "incomplete status header: missing {}".format(
+                ", ".join(field + ":" for field in missing))))
+        if "Status" in header:
+            line, value = header["Status"]
+            problem = _status_problem(value)
+            if problem is not None:
+                findings.append(Finding(rel, line, ERROR, "E2", problem))
+        if "Deadline" in header:
+            line, value = header["Deadline"]
+            if not is_absolute_date(value):
+                findings.append(Finding(rel, line, ERROR, "E3",
+                                        "Deadline: is not an absolute YYYY-MM-DD date"))
 
 
 def check_consent_source(root, tree, config, findings):
@@ -757,6 +892,7 @@ def check_living_files(root, tree, config, findings):
 
 
 CHECKS = (
+    check_outbound_headers,
     check_consent_source,
     check_living_files,
 )

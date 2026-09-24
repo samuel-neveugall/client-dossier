@@ -164,4 +164,142 @@ replace_line "$parent/consent-ok/dossier.yaml" 'consent_source: ""' 'consent_sou
 make_case c0-junk
 printf 'this line is not yaml\n' >>"$parent/c0-junk/dossier.yaml"
 
+# write_file PATH CONTENT -- create PATH (and its parent folders) holding
+# CONTENT verbatim; printf '%s' so a `%` or a backslash in CONTENT is inert.
+write_file() {
+  mkdir -p "$(dirname "$1")"
+  printf '%s' "$2" >"$1"
+}
+
+# A complete, well-formed mail header plus a body -- the baseline every
+# outbound case below starts from and breaks in exactly one place.
+GOOD_MAIL='Status: draft
+To: Jane Doe
+Subject: Follow-up on the audit
+Written by: agent session, 2026-09-17
+
+Hello Jane,
+
+Here is the follow-up we discussed.
+'
+
+# --- E1: an outbound mail with a body and no status block at all (D-07) ---
+make_case e1
+write_file "$parent/e1/outbound/mails/2026-09-17_relance.md" 'Hello Jane,
+
+Here is the follow-up we discussed, with no header above it.
+'
+
+# --- E2: a `sent` status with a date but no sender (D-08) ---
+make_case e2
+write_file "$parent/e2/outbound/mails/2026-09-17_relance.md" 'Status: sent 2026-09-17
+To: Jane Doe
+Subject: Follow-up on the audit
+Written by: agent session, 2026-09-17
+
+Body.
+'
+
+# --- e2-reviewed: E2, `reviewed by` with no name -- the same defect (D-08) ---
+make_case e2-reviewed
+write_file "$parent/e2-reviewed/outbound/mails/2026-09-17_relance.md" 'Status: reviewed by
+To: Jane Doe
+Subject: Follow-up on the audit
+Written by: agent session, 2026-09-17
+
+Body.
+'
+
+# --- E3: a relative Deadline (D-09) ---
+make_case e3
+write_file "$parent/e3/outbound/mails/2026-09-17_relance.md" 'Status: draft
+To: Jane Doe
+Subject: Follow-up on the audit
+Deadline: next week
+Written by: agent session, 2026-09-17
+
+Body.
+'
+
+# --- e3-baddate: E3, a Deadline with the right shape and an impossible date ---
+make_case e3-baddate
+write_file "$parent/e3-baddate/outbound/mails/2026-09-17_relance.md" 'Status: draft
+To: Jane Doe
+Subject: Follow-up on the audit
+Deadline: 2026-13-45
+Written by: agent session, 2026-09-17
+
+Body.
+'
+
+# --- mail-no-subject: E1, a mail header without Subject: (A-02) ---
+# calls-no-subject is the same file under outbound/calls/, where Subject: is
+# not required: it must lint clean.
+NO_SUBJECT='Status: draft
+To: Jane Doe
+Written by: agent session, 2026-09-17
+
+Body.
+'
+make_case mail-no-subject
+write_file "$parent/mail-no-subject/outbound/mails/2026-09-17_relance.md" "$NO_SUBJECT"
+make_case calls-no-subject
+write_file "$parent/calls-no-subject/outbound/calls/2026-09-17_relance.md" "$NO_SUBJECT"
+
+# --- header-ok: well-formed headers in the three comment syntaxes -- clean ---
+# The Markdown mail also quotes an older header below line 10, which must be
+# ignored (P-06); the HTML-comment and `#`-comment headers exercise the
+# no-per-format-parser rule (D-07); the sent status carries date, time and
+# sender (D-08) and the Deadline is a real date (D-09).
+make_case header-ok
+write_file "$parent/header-ok/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Best regards.
+
+> On 2026-09-10 you wrote:
+> Status: sent yesterday
+> Deadline: next week
+"
+write_file "$parent/header-ok/outbound/mails/2026-09-18_suite.md" '<!--
+Status: sent 2026-09-18 14:30 by Jane Doe
+To: Jane Doe
+Subject: Next steps
+Deadline: 2026-10-01
+Written by: Sam
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+Body.
+'
+write_file "$parent/header-ok/outbound/calls/2026-09-19_kickoff.txt" '# Status: reviewed by Sam
+# To: Jane Doe
+# Written by: agent session, 2026-09-19
+
+Agenda.
+'
+write_file "$parent/header-ok/outbound/deliverables/2026-09-20_audit.html" '<!-- Status: draft -->
+<!-- To: Jane Doe -->
+<!-- Written by: Sam -->
+<p>Audit.</p>
+'
+
+# Call minutes whose body, inside the 10-line window, repeats a Status: line
+# (first occurrence wins, P-06) and mentions a Deadline: mid-sentence (only
+# a line that *starts* with a field, after comment syntax, is a header line).
+write_file "$parent/header-ok/outbound/calls/2026-09-21_debrief.md" 'Status: draft
+To: Jane Doe
+Written by: Sam
+
+Minutes.
+Jane read the old header aloud:
+Status: sent last week
+We said the Deadline: next week was fine.
+'
+
+# --- binary-ok: a rendered PDF beside its Markdown source -- clean (D-07) ---
+# The .pdf carries no text header and is outside E1-E3; its .md sibling
+# carries the header.
+make_case binary-ok
+: >"$parent/binary-ok/outbound/deliverables/2026-09-17_audit.pdf"
+write_file "$parent/binary-ok/outbound/deliverables/2026-09-17_audit.md" "$GOOD_MAIL"
+
 echo "$parent"
