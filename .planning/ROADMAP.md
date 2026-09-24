@@ -127,12 +127,12 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: 6 plans
+**Plans**: 1/6 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — tracer: `lint.py` finds the root, parses `dossier.yaml` through a
+- [x] 02-01-PLAN.md — tracer: `lint.py` finds the root, parses `dossier.yaml` through a
   quotedness-preserving schema, walks the tree, runs E7, reports, and returns 0/1/2 — with the
   bash harness, the fixture generator and the config gate (E6, C1, C0) around it
 
@@ -289,7 +289,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
-| 2. Linter & Test Harness | 0/6 | Planned, not started | - |
+| 2. Linter & Test Harness | 1/6 | In Progress|  |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |

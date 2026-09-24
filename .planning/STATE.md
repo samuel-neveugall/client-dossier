@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Linter & Test Harness
-status: ready-to-execute
-stopped_at: Phase 2 planned and plan-checked; execution awaits Samuel's go
-last_updated: "2026-09-17T11:17:54.350Z"
-last_activity: 2026-09-17
-last_activity_desc: Phase 02 discussed, planned (6 plans / 5 waves) and plan-checked — ready to execute
-state_head: 0e6c0ec2f67ebbb6d7b526db9dcaa3ed5b62e3dc
+status: executing
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-09-24T19:41:18.310Z"
+last_activity: 2026-09-24
+last_activity_desc: Phase 02 execution started
+state_head: b5842b7fb39368eaea86137815c388e89bb3e7a5
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 12
-  completed_plans: 6
+  completed_plans: 7
   percent: 14
 ---
 
@@ -25,23 +25,19 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 02 — Linter & Test Harness (planned, plan-checked, ready to execute)
+**Current focus:** Phase 02 — Linter & Test Harness
 
 ## Current Position
 
-Phase: 02 (Linter & Test Harness) — PLANNED, READY TO EXECUTE
-Plan: 02-01 … 02-06 (6 plans, 5 waves, 17 tasks) — none executed yet
-Status: planning-only mission run 2026-09-17 (context → plans → plan-check). `gsd-plan-checker`
-passed on its second pass. Carried-over debts (a) and (b) are absorbed by plan 02-03 under the
-D-24 arbitration below. Execution is deliberately NOT started: it is a separate mandate Samuel
-must green-light.
-Last activity: 2026-09-17 — Phase 1 closed. Before that, 2026-09-16 — independent acceptance re-verification passed after 3
-review/fix rounds; SCAF-01…08 (8/8) and the 5 ROADMAP success criteria reproduced
-independently, including SCAF-06 replayed against the real origin repository under the
-confidentiality protocol. REQUIREMENTS.md (42 reqs), ROADMAP.md, PROJECT.md and CLAUDE.md
-resynchronised with the delivered code.
+Phase: 02 (Linter & Test Harness) — EXECUTING
+Plan: 2 of 6 (02-01 complete; 02-02 next)
+Status: 02-01 delivered `scripts/lint.py` (root discovery, D-24 schema with C1/C0, pruned
+read-only walk, E6, E7, reporter, exit 0/1/2/3) and `tests/test-lint.sh` (144 assertions);
+`bash tests/run.sh` reports 6 files, 0 failed. LINT-01..03 stay Pending until the remaining
+checks (E1-E5, E8, E9, W1, W2) and the French fixture land in 02-02 … 02-06.
+Last activity: 2026-09-24 — 02-01 executed (3 tasks, 3 commits).
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 14%
 
 ## Performance Metrics
 
@@ -64,6 +60,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: on track; Phase 1 closed on the human gate 2026-09-17
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 02 P01 | 8min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -111,6 +112,9 @@ mission, now validated by the phase's own delivery:
   Do not count it as a mitigation in any future threat model.
 - **Correction budget exhausted at 3 rounds.** Two residual findings (see Deferred Items
   below) were classified as tracked debt rather than fixed in a 4th round.
+- [Phase 02]: 02-01: sanitise_path also escapes C1 controls, surrogate-escaped bytes and U+2028/2029 (T-02-01 hardening beyond 0x00-0x1F/0x7F)
+- [Phase 02]: 02-01: an invalid JSON dossier.yaml is C1 (exit 1), not unreadable (exit 2); a nonexistent PATH exits 2 with its own message
+- [Phase 02]: 02-01: forged-name end-to-end \x0a assertion deferred to 02-02 (needs E4); pinned meanwhile by a direct report() probe, tracked in WINDOWS.md
 
 ### Pending Todos
 
@@ -141,6 +145,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-09-17 — Phase 2 planning mission (context, plans, plan-check).
-Stopped at: Phase 2 planned and verified; execution not started, awaiting Samuel's go.
-Resume file: .planning/phases/02-linter-test-harness/02-01-PLAN.md
+Last session: 2026-09-24T19:41:18.293Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
