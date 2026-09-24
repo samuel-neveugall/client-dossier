@@ -56,6 +56,16 @@ assert_last_line() {
   assert_eq "$1" "$(printf '%s\n' "$LINT_OUT" | tail -n 1)" "$2"
 }
 
+# assert_clean LABEL — the last lint run raised none of the identifiers and
+# its summary is exactly zero and zero.
+assert_clean() {
+  local label="$1" ident
+  assert_last_line '0 error(s), 0 warning(s)' "$label: summary is 0 error(s), 0 warning(s)"
+  for ident in $ALL_IDS; do
+    assert_no_finding "$ident" "$label: no finding at all"
+  done
+}
+
 # --- The linter is an executable script ---
 assert_exec "$(lint_py)"
 
@@ -74,10 +84,7 @@ python3 "$(init_py)" --target "$CLEAN" --language en --counterpart 'Acme|orderin
 assert_eq 0 "$init_status" 'clean: init.py scaffolds the base dossier'
 
 assert_lint "$CLEAN" 0 'clean: a fresh scaffold exits 0'
-assert_last_line '0 error(s), 0 warning(s)' 'clean: summary is 0 error(s), 0 warning(s)'
-for ident in $ALL_IDS; do
-  assert_no_finding "$ident" 'clean: no finding at all'
-done
+assert_clean 'clean'
 
 # --- The fixture generator's contract (LINT-02, D-29) ---
 # An absent, empty, non-directory or non-dossier argument is refused with a
@@ -128,11 +135,40 @@ for ident in e1 e2 e3 e4 e5 e6 e7 e8 e9; do
   assert_dir "$FIXTURES/$ident"
 done
 
-# --- E7: a living file lost its Last updated: line (D-13) ---
-assert_lint "$FIXTURES/e7" 1 'e7: exits 1'
-assert_only E7 'e7: only [E7] fires'
-assert_out_line '^dossier/TONE\.md:[0-9]+: ERROR \[E7\] ' 'e7: located on dossier/TONE.md'
-assert_last_line '1 error(s), 0 warning(s)' 'e7: exactly one error'
+# --- The nine-class sweep: each error fixture fires its identifier and no other (criterion 2) ---
+# Every one of these fixtures exits 1 for any error at all, so without the
+# negative half a linter that reported one class on all nine trees would pass.
+# Each pair is fixture:identifier, split by parameter expansion (bash 3.2 has
+# no associative arrays). The exact summary also catches a second finding of
+# the SAME class and a stray warning. Assertions are on exit code and
+# identifier only, never on a golden output file (D-30).
+SWEEP='e1:E1 e2:E2 e3:E3 e4:E4 e5:E5 e6:E6 e7:E7 e8:E8 e9:E9'
+for pair in $SWEEP; do
+  case_name="${pair%%:*}"
+  want="${pair#*:}"
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: exits 1"
+  assert_finding "$want" "$case_name: [$want] fires"
+  for ident in $ALL_IDS; do
+    [ "$ident" = "$want" ] && continue
+    assert_no_finding "$ident" "$case_name: [$ident] stays silent"
+  done
+  assert_last_line '1 error(s), 0 warning(s)' "$case_name: exactly one error, no warning"
+  # What the sweep cannot express: where each finding is located.
+  case "$case_name" in
+    e1) assert_out_line '^outbound/mails/2026-09-17_relance\.md:0: ERROR \[E1\] ' 'e1: no status block (D-07), reported at line 0 of the mail' ;;
+    e2) assert_out_line '^outbound/mails/2026-09-17_relance\.md:1: ERROR \[E2\] ' 'e2: sent without a sender (D-08), reported at the Status: line' ;;
+    e3) assert_out_line '^outbound/mails/2026-09-17_relance\.md:4: ERROR \[E3\] ' 'e3: a relative Deadline (D-09), reported at the Deadline: line' ;;
+    e4) assert_out_line '^outbound/mails/[^:]*:0: ERROR \[E4\] ' 'e4: a malformed filename (D-10), reported at line 0' ;;
+    e5)
+      assert_out_line '^outbound/mails/2026-09-17_relance\.md:[1-9][0-9]*: ERROR \[E5\] ' 'e5: a name in the body (D-11), reported at the matching line'
+      assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep -c 'travaillons')" 'e5: the message carries the needle, never the surrounding sentence (T-02-09)'
+      ;;
+    e6) assert_out_line '^dossier\.yaml:[0-9]+: ERROR \[E6\] ' 'e6: consent without a source (D-12), located in dossier.yaml' ;;
+    e7) assert_out_line '^dossier/TONE\.md:[0-9]+: ERROR \[E7\] ' 'e7: a lost Last updated: line (D-13), on dossier/TONE.md' ;;
+    e8) assert_out_line '^dossier/\.claude:0: ERROR \[E8\] ' 'e8: a nested .claude/ (D-14), reported at line 0 of the folder' ;;
+    e9) assert_out_line '^outbound/deliverables/2026-09-17_audit\.pdf:0: ERROR \[E9\] ' 'e9: a render with no source (D-15), reported at line 0' ;;
+  esac
+done
 
 # --- Sub-dossier boundary: a nested dossier is invisible from its parent (D-03) ---
 assert_lint "$FIXTURES/sub-dossier" 0 'sub-dossier: the parent exits 0'
@@ -257,12 +293,10 @@ assert_lint "$FIXTURES/c1-staleness" 1 'c1-staleness: exits 1'
 assert_out_line 'ERROR \[C1\] .*staleness_days' 'c1-staleness: the [C1] line names staleness_days'
 assert_only C1 'c1-staleness: only [C1] fires'
 
-assert_lint "$FIXTURES/e6" 1 'e6: exits 1'
-assert_out_line '^dossier\.yaml:[0-9]+: ERROR \[E6\] ' 'e6: located at dossier.yaml:<line>'
-assert_only E6 'e6: only [E6] fires, no [C1]'
-
+# E6 itself is in the nine-class sweep. Its clean twin is swept against all
+# thirteen identifiers: a recorded, sourced consent raises nothing at all.
 assert_lint "$FIXTURES/consent-ok" 0 'consent-ok: exits 0'
-assert_last_line '0 error(s), 0 warning(s)' 'consent-ok: a recorded, sourced consent is clean'
+assert_clean 'consent-ok'
 
 junk_line="$(wc -l <"$FIXTURES/c0-junk/dossier.yaml" | tr -d ' ')"
 assert_lint "$FIXTURES/c0-junk" 0 'c0-junk: an unparseable line is a warning, exit 0'
@@ -275,23 +309,9 @@ assert_lint "$CLEAN" 0 'clean: still exits 0'
 assert_no_finding C1 'clean: no [C1]'
 assert_no_finding C0 'clean: no [C0]'
 
-# --- E1: an outbound file with no status block in its first 10 lines (D-07) ---
-assert_lint "$FIXTURES/e1" 1 'e1: exits 1'
-assert_only E1 'e1: only [E1] fires'
-assert_out_line '^outbound/mails/2026-09-17_relance\.md:0: ERROR \[E1\] ' 'e1: reported at line 0 of the mail'
-assert_last_line '1 error(s), 0 warning(s)' 'e1: exactly one error'
-
-# --- E2: an incomplete status value (D-08) ---
-assert_lint "$FIXTURES/e2" 1 'e2: sent without a sender exits 1'
-assert_only E2 'e2: only [E2] fires'
-assert_out_line '^outbound/mails/2026-09-17_relance\.md:1: ERROR \[E2\] ' 'e2: reported at the Status: line'
+# --- E2 and E3 variants beyond the sweep's one fixture per class (D-08, D-09) ---
 assert_lint "$FIXTURES/e2-reviewed" 1 'e2-reviewed: reviewed by with no name exits 1'
 assert_only E2 'e2-reviewed: only [E2] fires'
-
-# --- E3: a Deadline that is not an absolute, real date (D-09) ---
-assert_lint "$FIXTURES/e3" 1 'e3: a relative Deadline exits 1'
-assert_only E3 'e3: only [E3] fires'
-assert_out_line '^outbound/mails/2026-09-17_relance\.md:4: ERROR \[E3\] ' 'e3: reported at the Deadline: line'
 assert_lint "$FIXTURES/e3-baddate" 1 'e3-baddate: Deadline 2026-13-45 exits 1'
 assert_only E3 'e3-baddate: the calendar is validated, not just the shape'
 
@@ -315,19 +335,11 @@ for ident in E1 E2 E3; do
   assert_no_finding "$ident" 'clean: the shipped outbound README raises no header finding'
 done
 
-# --- E4: the outbound filename convention (D-10, A-03) ---
-assert_lint "$FIXTURES/e4" 1 'e4: a malformed filename exits 1'
-assert_only E4 'e4: only [E4] fires'
-assert_out_line '^outbound/mails/[^:]*:0: ERROR \[E4\] ' 'e4: reported at line 0 of the file'
+# --- E4 variant: the filename date is calendar-validated (D-10, A-03) ---
 assert_lint "$FIXTURES/e4-baddate" 1 'e4-baddate: 2026-13-45 in the filename exits 1'
 assert_only E4 'e4-baddate: the filename date is calendar-validated'
 
-# --- E5: a confidential name under outbound/, in the text or the filename (D-11) ---
-assert_lint "$FIXTURES/e5" 1 'e5: a name in the body exits 1'
-assert_only E5 'e5: only [E5] fires'
-assert_out_line '^outbound/mails/2026-09-17_relance\.md:[1-9][0-9]*: ERROR \[E5\] ' 'e5: reported at the matching, non-zero line'
-assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep -c 'travaillons')" 'e5: the message carries the needle, never the surrounding sentence (T-02-09)'
-
+# --- E5 variants: the filename, word boundaries, NFD, binaries, no names (D-11) ---
 assert_lint "$FIXTURES/e5-filename" 1 'e5-filename: a name only in the filename exits 1'
 assert_only E5 'e5-filename: only [E5] fires'
 assert_out_line '^outbound/mails/2026-09-17_acme-offer\.md:0: ERROR \[E5\] ' 'e5-filename: reported at line 0'
@@ -382,12 +394,8 @@ assert_last_line '0 error(s), 0 warning(s)' 'e5-readme-nonames: zero findings'
 assert_lint "$CLEAN" 0 'clean: still exits 0'
 assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep -c '^outbound/README\.md:')" 'clean: no finding of any class on outbound/README.md'
 
-# --- E8: a .claude/ folder below the dossier root (D-14) ---
-assert_lint "$FIXTURES/e8" 1 'e8: dossier/.claude/ exits 1'
-assert_only E8 'e8: only [E8] fires'
-assert_out_line '^dossier/\.claude:0: ERROR \[E8\] ' 'e8: reported at line 0 of dossier/.claude'
-assert_last_line '1 error(s), 0 warning(s)' 'e8: exactly one error'
-# The negative controls that keep E8 from being vacuous: the root's own
+# --- E8's negative controls (D-14) ---
+# E8 itself is in the nine-class sweep. The negative controls that keep E8 from being vacuous: the root's own
 # agent folder, and a sub-dossier's own one seen from either side.
 assert_lint "$FIXTURES/claude-at-root" 0 'claude-at-root: <root>/.claude exits 0'
 assert_last_line '0 error(s), 0 warning(s)' 'claude-at-root: the root agent folder raises nothing'
@@ -396,11 +404,8 @@ assert_no_finding E8 'sub-dossier: no [E8] from the parent'
 assert_lint "$FIXTURES/sub-dossier/clients/other" 1 'sub-dossier: linted directly, still exits 1 (E4, E7)'
 assert_no_finding E8 'sub-dossier: linted directly, its own root .claude/ is permitted'
 
-# --- E9: a rendered deliverable with no .md/.html source beside it (D-15) ---
-assert_lint "$FIXTURES/e9" 1 'e9: a lone .pdf under deliverables/ exits 1'
-assert_only E9 'e9: only [E9] fires'
-assert_out_line '^outbound/deliverables/2026-09-17_audit\.pdf:0: ERROR \[E9\] ' 'e9: reported at line 0 of the render'
-assert_last_line '1 error(s), 0 warning(s)' 'e9: exactly one error'
+# --- E9's variant and negative controls (D-15) ---
+# E9 itself is in the nine-class sweep.
 assert_lint "$FIXTURES/e9-docx" 1 'e9-docx: a lone .docx under deliverables/ exits 1'
 assert_only E9 'e9-docx: only [E9] fires'
 assert_lint "$FIXTURES/e9-source-only" 0 'e9-source-only: a source with no render exits 0'
