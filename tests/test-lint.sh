@@ -768,13 +768,31 @@ assert_clean 'round-trip: the unreserved unknown-language dossier'
 rm -rf "$rt"
 
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
+# The upward walk has no stop condition (D-01), so this case only means
+# something when no ancestor of the scratch folder holds a dossier.yaml (a
+# CI workspace or a home folder may): then it is skipped, loudly, instead of
+# failing on the machine's layout rather than on the code (WR-08).
 EMPTY="$(mktemp -d)"
-assert_lint "$EMPTY" 2 'no dossier: exits 2'
-assert_eq '' "$LINT_OUT" 'no dossier: nothing on stdout'
-case "$LINT_ERR" in
-  *"no dossier.yaml found from "*" upward"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
-  *) echo "FAIL: no dossier: stderr lacks 'no dossier.yaml found from <path> upward' (got '$LINT_ERR')" >&2
-     TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
-esac
+ancestor_dossier=""
+probe="$(cd "$EMPTY" && pwd -P)"
+while :; do
+  if [ -f "$probe/dossier.yaml" ]; then
+    ancestor_dossier="$probe/dossier.yaml"
+    break
+  fi
+  [ "$probe" = "/" ] && break
+  probe="$(dirname "$probe")"
+done
+if [ -n "$ancestor_dossier" ]; then
+  echo "SKIP: no dossier: an ancestor of $EMPTY holds $ancestor_dossier, so exit 2 cannot be observed here" >&2
+else
+  assert_lint "$EMPTY" 2 'no dossier: exits 2'
+  assert_eq '' "$LINT_OUT" 'no dossier: nothing on stdout'
+  case "$LINT_ERR" in
+    *"no dossier.yaml found from "*" upward"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+    *) echo "FAIL: no dossier: stderr lacks 'no dossier.yaml found from <path> upward' (got '$LINT_ERR')" >&2
+       TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+  esac
+fi
 
 finish
