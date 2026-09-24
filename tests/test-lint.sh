@@ -473,6 +473,21 @@ for pair in 'Łukasz Nowak:lukasz-nowak' 'Michał Zieliński:michal-zielinski' '
     "e5-slug-translit: '${pair%%:*}' found in the slug ${pair#*:}"
 done
 assert_last_line '16 error(s), 0 warning(s)' 'e5-slug-translit: one finding per slug, no stray match'
+# The text half also matches the name as a slug would spell it (WR-03).
+tf="$FIXTURES/e5-text-fold/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/e5-text-fold" 1 'e5-text-fold: unaccented, hyphenated and joined spellings in a body exit 1'
+assert_only E5 'e5-text-fold: only [E5] fires'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$tf" 'Societe Exemple'): ERROR \\[E5\\] .*'Soci" \
+  'e5-text-fold: Societe Exemple matches Société Exemple, at its line'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$tf" 'Big-Telco'): ERROR \\[E5\\] .*'Big Telco'" \
+  'e5-text-fold: Big-Telco and BigTelco match Big Telco, at their line'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$tf" 'Lukasz Nowak'): ERROR \\[E5\\] .*ukasz Nowak'" \
+  'e5-text-fold: Lukasz Nowak matches Łukasz Nowak, at its line'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$tf" 'OBrien'): ERROR \\[E5\\] .*'O.Brien'" \
+  "e5-text-fold: OBrien matches O'Brien, at its line"
+assert_last_line '4 error(s), 0 warning(s)' 'e5-text-fold: one finding per (line, name)'
+assert_lint "$FIXTURES/e5-text-fold-boundary" 0 'e5-text-fold-boundary: Big, Telco and a lone c exit 0'
+assert_clean 'e5-text-fold-boundary'
 assert_lint "$FIXTURES/e5-slug-boundary" 0 'e5-slug-boundary: bigtelcom, Bigger Telco and Big Telcom exit 0'
 assert_last_line '0 error(s), 0 warning(s)' 'e5-slug-boundary: a longer word is still not the name'
 ew="$FIXTURES/e5-wrapped/outbound/mails/2026-09-17_relance.md"

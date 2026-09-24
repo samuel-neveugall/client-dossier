@@ -1326,6 +1326,42 @@ def filename_pattern(needle):
     return re.compile(r"(?<![^\W_])(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
 
 
+# A needle the folded text pass may take: letters, digits, whitespace and
+# the punctuation that only joins the words of a name. `C++`, `AT&T` or `F#`
+# fold down to one or two bare letters, which prose is full of: those are
+# left to the exact pass alone.
+_TEXT_FOLDABLE_RE = re.compile(r"[\w\s'.\-]+")
+
+# What may separate the words of a name in folded text: whitespace, a
+# hyphen, an underscore, an apostrophe, a dot, or nothing (`Big-Telco`,
+# `BigTelco`, `OBrien`, `jane.doe`). Never a comma or other sentence
+# punctuation, so `Big, Telco` stays two words.
+_TEXT_FOLD_SEPARATOR = r"[\s_'.\-]*"
+
+
+def folded_text_pattern(needle):
+    """E5's second text pattern, matched against fold_ascii(text) (WR-03).
+
+    The name as the filename half folds it -- accents dropped, the letters
+    NFKD leaves whole transliterated, both spellings of Đ -- with its words
+    joined by _TEXT_FOLD_SEPARATOR, so a body typed without accents
+    (`Societe Exemple`) or hyphenating the name (`Big-Telco`) is still a
+    leak. Matching more is the safe side of a leak check. A needle whose
+    punctuation carries meaning (`C++`) gets no folded pattern.
+    """
+    if _TEXT_FOLDABLE_RE.fullmatch(normalise(needle)) is None:
+        return _NEVER_RE
+    bodies = []
+    for alternate in (False, True):
+        tokens = re.findall(r"[^\W_]+", fold_ascii(normalise(needle), alternate))
+        body = _TEXT_FOLD_SEPARATOR.join(re.escape(token) for token in tokens)
+        if tokens and body not in bodies:
+            bodies.append(body)
+    if not bodies:
+        return _NEVER_RE
+    return re.compile(r"(?<![^\W_])(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
+
+
 def check_confidential_names(root, tree, config, findings):
     """E5: a confidential name in the text or the filename of an outbound file.
 
@@ -1333,7 +1369,10 @@ def check_confidential_names(root, tree, config, findings):
     consent_recorded reads as False in the schema, so the check stays armed
     (T-02-02). Both sides are NFC-normalised (P-05). The text half searches
     the whole file, so a name wrapped across two lines is found, and reports
-    the line the match starts on, once per (line, name). The filename half
+    the line the match starts on, once per (line, name). It runs twice: the
+    exact pattern on the NFC text, then folded_text_pattern() on the text as
+    fold_ascii() spells it (WR-03). Folding never adds or removes a `\n`,
+    so a line number read off either string is the same line. The filename half
     matches the slug spellings E4 allows (filename_pattern). A file that
     will not decode, is symlinked or is oversized skips the text half only;
     the filename half always runs (P-07). The message names the needle and
@@ -1341,13 +1380,13 @@ def check_confidential_names(root, tree, config, findings):
     """
     if consent_is_recorded(config) or not config["confidential_names"]:
         return
-    needles = [(name, boundary_pattern(name), filename_pattern(name))
+    needles = [(name, boundary_pattern(name), filename_pattern(name), folded_text_pattern(name))
                for name in config["confidential_names"]]
     prefix_len = len(OUTBOUND_DIR) + 1
     for rel in outbound_files(tree):
         # No EXEMPT_PATHS skip here, on purpose: a leaked name is a leak wherever it sits.
         path_name = fold_ascii(normalise(rel[prefix_len:]))
-        for name, _pattern, name_pattern in needles:
+        for name, _pattern, name_pattern, _folded in needles:
             if name_pattern.search(path_name):
                 findings.append(Finding(rel, 0, ERROR, "E5",
                                         "confidential name '{}' in the file name under outbound/".format(name)))
@@ -1355,18 +1394,25 @@ def check_confidential_names(root, tree, config, findings):
         if text is None:
             continue
         norm = normalise(text).replace("\r\n", "\n").replace("\r", "\n")
-        newlines = None
+        haystacks = {False: norm}
+        newlines = {}
         seen = set()
-        for name, pattern, _name_pattern in needles:
-            for match in pattern.finditer(norm):
-                if newlines is None:
-                    newlines = [m.start() for m in re.finditer("\n", norm)]
-                number = bisect.bisect_right(newlines, match.start()) + 1
-                if (number, name) in seen:
+        for name, pattern, _name_pattern, folded_pattern in needles:
+            for folded, regex in ((False, pattern), (True, folded_pattern)):
+                if regex is _NEVER_RE:
                     continue
-                seen.add((number, name))
-                findings.append(Finding(rel, number, ERROR, "E5",
-                                        "confidential name '{}' under outbound/".format(name)))
+                if folded not in haystacks:
+                    haystacks[True] = fold_ascii(norm)
+                haystack = haystacks[folded]
+                for match in regex.finditer(haystack):
+                    if folded not in newlines:
+                        newlines[folded] = [m.start() for m in re.finditer("\n", haystack)]
+                    number = bisect.bisect_right(newlines[folded], match.start()) + 1
+                    if (number, name) in seen:
+                        continue
+                    seen.add((number, name))
+                    findings.append(Finding(rel, number, ERROR, "E5",
+                                            "confidential name '{}' under outbound/".format(name)))
 
 
 def check_consent_source(root, tree, config, findings):

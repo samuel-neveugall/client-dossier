@@ -759,6 +759,27 @@ while IFS= read -r pair; do
 done <<EOF
 $TRANSLIT_PAIRS
 EOF
+# --- e5-text-fold / e5-text-fold-boundary: the text half spells a name as the slug does (WR-03) ---
+# A body typed without accents, a name hyphenated or run together in prose,
+# a letter NFKD leaves whole: each is the name. Each sits on its own line,
+# after a line whose folding changes its length (Æ -> ae, ﬁ -> fi), so a
+# line number taken from the wrong string would show.
+make_named_case e5-text-fold --confidential-name "$(printf 'Soci\303\251t\303\251 Exemple')" \
+  --confidential-name 'Big Telco' --confidential-name 'Łukasz Nowak' --confidential-name "O'Brien"
+write_file "$parent/e5-text-fold/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Æsthetics of the ﬁnal draft.
+We met Societe Exemple today.
+Æ ﬁ Æ ﬁ.
+Then Big-Telco called, then BigTelco wrote.
+Lukasz Nowak signed. So did OBrien.
+"
+# The folded half must not match more than a spelling of the name: not
+# across a comma, and never for a name whose punctuation carries meaning
+# (`C++` folds to the single letter c, which is everywhere in prose).
+make_named_case e5-text-fold-boundary --confidential-name 'Big Telco' --confidential-name 'C++'
+write_file "$parent/e5-text-fold-boundary/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We asked Big, Telco answered. See section c of the plan, c'est clair.
+"
 # The boundary still holds in both halves: longer words are not the name.
 make_named_case e5-slug-boundary --confidential-name 'Big Telco'
 write_file "$parent/e5-slug-boundary/outbound/mails/2026-09-17_bigtelcom-offer.md" "${GOOD_MAIL}
