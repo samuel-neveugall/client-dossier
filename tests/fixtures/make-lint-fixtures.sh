@@ -709,8 +709,9 @@ printf '%s\n' 'Jane calls back tomorrow.' '- An unsourced bullet line' >>"$paren
 # Each HISTORY.md line exists to fail one specific way: a sourced bullet, an
 # unsourced one, the `*` marker, an opinion marker, an inflected near-marker
 # (`reconstruite` is not `reconstruit`), a bullet inside a genuine multi-line
-# comment block and one right after it closes. None carries a relative-date
-# word, so W1 stays silent and every warning here is a W2.
+# comment block, one right after it closes and a heading whose text starts
+# with a bullet marker. None carries a relative-date word, so W1 stays
+# silent and every warning here is a W2.
 make_lang_case w2-fr fr
 cat >>"$parent/w2-fr/dossier/HISTORY.md" <<'MD'
 - Jane Doe (Acme) rappelle le 2026-10-01 (appel @12:34).
@@ -722,6 +723,7 @@ cat >>"$parent/w2-fr/dossier/HISTORY.md" <<'MD'
 - Une piste non vérifiée sur le budget
 -->
 - Une ligne après le commentaire
+## - Une rubrique en forme de puce
 MD
 # dossier/README.md is not a living file (P-02): seven unsourced bullets
 # there must stay silent, which is what iterating LIVING_FILES buys.

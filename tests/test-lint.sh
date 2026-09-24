@@ -586,12 +586,20 @@ assert_no_error 'w2-fr: no error identifier'
 assert_no_finding W1 'w2-fr: no relative-date word, so no [W1]'
 assert_last_line '0 error(s), 4 warning(s)' 'w2-fr: exactly the four expected bullets fire'
 # w2_at TEXT LABEL / no_w2_at TEXT LABEL — W2 does / does not fire at the
-# HISTORY.md line holding TEXT.
+# HISTORY.md line holding TEXT. A bait missing from the fixture is a
+# failure, never a vacuous pass (WR-07).
 w2_at() {
   assert_out_line "^dossier/HISTORY\\.md:$(line_of "$w2h" "$1"): WARNING \\[W2\\] " "$2"
 }
 no_w2_at() {
-  assert_eq 0 "$(count_out_lines "^dossier/HISTORY\\.md:$(line_of "$w2h" "$1"): WARNING \\[W2\\] ")" "$2"
+  local n
+  n="$(line_of "$w2h" "$1")"
+  if [ -z "$n" ]; then
+    echo "FAIL: $2 (bait '$1' not found in $w2h)" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    return
+  fi
+  assert_eq 0 "$(count_out_lines "^dossier/HISTORY\\.md:$n: WARNING \\[W2\\] ")" "$2"
 }
 no_w2_at 'rappelle le 2026-10-01 (appel' 'w2-fr: a bullet ending with a parenthetical source is silent'
 w2_at 'attendu le 2026-10-01.' 'w2-fr: an unsourced bullet fires at its exact line'
@@ -600,7 +608,9 @@ no_w2_at 'Probablement un budget' 'w2-fr: an opinion marker makes an unsourced b
 w2_at 'reconstruite' 'w2-fr: an inflected near-marker is not a marker (boundary)'
 no_w2_at 'Une piste non vérifiée' 'w2-fr: a bullet inside a multi-line comment block is silent'
 w2_at 'après le commentaire' 'w2-fr: the tracker closes -- the bullet after the block fires'
-no_w2_at '## Chronologie' 'w2-fr: a heading is never a bullet'
+# A heading whose text starts with a bullet marker: only a line that itself
+# starts with `- ` or `* ` is a bullet (D-18).
+no_w2_at '## - Une rubrique en forme de puce' 'w2-fr: a bullet-shaped heading is never a bullet'
 assert_eq 0 "$(count_out_lines '^dossier/README\.md:')" 'w2-fr: dossier/README.md is not a living file (P-02)'
 assert_eq 0 "$(count_out_lines '^knowledge/')" 'w2-fr: knowledge/ is outside W2'
 assert_eq 0 "$(count_out_lines '^outbound/')" 'w2-fr: outbound/ is outside W2'
@@ -647,7 +657,11 @@ fr_at() {
 fr_none() {
   local n
   n="$(line_of "$FR/$1" "$2")"
-  [ -n "$n" ] || n='missing'
+  if [ -z "$n" ]; then
+    echo "FAIL: $3 (bait '$2' not found in $1)" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    return
+  fi
   assert_eq 0 "$(count_out_lines "^$(printf '%s' "$1" | sed 's/\./\\./g'):$n: ")" "$3"
 }
 fr_at dossier/HISTORY.md 'rappelle demain' W1 'fr: demain raises [W1]'
