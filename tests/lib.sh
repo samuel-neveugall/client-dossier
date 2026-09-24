@@ -10,12 +10,24 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TESTS_PASSED=0
 TESTS_FAILED=0
 
+# The last lint run's stdout and stderr, set by assert_lint(). Initialised
+# here because set -u aborts on a read before the first assert_lint.
+LINT_OUT=""
+LINT_ERR=""
+
 # init_py — the absolute path to the script under test. Tests call
 # `python3 "$(init_py)" ...` because the bash harness has no
 # `${CLAUDE_SKILL_DIR}` expansion (that is a Claude Code harness-side
 # substitution, not an environment variable — RESEARCH assumption A4).
 init_py() {
   echo "$REPO_ROOT/skills/dossier-init/scripts/init.py"
+}
+
+# lint_py — the absolute path to the linter under test. Mirrors init_py():
+# the bash harness has no ${CLAUDE_PLUGIN_ROOT} expansion, and a hardcoded
+# path breaks the moment the repository is checked out elsewhere.
+lint_py() {
+  echo "$REPO_ROOT/scripts/lint.py"
 }
 
 # scratch_repo — a fresh throwaway git repository. Echoes its path.
@@ -99,6 +111,44 @@ assert_eq() {
     echo "FAIL: $label (expected '$expected', got '$actual')" >&2
     TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
+}
+
+# assert_lint DOSSIER EXPECTED_EXIT LABEL — runs the linter once on DOSSIER,
+# stores stdout in LINT_OUT and stderr in LINT_ERR for the assertions that
+# follow, and asserts the exit code. stderr goes through a mktemp file, never
+# a file beside the dossier, so the tree under test is left untouched.
+assert_lint() {
+  local dossier="$1" expected="$2" label="$3" status=0 err_file
+  err_file="$(mktemp)"
+  LINT_OUT="$(python3 "$(lint_py)" "$dossier" 2>"$err_file")" || status=$?
+  LINT_ERR="$(cat "$err_file")"
+  rm -f "$err_file"
+  assert_eq "$expected" "$status" "$label"
+}
+
+# assert_finding ID LABEL — the identifier `[ID]` appears in LINT_OUT.
+# assert_no_finding ID LABEL — it does not (D-29 isolation). `case` glob
+# matching keeps both bash-3.2-safe with no subprocess per assertion.
+assert_finding() {
+  local ident="$1" label="$2"
+  case "$LINT_OUT" in
+    *"[$ident]"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+    *)
+      echo "FAIL: $label (no [$ident] in lint output)" >&2
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+      ;;
+  esac
+}
+
+assert_no_finding() {
+  local ident="$1" label="$2"
+  case "$LINT_OUT" in
+    *"[$ident]"*)
+      echo "FAIL: $label (unexpected [$ident] in lint output)" >&2
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+      ;;
+    *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  esac
 }
 
 # finish — prints the summary line and exits 1 when any assertion failed.
