@@ -27,6 +27,7 @@ Python 3 standard library only, targeting Python >= 3.8.
 import argparse
 import bisect
 import datetime
+import difflib
 import json
 import os
 import re
@@ -218,6 +219,11 @@ _KEY_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*):(?:[ \t]+(.*))?")
 # skipped line fails closed, and a gate key is named in the message when one
 # can be read off the line.
 GATE_KEYS = frozenset(("confidential_names", "consent_recorded", "consent_source"))
+
+# How close an unknown key must be to a gate key to be read as a misspelling
+# of it (difflib ratio, WR-01). `confidental_names` scores 0.97; every other
+# key of spec Sec3.2 (and name/role/contacts) scores under 0.5.
+GATE_KEY_CUTOFF = 0.8
 
 # Which key an UNREADABLE line belongs to, used to word the C1 message.
 # Looser than _KEY_RE on purpose: it accepts a quoted key and no space after
@@ -413,6 +419,14 @@ def parse_scalar(text, line):
         return Scalar(_unquote_single(text), True, line)
     if text[:1] == "[" or (text and text[0] in _PLAIN_FORBIDDEN_START):
         raise ValueError("construct outside the supported YAML subset")
+    if text in ("-", "?", ":") or text[:2] in ("- ", "? ", ": ", "-\t", "?\t", ":\t"):
+        # `- - Acme` is a list inside a list in YAML; read as the plain
+        # scalar `- Acme`, a name would never match (WR-01).
+        raise ValueError("nested collection outside the supported YAML subset")
+    if ": " in text or ":\t" in text or text.endswith(":"):
+        # Not a plain scalar in YAML: most likely two lines joined, the
+        # second one a key the schema would never see (WR-01).
+        raise ValueError("`: ` inside a plain scalar")
     return Scalar(text, False, line)
 
 
@@ -491,16 +505,41 @@ def _owning_key(body, previous):
     return match.group(1) if match is not None else previous
 
 
+def _fold_key(text):
+    """A key as a person means it: casefolded, hyphens and spaces as `_`."""
+    return re.sub(r"[\s-]+", "_", text.strip().casefold())
+
+
+def gate_key_for(key):
+    """The gate key KEY spells, exactly or nearly, else None (WR-01).
+
+    Nearly: after _fold_key (`Confidential-Names`), or within
+    GATE_KEY_CUTOFF of one (`confidental_names`). A key that is not the
+    exact spelling is never READ as the gate -- the caller reports it.
+    """
+    folded = _fold_key(key)
+    if folded in GATE_KEYS:
+        return folded
+    close = difflib.get_close_matches(folded, sorted(GATE_KEYS), n=1, cutoff=GATE_KEY_CUTOFF)
+    return close[0] if close else None
+
+
 def _skipped_key(body, owner):
     """The key an unreadable line is reported under, for the message (CR-01).
 
-    The line's own key first, when it is a gate key: an indented
+    The line's own key first, when it spells a gate key: an indented
     `confidential_names:` line under counterparts is about the names, not
-    about counterparts. Otherwise the top-level key above it.
+    about counterparts. Then a gate key written anywhere on the line (two
+    lines joined, a key with a space in it). Otherwise the top-level key
+    above it.
     """
     own = _LOOSE_KEY_RE.match(body) or _GATE_KEY_START_RE.match(body)
-    if own is not None and own.group(1) in GATE_KEYS:
-        return own.group(1)
+    if own is not None and gate_key_for(own.group(1)) is not None:
+        return gate_key_for(own.group(1))
+    folded = _fold_key(body)
+    for key in sorted(GATE_KEYS):
+        if key in folded:
+            return key
     return owner
 
 
@@ -753,14 +792,53 @@ def _schema_counterparts(value, findings):
     return out
 
 
+def _misplaced_gate_keys(raw, findings):
+    """C1 for every key that spells a gate key without being it (WR-01).
+
+    A misspelt top-level key (`confidential-names`, `Confidential_names`,
+    `confidental_names`) and a gate key nested anywhere below the top level
+    (a counterparts entry, a mapping) are both keys D-22 would otherwise
+    ignore in silence, with E5 off. Returns True when one was found, so the
+    caller keeps the leak check armed.
+    """
+    found = False
+
+    def visit(value, where):
+        nonlocal found
+        if isinstance(value, dict):
+            for key, entry in value.items():
+                gate = gate_key_for(key)
+                if gate is not None:
+                    found = True
+                    findings.append(Finding(CONFIG_NAME, _line_of(entry), ERROR, "C1",
+                                            "{} is written under {}: it is read only at the top level, "
+                                            "the confidentiality gate fails closed".format(gate, where)))
+                visit(entry, where + "." + key)
+        elif isinstance(value, list):
+            for entry in value:
+                visit(entry, where + "[]")
+
+    for key, value in raw.items():
+        if key not in GATE_KEYS:
+            gate = gate_key_for(key)
+            if gate is not None:
+                found = True
+                findings.append(Finding(CONFIG_NAME, _line_of(value), ERROR, "C1",
+                                        "key '{}' is not {}: write the key exactly, "
+                                        "the confidentiality gate fails closed".format(key, gate)))
+        visit(value, key)
+    return found
+
+
 def apply_schema(raw, findings):
     """Type every field the linter reads; emit C1 on a malformed one.
 
-    The per-field typing authority (D-24.2). Unknown keys are ignored (D-22).
-    Every reader returns a safe default after reporting, so one malformed
-    field never hides the findings of the rest of the dossier.
+    The per-field typing authority (D-24.2). Unknown keys are ignored (D-22),
+    except a key that spells a gate key without being it (WR-01). Every
+    reader returns a safe default after reporting, so one malformed field
+    never hides the findings of the rest of the dossier.
     """
-    config = {}
+    config = {"gate_damaged": _misplaced_gate_keys(raw, findings)}
     version = raw.get("version")
     config["version"] = SUPPORTED_VERSION
     if version is not None:
@@ -882,7 +960,7 @@ def load_config(path, findings):
                                         "fix it, the confidentiality gate fails closed until then".format(
                                             number, reason)))
     config = apply_schema(raw, findings)
-    config["gate_damaged"] = gate_damaged
+    config["gate_damaged"] = config["gate_damaged"] or gate_damaged
     return config
 
 

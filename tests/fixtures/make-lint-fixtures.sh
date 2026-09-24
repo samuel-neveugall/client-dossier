@@ -534,6 +534,49 @@ drop_line "$parent/gate-misindent-scalar/dossier.yaml" 'confidential_names: []'
 replace_line "$parent/gate-misindent-scalar/dossier.yaml" 'status_header: required' \
   "$(printf 'status_header: required\n  confidential_names: [ Acme ]')"
 write_file "$parent/gate-misindent-scalar/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-*: a misspelt gate key, which D-22 would otherwise ignore (WR-01) ---
+# A hyphen, a capital, a dropped letter, a space: each is the names line
+# with a key the schema does not know, so E5 would be off with nothing said.
+make_gate_case gate-key-dash 'confidential-names: [ Acme ]'
+make_gate_case gate-key-case 'Confidential_names: [ Acme ]'
+make_gate_case gate-key-typo 'confidental_names: [ Acme ]'
+make_gate_case gate-key-space 'confidential names: [ Acme ]'
+# --- gate-nested-seq: a nested sequence inside the names list (WR-01) ---
+# YAML reads a list inside the list; the subset must not read `- Acme` as a name.
+make_gate_case gate-nested-seq "$(printf 'confidential_names:\n  - - Acme')"
+# --- gate-in-counterpart: the names line indented to a counterpart item's column (WR-01) ---
+# YAML reads it as counterparts[0].confidential_names, and the top-level key is absent.
+make_gate_case gate-in-counterpart '    confidential_names: [ Acme ]'
+# --- gate-joined: the names line joined onto the line above it (WR-01) ---
+# `: ` inside a plain scalar is not YAML; the subset must not read the
+# names as part of status_header's value.
+make_case gate-joined
+drop_line "$parent/gate-joined/dossier.yaml" 'confidential_names: []'
+replace_line "$parent/gate-joined/dossier.yaml" 'status_header: required' \
+  'status_header: required confidential_names: [ Acme ]'
+write_file "$parent/gate-joined/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-consent: a misspelt consent_recorded beside a sourced consent (WR-01) ---
+make_named_case gate-key-consent --confidential-name Acme --consent-recorded true \
+  --consent-source 'mail 2026-09-16 from Jane'
+replace_line "$parent/gate-key-consent/dossier.yaml" 'consent_recorded: true' 'consent-recorded: true'
+write_file "$parent/gate-key-consent/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-json-key-case / gate-json-nested: the same two mistakes in a JSON config (WR-01) ---
+make_case gate-json-key-case
+write_file "$parent/gate-json-key-case/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "Confidential_Names": ["Acme"]
+}
+'
+write_file "$parent/gate-json-key-case/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+make_case gate-json-nested
+write_file "$parent/gate-json-nested/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "counterparts": [{"name": "Jane", "confidential_names": ["Acme"]}]
+}
+'
+write_file "$parent/gate-json-nested/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-skip-armed: consent recorded and sourced, plus one unreadable line (CR-01) ---
 # Any skipped line may have been the gate, so the leak check stays armed.
 make_named_case gate-skip-armed --confidential-name Acme --consent-recorded true \

@@ -408,6 +408,17 @@ for case_name in gate-misindent-block gate-misindent-scalar; do
   assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*confidential_names' "$case_name: [C1] names the gate key"
   assert_no_finding C0 "$case_name: never a mere [C0] warning"
 done
+# A misspelt, misplaced or nested gate key is an error, never ignored (WR-01).
+for case_name in gate-key-dash gate-key-case gate-key-typo gate-key-space gate-nested-seq \
+  gate-in-counterpart gate-joined gate-json-key-case gate-json-nested; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: a names line the schema cannot read as the gate exits 1"
+  assert_out_line '^dossier\.yaml:[0-9]+: ERROR \[C1\] .*confidential_names' "$case_name: [C1] names the gate key"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
+assert_lint "$FIXTURES/gate-key-consent" 1 'gate-key-consent: a misspelt consent_recorded exits 1'
+assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-key-consent: [C1] names consent_recorded'
+assert_finding E5 'gate-key-consent: the leak check stays armed'
+assert_no_finding C0 'gate-key-consent: never a mere [C0] warning'
 assert_lint "$FIXTURES/gate-skip-armed" 1 'gate-skip-armed: an unreadable line beside a sourced consent exits 1'
 assert_finding C1 'gate-skip-armed: the unreadable line is a [C1]'
 assert_finding E5 'gate-skip-armed: and the leak check stays armed'
