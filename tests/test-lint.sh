@@ -306,11 +306,23 @@ assert_only C1 'c1-staleness: only [C1] fires'
 assert_lint "$FIXTURES/consent-ok" 0 'consent-ok: exits 0'
 assert_clean 'consent-ok'
 
-junk_line="$(wc -l <"$FIXTURES/c0-junk/dossier.yaml" | tr -d ' ')"
-assert_lint "$FIXTURES/c0-junk" 0 'c0-junk: an unparseable line is a warning, exit 0'
-assert_out_line "^dossier\\.yaml:$junk_line: WARNING \\[C0\\] .*$junk_line" 'c0-junk: the [C0] warning names the line number'
-assert_only C0 'c0-junk: only [C0] fires'
-assert_last_line '0 error(s), 1 warning(s)' 'c0-junk: one warning, zero errors'
+# An unreadable line is an error whatever key it sits under (CR-01): the
+# subset cannot tell which key it really belonged to.
+junk_line="$(wc -l <"$FIXTURES/c1-junk/dossier.yaml" | tr -d ' ')"
+assert_lint "$FIXTURES/c1-junk" 1 'c1-junk: an unparseable line is an error, exit 1'
+assert_out_line "^dossier\\.yaml:$junk_line: ERROR \\[C1\\] .*$junk_line" 'c1-junk: the [C1] error names the line number'
+assert_only C1 'c1-junk: only [C1] fires'
+assert_last_line '1 error(s), 0 warning(s)' 'c1-junk: one error, zero warnings'
+cb_line="$(line_of "$FIXTURES/c1-counterpart-broken/dossier.yaml" 'role: "ordering party')"
+assert_lint "$FIXTURES/c1-counterpart-broken" 1 'c1-counterpart-broken: an unreadable counterparts line exits 1'
+assert_out_line "^dossier\\.yaml:$cb_line: ERROR \\[C1\\] " 'c1-counterpart-broken: [C1] at the broken line'
+assert_only C1 'c1-counterpart-broken: only [C1] fires'
+# The one warning left: a duplicated non-gate key, both lines well formed.
+dup_line="$(wc -l <"$FIXTURES/c0-dup/dossier.yaml" | tr -d ' ')"
+assert_lint "$FIXTURES/c0-dup" 0 'c0-dup: a duplicated staleness_days is a warning, exit 0'
+assert_out_line "^dossier\\.yaml:$dup_line: WARNING \\[C0\\] " 'c0-dup: the [C0] warning is on the second occurrence'
+assert_only C0 'c0-dup: only [C0] fires'
+assert_last_line '0 error(s), 1 warning(s)' 'c0-dup: one warning, zero errors'
 
 # A fresh scaffold raises neither configuration identifier.
 assert_lint "$CLEAN" 0 'clean: still exits 0'
@@ -389,6 +401,17 @@ for case_name in gate-dup gate-consent-dup gate-consent-dup-rev gate-json-dup ga
   assert_finding E5 "$case_name: and the leak check stays armed"
   assert_no_finding C0 "$case_name: never a mere [C0] warning"
 done
+# An indented names line is read as its own key, whatever block its
+# indentation puts it in (CR-01).
+for case_name in gate-misindent-block gate-misindent-scalar; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: an indented confidential_names line exits 1"
+  assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*confidential_names' "$case_name: [C1] names the gate key"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
+assert_lint "$FIXTURES/gate-skip-armed" 1 'gate-skip-armed: an unreadable line beside a sourced consent exits 1'
+assert_finding C1 'gate-skip-armed: the unreadable line is a [C1]'
+assert_finding E5 'gate-skip-armed: and the leak check stays armed'
+assert_no_finding C0 'gate-skip-armed: never a mere [C0] warning'
 assert_lint "$FIXTURES/gate-consent-dup-rev" 1 'gate-consent-dup-rev: exits 1'
 assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-consent-dup-rev: the [C1] names consent_recorded'
 # --- Unicode line breaks inside a name drop no name (CR-02) ---

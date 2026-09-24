@@ -204,9 +204,23 @@ make_case consent-ok
 replace_line "$parent/consent-ok/dossier.yaml" 'consent_recorded: false' 'consent_recorded: true'
 replace_line "$parent/consent-ok/dossier.yaml" 'consent_source: ""' 'consent_source: "mail 2026-09-16 from Jane"'
 
-# --- c0-junk: C0, one line outside the YAML subset is skipped (D-22) ---
-make_case c0-junk
-printf 'this line is not yaml\n' >>"$parent/c0-junk/dossier.yaml"
+# --- c1-junk: C1, a line outside the YAML subset, attributable to no key (D-22, CR-01) ---
+# Skipped, never a crash -- but an error: a line the subset cannot read may
+# be the one that held the confidential names, so it can never exit 0.
+make_case c1-junk
+printf 'this line is not yaml\n' >>"$parent/c1-junk/dossier.yaml"
+
+# --- c1-counterpart-broken: C1, an unreadable line under a non-gate key (CR-01) ---
+# Whatever key a skipped line sits under, it is an error: the indentation that
+# attributes it to counterparts is exactly what a hand edit gets wrong.
+make_case c1-counterpart-broken
+replace_line "$parent/c1-counterpart-broken/dossier.yaml" '    role: "ordering party"' '    role: "ordering party'
+
+# --- c0-dup: C0, a non-gate key written twice, both lines well formed (D-22) ---
+# The one skipped line whose meaning is certain: the key is exact and the
+# value parses. The first occurrence is read, the second reported.
+make_case c0-dup
+printf 'staleness_days: 7\n' >>"$parent/c0-dup/dossier.yaml"
 
 # write_file PATH CONTENT -- create PATH (and its parent folders) holding
 # CONTENT verbatim; printf '%s' so a `%` or a backslash in CONTENT is inert.
@@ -510,6 +524,22 @@ write_file "$parent/gate-json-dup/dossier.yaml" '{
 }
 '
 write_file "$parent/gate-json-dup/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-misindent-block / gate-misindent-scalar: the names line indented by mistake (CR-01) ---
+# Appended after the counterparts block, or after a scalar, one level too
+# deep: a conforming YAML parser rejects both files. The line carries the
+# gate key itself, whatever block its indentation puts it in.
+make_gate_case gate-misindent-block '  confidential_names: [ Acme ]'
+make_case gate-misindent-scalar
+drop_line "$parent/gate-misindent-scalar/dossier.yaml" 'confidential_names: []'
+replace_line "$parent/gate-misindent-scalar/dossier.yaml" 'status_header: required' \
+  "$(printf 'status_header: required\n  confidential_names: [ Acme ]')"
+write_file "$parent/gate-misindent-scalar/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-skip-armed: consent recorded and sourced, plus one unreadable line (CR-01) ---
+# Any skipped line may have been the gate, so the leak check stays armed.
+make_named_case gate-skip-armed --confidential-name Acme --consent-recorded true \
+  --consent-source 'mail 2026-09-16 from Jane'
+printf 'this line is not yaml\n' >>"$parent/gate-skip-armed/dossier.yaml"
+write_file "$parent/gate-skip-armed/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-sq-names / gate-sq-source: `''` inside a single-quoted scalar (WR-01) ---
 # Valid YAML: the doubled quote is an escaped apostrophe, so the `,` and
 # the `#` after it are still inside the scalar.

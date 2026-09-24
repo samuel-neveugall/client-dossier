@@ -211,15 +211,17 @@ EXIT_INTERNAL = 3
 _KEY_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*):(?:[ \t]+(.*))?")
 
 # The three keys that gate the confidential-name check E5 (spec Sec3.2,
-# T-02-02). A dossier.yaml line carrying one of them that the subset cannot
-# read is an ERROR [C1], never a WARNING [C0]: a warning exits 0, and the
-# lost line may be the whole name list -- E5 silently off (fail closed).
+# T-02-02). A dossier.yaml line the subset cannot read is an ERROR [C1],
+# never a WARNING [C0], whatever key it seems to sit under (CR-01): a warning
+# exits 0, and which key an unreadable line really belonged to is a guess --
+# the lost line may be the whole name list, E5 silently off. So every
+# skipped line fails closed, and a gate key is named in the message when one
+# can be read off the line.
 GATE_KEYS = frozenset(("confidential_names", "consent_recorded", "consent_source"))
 
-# Which key an UNREADABLE top-level line belongs to, used for the severity
-# above only. Looser than _KEY_RE on purpose: it accepts a quoted key and no
-# space after the colon, and a gate key with its colon forgotten still
-# counts as that key.
+# Which key an UNREADABLE line belongs to, used to word the C1 message.
+# Looser than _KEY_RE on purpose: it accepts a quoted key and no space after
+# the colon, and a gate key with its colon forgotten still counts as that key.
 _LOOSE_KEY_RE = re.compile(r"""["']?([A-Za-z_][A-Za-z0-9_-]*)["']?[ \t]*:""")
 _GATE_KEY_START_RE = re.compile(
     r"""["']?(""" + "|".join(sorted(GATE_KEYS)) + r""")(?![A-Za-z0-9_-])""")
@@ -489,6 +491,32 @@ def _owning_key(body, previous):
     return match.group(1) if match is not None else previous
 
 
+def _skipped_key(body, owner):
+    """The key an unreadable line is reported under, for the message (CR-01).
+
+    The line's own key first, when it is a gate key: an indented
+    `confidential_names:` line under counterparts is about the names, not
+    about counterparts. Otherwise the top-level key above it.
+    """
+    own = _LOOSE_KEY_RE.match(body) or _GATE_KEY_START_RE.match(body)
+    if own is not None and own.group(1) in GATE_KEYS:
+        return own.group(1)
+    return owner
+
+
+class _DuplicateKey(ValueError):
+    """A top-level key seen a second time.
+
+    `certain` is True when the line is otherwise well formed (its value
+    parses): the one skipped line whose meaning is known exactly, and so the
+    one that may stay a warning when the key is not a gate key.
+    """
+
+    def __init__(self, certain):
+        ValueError.__init__(self, "duplicate key")
+        self.certain = certain
+
+
 def yaml_lines(text):
     """dossier.yaml's lines, split on \\r\\n, \\r and \\n only (CR-02).
 
@@ -510,11 +538,13 @@ def parse_yaml_subset(text, skipped=None):
     implicit int/bool/null/float/date conversion happens here: every scalar
     comes back as its raw text plus a `quoted` flag, and apply_schema()
     alone decides a field's type. A line outside the subset is skipped and
-    `(number, key, reason)` appended to `skipped` -- never a crash -- where `key` is
-    the top-level key the line belongs to (None when there is none), so the
-    caller can fail closed on the gate keys (CR-01). A top-level key seen a
-    second time is skipped the same way: the first occurrence wins, and a
-    conforming YAML parser would have rejected the file.
+    `(number, key, reason, certain)` appended to `skipped` -- never a crash.
+    `key` is the line's own gate key when it carries one, else the top-level
+    key above it (None when there is none); `certain` is True only for a
+    well-formed duplicate of a top-level key, so the caller fails closed on
+    every other skipped line (CR-01). A top-level key seen a second time is
+    skipped: the first occurrence wins, and a conforming YAML parser would
+    have rejected the file.
     """
     data = {}
     block_key = None
@@ -539,7 +569,11 @@ def parse_yaml_subset(text, skipped=None):
                     raise ValueError("not a `key: value` line")
                 key, value = match.group(1), match.group(2)
                 if key in data:
-                    raise ValueError("duplicate key")
+                    try:
+                        _value_or_empty(value, number)
+                    except ValueError:
+                        raise _DuplicateKey(False)
+                    raise _DuplicateKey(True)
                 if value is None or value.strip() == "":
                     data[key] = Scalar("", False, number)
                     block_key = key
@@ -581,7 +615,8 @@ def parse_yaml_subset(text, skipped=None):
             raise ValueError("mapping line at an unsupported indentation")
         except ValueError as exc:
             if skipped is not None:
-                skipped.append((number, owner, str(exc)))
+                certain = isinstance(exc, _DuplicateKey) and exc.certain
+                skipped.append((number, _skipped_key(body, owner), str(exc), certain))
     return data
 
 
@@ -768,9 +803,9 @@ def consent_is_recorded(config):
     """True only when the flag is true AND a source is filled in (spec Sec3.2).
 
     The one condition under which the confidential-name check (E5) is
-    suppressed -- and never while a gate key's line was unreadable or
-    duplicated (CR-01): what the file really says is unknown, so the check
-    stays armed.
+    suppressed -- and never while any dossier.yaml line was unreadable, or a
+    gate key duplicated (CR-01): what the file really says is unknown, so
+    the check stays armed.
     """
     if config.get("gate_damaged"):
         return False
@@ -824,17 +859,27 @@ def load_config(path, findings):
     else:
         skipped = []
         raw = parse_yaml_subset(text, skipped)
-        for number, key, reason in skipped:
+        for number, key, reason, certain in skipped:
+            if certain and key not in GATE_KEYS:
+                # A well-formed repeat of a non-gate key: its meaning is
+                # known exactly, and the first occurrence is read (D-22).
+                findings.append(Finding(CONFIG_NAME, number, WARNING, "C0",
+                                        "line {} skipped: duplicate key {}, the first one is read".format(
+                                            number, key)))
+                continue
+            # Fail closed (CR-01): which key an unreadable line really
+            # belonged to is a guess, and it may have held the names or the
+            # consent -- so it can never be a mere warning, and the leak
+            # check stays armed whatever the consent flag says.
+            gate_damaged = True
             if key in GATE_KEYS:
-                # Fail closed (CR-01): this line may have held the names or
-                # the consent, so it can never be a mere warning.
-                gate_damaged = True
                 findings.append(Finding(CONFIG_NAME, number, ERROR, "C1",
                                         "line {} skipped ({}) on the confidentiality gate key {}: "
                                         "fix it, the leak check cannot trust it".format(number, reason, key)))
             else:
-                findings.append(Finding(CONFIG_NAME, number, WARNING, "C0",
-                                        "line {} skipped: {} (outside the supported YAML subset)".format(
+                findings.append(Finding(CONFIG_NAME, number, ERROR, "C1",
+                                        "line {} skipped ({}, outside the supported YAML subset): "
+                                        "fix it, the confidentiality gate fails closed until then".format(
                                             number, reason)))
     config = apply_schema(raw, findings)
     config["gate_damaged"] = gate_damaged
