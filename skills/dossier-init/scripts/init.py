@@ -208,6 +208,19 @@ def yaml_quote(value):
 # allowlist, not a blocklist: a value needs no denylist of "dangerous"
 # characters to be rejected into the quoted path, it just needs to not look
 # like a bare identifier.
+#
+# Phase 1 debt (a), settled by D-24 point 3: a bare `no` is read back as
+# boolean false by a strict YAML 1.1 parser, and `no` is the ISO 639-1 code
+# for Norwegian -- so `--language no` reached that ambiguity through the
+# allowlist above. Any value whose case-folded form is a YAML 1.1 reserved
+# spelling is therefore routed through yaml_quote() as well. This is a
+# serialisation rule, not typing: the per-field schema in the repository-
+# root linter (scripts/lint.py) is the single place that decides a field's
+# type. `~` cannot match the allowlist anyway (it requires a leading
+# letter); it is listed for completeness of intent.
+_YAML_RESERVED_SCALARS = frozenset(
+    ("y", "n", "yes", "no", "on", "off", "true", "false", "null", "~")
+)
 _SAFE_PLAIN_SCALAR_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 
 
@@ -218,8 +231,18 @@ def emit_scalar(key, value):
     _SAFE_PLAIN_SCALAR_RE (preserving today's nominal output byte for byte),
     otherwise routes through yaml_quote() -- the same escaping every other
     free-text field in this file already goes through.
+
+    Two Phase 1 debts are closed here (D-24 point 3): the match is end to
+    end (`fullmatch` -- a prefix match also accepted a value ending in a
+    newline and left a blank line, debt (b)), and a YAML 1.1 reserved
+    spelling is quoted even though it looks like an identifier (debt (a)).
+    `en`, `fr`, `es` and `required` remain unquoted, byte for byte.
     """
-    text = value if _SAFE_PLAIN_SCALAR_RE.match(value) else yaml_quote(value)
+    plain = (
+        _SAFE_PLAIN_SCALAR_RE.fullmatch(value) is not None
+        and value.casefold() not in _YAML_RESERVED_SCALARS
+    )
+    text = value if plain else yaml_quote(value)
     return "{}: {}".format(key, text)
 
 
