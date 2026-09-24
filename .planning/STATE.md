@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Linter & Test Harness
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-09-24T19:51:54.974Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-09-24T19:55:14.384Z"
 last_activity: 2026-09-24
 last_activity_desc: Phase 02 execution started
-state_head: a30f367c95e63851038516595620a91d9beeb682
+state_head: a178e8861ab97193dd4eb817787ba11bb480300c
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
   percent: 14
 ---
 
@@ -30,13 +30,15 @@ human and a doctrine check.
 ## Current Position
 
 Phase: 02 (Linter & Test Harness) — EXECUTING
-Plan: 3 of 6 (02-01 and 02-02 complete; 02-03 next)
-Status: 02-02 added the outbound checks to `scripts/lint.py` -- E1/E2/E3 (status block in the
-first 10 lines), E4 (`YYYY-MM-DD_slug.ext`, calendar-validated), E5 (confidential names in text
-and filename, `[^\W_]` boundary, NFC both sides, fail-closed consent gate) -- and
-`tests/test-lint.sh` now holds 403 assertions; `bash tests/run.sh` reports 6 files, 0 failed.
-LINT-01..03 stay Pending until E8, E9, W1, W2 and the French fixture land in 02-04 … 02-06.
-Last activity: 2026-09-24 — 02-02 executed (3 tasks, 3 commits).
+Plan: 4 of 6 (02-01, 02-02 and 02-03 complete; 02-04 next)
+Status: 02-03 closed Phase 1 debts (a) and (b) in the producer -- `init.py` quotes any value
+whose casefold is a YAML 1.1 reserved spelling (`--language no` -> `language: "no"`) and the
+plain-scalar allowlist uses `fullmatch` (a trailing newline no longer leaves a blank line);
+`en`/`fr`/`es`/`required` output is byte-identical. `tests/test-init-empty.sh` gained d14/d15
+(111 assertions); `bash tests/run.sh` reports 6 files, 0 failed.
+LINT-01..03 stay Pending until E8, E9, W1, W2, the French fixture and the D-24.4 round-trip
+land in 02-04 … 02-06.
+Last activity: 2026-09-24 — 02-03 executed (2 tasks, 2 commits).
 
 Progress: [█░░░░░░░░░] 14%
 
@@ -67,6 +69,7 @@ Progress: [█░░░░░░░░░] 14%
 |------|----------|-------|-------|
 | Phase 02 P01 | 8min | 3 tasks | 4 files |
 | Phase 02 P02 | 7min | 3 tasks | 3 files |
+| Phase 02 P03 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -120,6 +123,8 @@ mission, now validated by the phase's own delivery:
 - [Phase 02]: 02-02: status-header lines are anchored -- only comment syntax may precede a protocol field, so prose mentioning Deadline: is not a header
 - [Phase 02]: 02-02: an unreadable non-binary outbound file is E1, never silently skipped
 - [Phase 02]: 02-02: E5 searches the whole path below outbound/ and ignores the README exemption; E1-E4 honour it
+- [Phase 02]: 02-03: the producer quotes any value whose casefold is a YAML 1.1 reserved spelling (YES/No too), and the allowlist uses fullmatch
+- [Phase 02]: 02-03: a bash payload that must end in a newline needs a sentinel, command substitution strips it
 
 ### Pending Todos
 
@@ -145,11 +150,11 @@ mission, now validated by the phase's own delivery:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| Debt (Phase 1 → Phase 2) | (a) YAML 1.1 reserved words: `init.py`'s `_SAFE_PLAIN_SCALAR_RE` lets `yes/no/on/off/true/false/null/y/n` through unquoted; `--language no` writes `language: no`, read back as boolean `False` by a strict YAML parser. Not a vulnerability (no key injection; `consent_recorded` unreachable) — a typing-fidelity gap. Fix when writing `lint.py`'s YAML-subset parser, aligning producer and consumer in one move. | Planned — plan 02-03 (D-24 rule), not yet executed | 2026-09-16 (Phase 1 review, round 3) | v1 |
-| Debt (Phase 1 → Phase 2) | (b) Regex anchoring: same regex's `$` also matches just before a trailing `\n` (vs. `\Z`/`re.fullmatch`); a value ending in a newline passes the allowlist and leaves a blank line. No key injection — cosmetic guard bypass. One-line fix, bundle with (a). | Planned — plan 02-03 (`re.fullmatch`), not yet executed | 2026-09-16 (Phase 1 review, round 3) | v1 |
+| Debt (Phase 1 → Phase 2) | (a) YAML 1.1 reserved words: `init.py`'s `_SAFE_PLAIN_SCALAR_RE` lets `yes/no/on/off/true/false/null/y/n` through unquoted; `--language no` writes `language: no`, read back as boolean `False` by a strict YAML parser. Not a vulnerability (no key injection; `consent_recorded` unreachable) — a typing-fidelity gap. Fix when writing `lint.py`'s YAML-subset parser, aligning producer and consumer in one move. | Resolved — 02-03 (`bd2ecd2`): `_YAML_RESERVED_SCALARS` routes reserved spellings to `yaml_quote()`; pinned by `tests/test-init-empty.sh` d14. Round-trip through the lint parser still due in 02-06 | 2026-09-16 (Phase 1 review, round 3) | v1 |
+| Debt (Phase 1 → Phase 2) | (b) Regex anchoring: same regex's `$` also matches just before a trailing `\n` (vs. `\Z`/`re.fullmatch`); a value ending in a newline passes the allowlist and leaves a blank line. No key injection — cosmetic guard bypass. One-line fix, bundle with (a). | Resolved — 02-03 (`bd2ecd2`): `emit_scalar` uses `fullmatch`; pinned by `tests/test-init-empty.sh` d15 | 2026-09-16 (Phase 1 review, round 3) | v1 |
 
 ## Session Continuity
 
-Last session: 2026-09-24T19:51:54.955Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-09-24T19:55:14.344Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
