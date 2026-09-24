@@ -100,6 +100,11 @@ BINARY_EXTS = frozenset((
 # Never descended into (D-03's other half: sub-dossiers are pruned too).
 PRUNED_DIRS = frozenset((".git",))
 
+# The fixed-layout folders (spec Sec3.2). No sub-dossier can legitimately
+# live in one of them or below, so a dossier.yaml there is never a D-03
+# boundary: pruning on it would hide the folder from every check (WR-03).
+LAYOUT_DIRS = frozenset(("sources", LIVING_DIR, "outbound", "knowledge"))
+
 # The agent folder (D-14, spec Sec4.4 check 7). Allowed at exactly
 # `<root>/.claude` and nowhere below it: a second one under the dossier means
 # an agent configuration that the root's own does not govern.
@@ -845,14 +850,19 @@ def find_root(start):
 
 
 class Tree:
-    """The result of the single walk: POSIX paths relative to the root."""
+    """The result of the single walk: POSIX paths relative to the root.
 
-    __slots__ = ("files", "dirs", "file_set")
+    `pruned` lists the sub-dossiers skipped as D-03 boundaries, each named
+    on an info line so a skipped subtree is never silent (WR-03).
+    """
 
-    def __init__(self, files, dirs):
+    __slots__ = ("files", "dirs", "file_set", "pruned")
+
+    def __init__(self, files, dirs, pruned=()):
         self.files = files
         self.dirs = dirs
         self.file_set = frozenset(files)
+        self.pruned = list(pruned)
 
 
 def walk_tree(root):
@@ -864,26 +874,35 @@ def walk_tree(root):
     boundary, never descended into and never merged into this one's findings.
     Directory symlinks are listed but never followed (the os.walk default,
     deliberately not overridden -- T-02-03). `.gitkeep` is dropped
-    everywhere (LINT-01).
+    everywhere (LINT-01). A dossier.yaml inside the fixed layout (LAYOUT_DIRS)
+    is not a boundary: that folder is walked as usual, and under outbound/
+    the stray file meets the outbound checks like any other (WR-03).
     """
     files = []
     dirs = []
+    pruned = []
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         dirnames.sort()
         filenames.sort()
-        dirnames[:] = [
-            name for name in dirnames
-            if name not in PRUNED_DIRS
-            and not os.path.isfile(os.path.join(dirpath, name, CONFIG_NAME))
-        ]
         rel_dir = os.path.relpath(dirpath, root)
         prefix = "" if rel_dir == os.curdir else rel_dir.replace(os.sep, "/") + "/"
+        in_layout = prefix.split("/", 1)[0] in LAYOUT_DIRS
+        kept = []
+        for name in dirnames:
+            if name in PRUNED_DIRS:
+                continue
+            if (not in_layout and not (prefix == "" and name in LAYOUT_DIRS)
+                    and os.path.isfile(os.path.join(dirpath, name, CONFIG_NAME))):
+                pruned.append(prefix + name)
+                continue
+            kept.append(name)
+        dirnames[:] = kept
         for name in dirnames:
             dirs.append(prefix + name)
         for name in filenames:
             if name != GITKEEP:
                 files.append(prefix + name)
-    return Tree(files, dirs)
+    return Tree(files, dirs, pruned)
 
 
 def read_text_safe(path, follow_symlink=False):
@@ -1439,7 +1458,10 @@ def _run(start):
     tree = walk_tree(root)
     for check in CHECKS:
         check(root, tree, config, findings)
-    errors, _warnings = report(findings, language_infos(config))
+    infos = language_infos(config) + [
+        "sub-dossier {}/ skipped: it holds its own {} (lint it separately)".format(rel, CONFIG_NAME)
+        for rel in tree.pruned]
+    errors, _warnings = report(findings, infos)
     return EXIT_ERRORS if errors else EXIT_CLEAN
 
 

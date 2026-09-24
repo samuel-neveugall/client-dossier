@@ -433,6 +433,16 @@ for case_name in source-null source-tilde source-punct; do
     assert_no_finding "$ident" "$case_name: nothing but [E6] and [E5]"
   done
 done
+# --- A dossier.yaml inside the fixed layout is not a boundary (WR-03, D-03) ---
+assert_lint "$FIXTURES/stray-config" 1 'stray-config: outbound/mails/dossier.yaml hides nothing, exit 1'
+assert_finding E5 'stray-config: the leak in outbound/mails/ is still reported'
+assert_out_line '^outbound/mails/dossier\.yaml:0: ERROR \[E1\] ' 'stray-config: the stray dossier.yaml is itself an outbound file with no header'
+assert_eq 0 "$(count_out_lines '^info: ')" 'stray-config: nothing was pruned'
+assert_lint "$FIXTURES/stray-config-knowledge" 0 'stray-config-knowledge: exits 0'
+assert_out_line '^knowledge/CONTEXT\.md:[1-9][0-9]*: WARNING \[W1\] ' 'stray-config-knowledge: knowledge/ is still checked'
+# A real sub-dossier is still pruned, and never silently (D-03).
+assert_lint "$FIXTURES/sub-dossier" 0 'sub-dossier: the parent still exits 0'
+assert_out_line '^info: .*clients/other' 'sub-dossier: the pruned sub-dossier is named on an info line'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

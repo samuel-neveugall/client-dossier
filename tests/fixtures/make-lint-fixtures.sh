@@ -528,6 +528,15 @@ for pair in 'source-null:null' 'source-tilde:~' 'source-punct:"-"'; do
   replace_line "$parent/$case_name/dossier.yaml" 'consent_source: "placeholder"' "consent_source: ${pair#*:}"
   write_file "$parent/$case_name/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 done
+# --- stray-config / stray-config-knowledge: a dossier.yaml inside the fixed layout (WR-03) ---
+# A nested dossier cannot legitimately live in sources/, dossier/, outbound/
+# or knowledge/, so a stray dossier.yaml there is never a sub-dossier
+# boundary: pruning on it would hide the whole folder from every check.
+make_gate_case stray-config 'confidential_names: [ Acme ]'
+: >"$parent/stray-config/outbound/mails/dossier.yaml"
+make_named_case stray-config-knowledge
+: >"$parent/stray-config-knowledge/knowledge/dossier.yaml"
+printf '%s\n' 'The budget is decided tomorrow.' >>"$parent/stray-config-knowledge/knowledge/CONTEXT.md"
 # --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
 # str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
 # and the producer do not. A name holding one must neither reach
