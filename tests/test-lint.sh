@@ -415,13 +415,30 @@ assert_no_finding C0 'gate-skip-armed: never a mere [C0] warning'
 assert_lint "$FIXTURES/gate-consent-dup-rev" 1 'gate-consent-dup-rev: exits 1'
 assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-consent-dup-rev: the [C1] names consent_recorded'
 # --- Unicode line breaks inside a name drop no name (CR-02) ---
-# The producer strips them; the consumer splits lines on \n and \r only.
+# The producer writes them as spaces; the consumer splits lines on \n and \r only.
 for sep in '\342\200\250' '\342\200\251' '\302\205'; do
   assert_eq 0 "$(grep -c -F -- "$(printf "$sep")" "$FIXTURES/linebreak-name/dossier.yaml")" \
     "linebreak-name: init.py writes no raw Unicode line break into dossier.yaml ($sep)"
 done
 assert_lint "$FIXTURES/linebreak-name" 1 'linebreak-name: init.py -> lint.py round trip, the leak of Beta exits 1'
 assert_only E5 'linebreak-name: only [E5] fires, the names line was read whole'
+# ... and a break between two words is a space, never deleted (CR-02).
+lw="$FIXTURES/linebreak-words"
+for name in 'Acme Corp' 'Big Telco' 'Sam Co' 'Nord Star' 'Red Fox'; do
+  assert_grep "\"$name\"" "$lw/dossier.yaml"
+done
+assert_lint "$lw" 1 'linebreak-words: init.py -> lint.py round trip, the multi-word leaks exit 1'
+assert_only E5 'linebreak-words: only [E5] fires'
+lw_line="$(line_of "$lw/outbound/mails/2026-09-17_relance.md" 'We met Acme Corp')"
+for pair in 'Acme Corp:acme-corp' 'Big Telco:big-telco' 'Sam Co:sam-co' 'Nord Star:nord-star' 'Red Fox:red-fox'; do
+  name="${pair%%:*}"
+  slug="${pair#*:}"
+  assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$lw_line: ERROR \\[E5\\] .*'$name'" \
+    "linebreak-words: '$name' found in the body"
+  assert_out_line "^outbound/mails/2026-09-17_$slug\\.md:0: ERROR \\[E5\\] .*'$name'" \
+    "linebreak-words: '$name' found in the filename $slug"
+done
+assert_last_line '10 error(s), 0 warning(s)' 'linebreak-words: five names, each in a body and a filename'
 assert_lint "$FIXTURES/linebreak-yaml" 1 'linebreak-yaml: a U+2028 inside a quoted name still reads the line'
 assert_only E5 'linebreak-yaml: only [E5] fires, no [C0] or [C1] for a split line'
 # --- E5 on multi-word names: slugs and whitespace variants (CR-03) ---

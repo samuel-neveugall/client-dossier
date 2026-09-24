@@ -177,22 +177,26 @@ class MarkerSectionError(Exception):
     """
 
 
-# NEL, LINE SEPARATOR, PARAGRAPH SEPARATOR: what str.splitlines() breaks on
-# beyond the C0 controls yaml_quote() already strips (CR-02).
-_UNICODE_LINE_BREAKS = frozenset((chr(0x85), chr(0x2028), chr(0x2029)))
+# Every character that cannot stand raw inside a one-line double-quoted YAML
+# scalar: the C0 controls (tab and newline included), DEL, the C1 controls
+# (NEL among them, which YAML 1.2 does not allow unescaped -- IN-11), and
+# the two Unicode line breaks U+2028/U+2029 that str.splitlines() breaks on.
+_SCALAR_BREAKS_RE = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 
 
 def yaml_quote(value):
     """Return a double-quoted YAML scalar, safe for any user-supplied string.
 
-    Strips every character below 0x20 (newlines included) and the three
-    Unicode line breaks U+0085, U+2028 and U+2029 (a Word manual line break
-    pasted into an argument is U+2028; a reader splitting lines the Python
-    way would cut the scalar in two), then escapes backslashes and double
-    quotes -- in that order, so a backslash inserted by the first escape is
+    Each break or control character (_SCALAR_BREAKS_RE) becomes a space --
+    never deleted: between two words it is a separator, and deleting it
+    fuses `Acme<U+2028>Corp` into `AcmeCorp`, a confidential name nothing
+    would ever match (CR-02). A Word manual line break is U+2028, a
+    spreadsheet cell pastes a tab. Runs of whitespace then collapse to one
+    space and the ends are trimmed. Last, backslashes and double quotes are
+    escaped -- in that order, so a backslash inserted by the first escape is
     never re-escaped by the second.
     """
-    cleaned = "".join(ch for ch in value if ord(ch) >= 0x20 and ch not in _UNICODE_LINE_BREAKS)
+    cleaned = " ".join(_SCALAR_BREAKS_RE.sub(" ", value).split())
     cleaned = cleaned.replace("\\", "\\\\").replace('"', '\\"')
     return '"' + cleaned + '"'
 

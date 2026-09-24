@@ -630,6 +630,20 @@ make_named_case linebreak-name --confidential-name "Acme${LS}Corp" \
 write_file "$parent/linebreak-name/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 Beta asked for the audit.
 "
+# --- linebreak-words: a break or a control between two words separates them (CR-02) ---
+# A Word manual line break, a tab from a spreadsheet cell, a newline, NEL,
+# and a run of them: init.py writes each as one space, never deleting it
+# (which would fuse `Acme Corp` into `AcmeCorp`, a needle nothing matches).
+# The leak is both in a body and in a conforming slug, per name.
+make_named_case linebreak-words --confidential-name "Acme${LS}Corp" \
+  --confidential-name "Big$(printf '\t')Telco" --confidential-name "$(printf 'Sam\nCo')" \
+  --confidential-name "Nord${NEL}Star" --confidential-name "$(printf 'Red\t\r\nFox')"
+write_file "$parent/linebreak-words/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Acme Corp, Big Telco, Sam Co, Nord Star and Red Fox today.
+"
+for slug in acme-corp big-telco sam-co nord-star red-fox; do
+  write_file "$parent/linebreak-words/outbound/mails/2026-09-17_${slug}.md" "$GOOD_MAIL"
+done
 make_case linebreak-yaml
 replace_line "$parent/linebreak-yaml/dossier.yaml" 'confidential_names: []' \
   "confidential_names: [ \"Acme${LS}Corp\", \"Sam${NEL}Co\", \"Beta\" ]"

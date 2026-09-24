@@ -249,7 +249,9 @@ python3 "$(init_py)" \
   --counterpart "$(printf 'Jane\ninjected: pwned')|contact" \
   >"$d9.stdout" 2>"$d9.stderr" || status10=$?
 assert_eq 0 "$status10" 'init exits 0 with a newline in --counterpart name'
-assert_grep '  - name: "Janeinjected: pwned"' "$d9/dossier.yaml"
+# The newline becomes a space, never deleted (CR-02 of phase 02): deleting it
+# would fuse two words of a name.
+assert_grep '  - name: "Jane injected: pwned"' "$d9/dossier.yaml"
 assert_not_grep '^injected:' "$d9/dossier.yaml"
 rm -rf "$d9" "$d9.stdout" "$d9.stderr"
 
@@ -276,7 +278,7 @@ python3 "$(init_py)" \
   --language "$(printf 'en\ninjected: pwned')" \
   >"$d11.stdout" 2>"$d11.stderr" || status12=$?
 assert_eq 0 "$status12" 'init exits 0 with a newline in --language'
-assert_grep '^language: "eninjected: pwned"$' "$d11/dossier.yaml"
+assert_grep '^language: "en injected: pwned"$' "$d11/dossier.yaml"
 assert_not_grep '^injected:' "$d11/dossier.yaml"
 rm -rf "$d11" "$d11.stdout" "$d11.stderr"
 
