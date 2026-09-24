@@ -529,6 +529,35 @@ replace_line "$parent/linebreak-yaml/dossier.yaml" 'confidential_names: []' \
 write_file "$parent/linebreak-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 Beta asked for the audit.
 "
+# --- Multi-word names: filename slugs and whitespace variants (CR-03) ---
+# E4 only accepts a lowercase ASCII slug joined by hyphens, so the only
+# conforming spelling of a multi-word name in a filename is `big-telco`;
+# in text, a mail body is hard-wrapped and spaced by hand.
+make_named_case e5-slug --confidential-name 'Big Telco'
+write_file "$parent/e5-slug/outbound/mails/2026-09-17_big-telco-offer.md" "$GOOD_MAIL"
+# The slug with no separator at all, and an accented name folded to ASCII.
+make_named_case e5-slug-joined --confidential-name 'Big Telco'
+write_file "$parent/e5-slug-joined/outbound/mails/2026-09-17_bigtelco-offer.md" "$GOOD_MAIL"
+make_named_case e5-slug-accent --confidential-name "$(printf 'Soci\303\251t\303\251 Exemple')"
+write_file "$parent/e5-slug-accent/outbound/mails/2026-09-17_societe-exemple-offer.md" "$GOOD_MAIL"
+# The boundary still holds in both halves: longer words are not the name.
+make_named_case e5-slug-boundary --confidential-name 'Big Telco'
+write_file "$parent/e5-slug-boundary/outbound/mails/2026-09-17_bigtelcom-offer.md" "${GOOD_MAIL}
+Bigger Telco and Big Telcom are unrelated.
+"
+# The name hard-wrapped across two lines of a mail body.
+make_named_case e5-wrapped --confidential-name 'Big Telco'
+write_file "$parent/e5-wrapped/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met the people at Big
+Telco last week.
+"
+# Two spaces, a no-break space, a tab: one finding each.
+make_named_case e5-spacing --confidential-name 'Big Telco'
+write_file "$parent/e5-spacing/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Two spaces: Big  Telco.
+No-break space: Big$(printf '\302\240')Telco.
+Tab: Big$(printf '\t')Telco.
+"
 # --- e5-readme: E5, a confidential name in the exempt outbound/README.md (Q-5) ---
 # README.md is exempt from E1-E4 only: a leaked name is a leak wherever it sits.
 # e5-readme-nonames is the same edit with no configured name -- clean, which

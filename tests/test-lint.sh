@@ -401,6 +401,24 @@ assert_lint "$FIXTURES/linebreak-name" 1 'linebreak-name: init.py -> lint.py rou
 assert_only E5 'linebreak-name: only [E5] fires, the names line was read whole'
 assert_lint "$FIXTURES/linebreak-yaml" 1 'linebreak-yaml: a U+2028 inside a quoted name still reads the line'
 assert_only E5 'linebreak-yaml: only [E5] fires, no [C0] or [C1] for a split line'
+# --- E5 on multi-word names: slugs and whitespace variants (CR-03) ---
+assert_lint "$FIXTURES/e5-slug" 1 'e5-slug: big-telco in a conforming filename exits 1'
+assert_only E5 'e5-slug: only [E5] fires'
+assert_out_line '^outbound/mails/2026-09-17_big-telco-offer\.md:0: ERROR \[E5\] ' 'e5-slug: reported at line 0 of the file'
+assert_lint "$FIXTURES/e5-slug-joined" 1 'e5-slug-joined: bigtelco in a filename exits 1'
+assert_only E5 'e5-slug-joined: only [E5] fires'
+assert_lint "$FIXTURES/e5-slug-accent" 1 'e5-slug-accent: an accented name folded into an ASCII slug exits 1'
+assert_only E5 'e5-slug-accent: only [E5] fires'
+assert_lint "$FIXTURES/e5-slug-boundary" 0 'e5-slug-boundary: bigtelcom, Bigger Telco and Big Telcom exit 0'
+assert_last_line '0 error(s), 0 warning(s)' 'e5-slug-boundary: a longer word is still not the name'
+ew="$FIXTURES/e5-wrapped/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/e5-wrapped" 1 'e5-wrapped: a name split across two lines exits 1'
+assert_only E5 'e5-wrapped: only [E5] fires'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'people at Big'): ERROR \\[E5\\] " \
+  'e5-wrapped: reported at the line the name starts on'
+assert_lint "$FIXTURES/e5-spacing" 1 'e5-spacing: whitespace variants exit 1'
+assert_only E5 'e5-spacing: only [E5] fires'
+assert_last_line '3 error(s), 0 warning(s)' 'e5-spacing: two spaces, a no-break space and a tab all match'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

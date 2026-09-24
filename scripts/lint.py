@@ -25,6 +25,7 @@ Python 3 standard library only, targeting Python >= 3.8.
 """
 
 import argparse
+import bisect
 import datetime
 import json
 import os
@@ -1031,20 +1032,56 @@ def check_outbound_names(root, tree, config, findings):
                                     "(real date, lowercase slug joined by hyphens)"))
 
 
+# Matches nothing: the pattern for a needle with no token at all.
+_NEVER_RE = re.compile(r"(?!)")
+
+
 def boundary_pattern(needle):
     """A case-insensitive pattern matching NEEDLE as a whole name (D-11, F-02).
 
-    The needle is escaped first: it comes from dossier.yaml, and an unescaped
-    one would let a hostile config inject a regex (T-02-05); escaped, the
-    pattern is a literal between two lookarounds, with nothing to backtrack.
-    The boundary is "a character that is alphanumeric but not `_`", i.e.
-    [^\\W_], on both sides. The obvious (?<!\\w) counts `_` as a word
-    character, and since every outbound filename is YYYY-MM-DD_slug, a name
-    at the head of a slug would never match -- the silent miss measured on
-    2026-09-17_acme-proposal.md. This class still refuses `Acmetal`.
+    Each whitespace-separated token is escaped first: it comes from
+    dossier.yaml, and an unescaped one would let a hostile config inject a
+    regex (T-02-05). The tokens are joined by `\\s+`, so a multi-word name
+    still matches when a mail body is hard-wrapped between its words, or
+    spaced with two spaces, a tab or a no-break space (CR-03); the caller
+    searches the whole text, not one line at a time. The boundary is "a
+    character that is alphanumeric but not `_`", i.e. [^\\W_], on both sides.
+    The obvious (?<!\\w) counts `_` as a word character, and since every
+    outbound filename is YYYY-MM-DD_slug, a name at the head of a slug would
+    never match -- the silent miss measured on 2026-09-17_acme-proposal.md.
+    This class still refuses `Acmetal`.
     """
-    return re.compile(r"(?<![^\W_])" + re.escape(normalise(needle.strip())) + r"(?![^\W_])",
-                      re.IGNORECASE)
+    tokens = normalise(needle).split()
+    if not tokens:
+        return _NEVER_RE
+    body = r"\s+".join(re.escape(token) for token in tokens)
+    return re.compile(r"(?<![^\W_])" + body + r"(?![^\W_])", re.IGNORECASE)
+
+
+def fold_ascii(text):
+    """TEXT as an E4 slug would spell it: NFKD, combining marks dropped, casefolded.
+
+    E4 only accepts a lowercase ASCII slug, so `Société Exemple` can only
+    appear in a conforming filename as `societe-exemple` (CR-03).
+    """
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
+
+
+def filename_pattern(needle):
+    """E5's pattern for a file NAME, matched against fold_ascii(path) (CR-03).
+
+    The needle is folded the same way and cut into its alphanumeric tokens,
+    joined by any run of non-alphanumeric characters, possibly empty: the
+    only spellings of `Big Telco` that pass E4 are `big-telco` and
+    `bigtelco`, and `O'Brien` becomes `obrien` or `o-brien`. The boundary
+    stays the [^\\W_] class of boundary_pattern(), so `bigtelcom` is refused.
+    """
+    tokens = re.findall(r"[^\W_]+", fold_ascii(needle))
+    if not tokens:
+        return _NEVER_RE
+    body = r"[\W_]*".join(re.escape(token) for token in tokens)
+    return re.compile(r"(?<![^\W_])" + body + r"(?![^\W_])", re.IGNORECASE)
 
 
 def check_confidential_names(root, tree, config, findings):
@@ -1052,30 +1089,42 @@ def check_confidential_names(root, tree, config, findings):
 
     Suppressed only when consent is recorded AND sourced; a malformed
     consent_recorded reads as False in the schema, so the check stays armed
-    (T-02-02). Both sides are NFC-normalised (P-05). A file that will not
-    decode, is symlinked or is oversized skips the text half only; the
-    filename half always runs (P-07). The message names the needle and the
-    location, never the surrounding sentence (T-02-09).
+    (T-02-02). Both sides are NFC-normalised (P-05). The text half searches
+    the whole file, so a name wrapped across two lines is found, and reports
+    the line the match starts on, once per (line, name). The filename half
+    matches the slug spellings E4 allows (filename_pattern). A file that
+    will not decode, is symlinked or is oversized skips the text half only;
+    the filename half always runs (P-07). The message names the needle and
+    the location, never the surrounding sentence (T-02-09).
     """
     if consent_is_recorded(config) or not config["confidential_names"]:
         return
-    needles = [(name, boundary_pattern(name)) for name in config["confidential_names"]]
+    needles = [(name, boundary_pattern(name), filename_pattern(name))
+               for name in config["confidential_names"]]
     prefix_len = len(OUTBOUND_DIR) + 1
     for rel in outbound_files(tree):
         # No EXEMPT_BASENAMES skip here, on purpose: a leaked name is a leak wherever it sits.
-        path_name = normalise(rel[prefix_len:])
-        for name, pattern in needles:
-            if pattern.search(path_name):
+        path_name = fold_ascii(normalise(rel[prefix_len:]))
+        for name, _pattern, name_pattern in needles:
+            if name_pattern.search(path_name):
                 findings.append(Finding(rel, 0, ERROR, "E5",
                                         "confidential name '{}' in the file name under outbound/".format(name)))
         text = read_text_safe(os.path.join(root, *rel.split("/")))
         if text is None:
             continue
-        for number, line in enumerate(normalise(text).splitlines(), 1):
-            for name, pattern in needles:
-                if pattern.search(line):
-                    findings.append(Finding(rel, number, ERROR, "E5",
-                                            "confidential name '{}' under outbound/".format(name)))
+        norm = normalise(text).replace("\r\n", "\n").replace("\r", "\n")
+        newlines = None
+        seen = set()
+        for name, pattern, _name_pattern in needles:
+            for match in pattern.finditer(norm):
+                if newlines is None:
+                    newlines = [m.start() for m in re.finditer("\n", norm)]
+                number = bisect.bisect_right(newlines, match.start()) + 1
+                if (number, name) in seen:
+                    continue
+                seen.add((number, name))
+                findings.append(Finding(rel, number, ERROR, "E5",
+                                        "confidential name '{}' under outbound/".format(name)))
 
 
 def check_consent_source(root, tree, config, findings):
