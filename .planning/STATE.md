@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Linter & Test Harness
 status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-09-24T20:03:27.162Z"
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-09-24T20:12:27.616Z"
 last_activity: 2026-09-24
 last_activity_desc: Phase 02 execution started
-state_head: 498c85d61a1c4fc7d3fa4628c8f4e5d4c8553ba9
+state_head: 4b370f100de01cad85f87e054d2a07d83c51be15
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 14
 ---
 
@@ -30,16 +30,16 @@ human and a doctrine check.
 ## Current Position
 
 Phase: 02 (Linter & Test Harness) — EXECUTING
-Plan: 5 of 6 (02-01 … 02-04 complete; 02-05 next)
-Status: 02-04 completed the nine error classes -- E8 (a `.claude/` folder below the root, read
-from the walk's pruned directory list) and E9 (a `.pdf`/`.docx` under `outbound/deliverables/`
-with no same-stem `.md`/`.html`). `tests/test-lint.sh` now sweeps e1..e9 for the identifier
-that must fire and the twelve that must not, with an exact `1 error(s), 0 warning(s)` summary;
-the fixture generator states its contract and refuses a bad argument before creating anything
-(497 assertions); `bash tests/run.sh` reports 6 files, 0 failed.
-LINT-01..03 stay Pending until W1, W2, the French fixture and the D-24.4 round-trip land in
-02-05 and 02-06.
-Last activity: 2026-09-24 — 02-04 executed (3 tasks, 3 commits).
+Plan: 6 of 6 (02-01 … 02-05 complete; 02-06 next)
+Status: 02-05 added the two prose warnings -- W1 (relative-date words in `dossier/` and
+`knowledge/`, boundary-matched from the single `LANGUAGE_WORDS` block) and W2 (bullets with no
+parenthetical source in the seven living files, with a multi-line HTML-comment tracker and
+opinion markers) -- and committed `tests/fixtures/lint/fr/`, which exits 0 with both warnings
+and no error (ROADMAP criterion 3). An unlisted language skips both with one `info:` line.
+Both clean scaffolds stay at 0/0; `tests/test-lint.sh` has 675 assertions; `bash tests/run.sh`
+reports 6 files, 0 failed. LINT-01..03 stay Pending until 02-06 (zero-findings acceptance,
+D-24.4 round trip, commands and file-size window) lands.
+Last activity: 2026-09-24 — 02-05 executed (3 tasks, 3 commits).
 
 Progress: [█░░░░░░░░░] 14%
 
@@ -72,6 +72,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase 02 P02 | 7min | 3 tasks | 3 files |
 | Phase 02 P03 | 3min | 2 tasks | 2 files |
 | Phase 02 P04 | 6min | 3 tasks | 3 files |
+| Phase 02 P05 | 6min | 3 tasks | 25 files |
 
 ## Accumulated Context
 
@@ -130,6 +131,8 @@ mission, now validated by the phase's own delivery:
 - [Phase 02]: 02-04: E8 reads Tree.dirs from the single walk (pruning decided in one place); E9 is scoped to direct children of outbound/deliverables/, the reverse (source without render) silent
 - [Phase 02]: 02-04: the nine-class sweep checks each e1..e9 fixture against all twelve other identifiers (C0 included) plus an exact 1/0 summary; W1/W2 are already in ALL_IDS for 02-05
 - [Phase 02]: 02-04: generator refusal is proven with a logging mktemp shim on PATH, because macOS mktemp -d ignores TMPDIR
+- [Phase 02]: 02-05: W1/W2 keep the uniform check(root, tree, config, findings) signature; an unlisted language skips both W1 and W2 with one info: line (D-20)
+- [Phase 02]: 02-05: D-28 as amended applied -- tests/fixtures/lint/fr/ is the only committed lint fixture; a test asserts no tests/fixtures/lint/clean/ is tracked
 
 ### Pending Todos
 
@@ -160,6 +163,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-09-24T20:03:27.143Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-09-24T20:12:27.593Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None
