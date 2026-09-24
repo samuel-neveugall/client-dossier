@@ -661,6 +661,41 @@ make_named_case e5-slug-joined --confidential-name 'Big Telco'
 write_file "$parent/e5-slug-joined/outbound/mails/2026-09-17_bigtelco-offer.md" "$GOOD_MAIL"
 make_named_case e5-slug-accent --confidential-name "$(printf 'Soci\303\251t\303\251 Exemple')"
 write_file "$parent/e5-slug-accent/outbound/mails/2026-09-17_societe-exemple-offer.md" "$GOOD_MAIL"
+# Letters NFKD does not decompose (CR-03): a stroke, a slash, a ligature, an
+# eth, a thorn, a dotless i. Each name is leaked through its only conforming
+# slug; Đ has two customary transliterations, d and dj, and both are slugs.
+TRANSLIT_PAIRS='Łukasz Nowak:lukasz-nowak
+Michał Zieliński:michal-zielinski
+Øresund Bank:oresund-bank
+Søren Holm:soren-holm
+Æther Labs:aether-labs
+Encyclopædia Nordica:encyclopaedia-nordica
+Œuvre SA:oeuvre-sa
+Cœur Studio:coeur-studio
+Đorđe Petrović:djordje-petrovic
+Đorđe Petrović:dorde-petrovic
+Straße AG:strasse-ag
+Þór Holdings:thor-holdings
+Borgarþing:borgarthing
+Aðalsteinn Ltd:adalsteinn-ltd
+Kırmızı Tekstil:kirmizi-tekstil
+Ħamrun Spartans:hamrun-spartans'
+set --
+previous=''
+while IFS= read -r pair; do
+  # Đorđe Petrović has two slugs but is configured once.
+  [ "${pair%%:*}" = "$previous" ] || set -- "$@" --confidential-name "${pair%%:*}"
+  previous="${pair%%:*}"
+done <<EOF
+$TRANSLIT_PAIRS
+EOF
+make_named_case e5-slug-translit "$@"
+set --
+while IFS= read -r pair; do
+  write_file "$parent/e5-slug-translit/outbound/mails/2026-09-17_${pair#*:}.md" "$GOOD_MAIL"
+done <<EOF
+$TRANSLIT_PAIRS
+EOF
 # The boundary still holds in both halves: longer words are not the name.
 make_named_case e5-slug-boundary --confidential-name 'Big Telco'
 write_file "$parent/e5-slug-boundary/outbound/mails/2026-09-17_bigtelcom-offer.md" "${GOOD_MAIL}

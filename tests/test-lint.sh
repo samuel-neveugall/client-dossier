@@ -449,6 +449,19 @@ assert_lint "$FIXTURES/e5-slug-joined" 1 'e5-slug-joined: bigtelco in a filename
 assert_only E5 'e5-slug-joined: only [E5] fires'
 assert_lint "$FIXTURES/e5-slug-accent" 1 'e5-slug-accent: an accented name folded into an ASCII slug exits 1'
 assert_only E5 'e5-slug-accent: only [E5] fires'
+# Letters NFKD leaves alone are transliterated on both sides (CR-03).
+assert_lint "$FIXTURES/e5-slug-translit" 1 'e5-slug-translit: names with letters NFKD cannot decompose exit 1'
+assert_only E5 'e5-slug-translit: only [E5] fires'
+for pair in 'Łukasz Nowak:lukasz-nowak' 'Michał Zieliński:michal-zielinski' 'Øresund Bank:oresund-bank' \
+  'Søren Holm:soren-holm' 'Æther Labs:aether-labs' 'Encyclopædia Nordica:encyclopaedia-nordica' \
+  'Œuvre SA:oeuvre-sa' 'Cœur Studio:coeur-studio' 'Đorđe Petrović:djordje-petrovic' \
+  'Đorđe Petrović:dorde-petrovic' 'Straße AG:strasse-ag' 'Þór Holdings:thor-holdings' \
+  'Borgarþing:borgarthing' 'Aðalsteinn Ltd:adalsteinn-ltd' 'Kırmızı Tekstil:kirmizi-tekstil' \
+  'Ħamrun Spartans:hamrun-spartans'; do
+  assert_out_line "^outbound/mails/2026-09-17_${pair#*:}\\.md:0: ERROR \\[E5\\] .*'${pair%%:*}'" \
+    "e5-slug-translit: '${pair%%:*}' found in the slug ${pair#*:}"
+done
+assert_last_line '16 error(s), 0 warning(s)' 'e5-slug-translit: one finding per slug, no stray match'
 assert_lint "$FIXTURES/e5-slug-boundary" 0 'e5-slug-boundary: bigtelcom, Bigger Telco and Big Telcom exit 0'
 assert_last_line '0 error(s), 0 warning(s)' 'e5-slug-boundary: a longer word is still not the name'
 ew="$FIXTURES/e5-wrapped/outbound/mails/2026-09-17_relance.md"

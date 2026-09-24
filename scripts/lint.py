@@ -1175,30 +1175,57 @@ def boundary_pattern(needle):
     return re.compile(r"(?<![^\W_])" + body + r"(?![^\W_])", re.IGNORECASE)
 
 
-def fold_ascii(text):
-    """TEXT as an E4 slug would spell it: NFKD, combining marks dropped, casefolded.
+# Letters NFKD leaves whole, so fold_ascii() would keep them non-ASCII and a
+# name holding one could never match an E4-conforming slug (CR-03): a
+# stroke, a slash, the ligatures, eth, thorn, the dotless i, the sharp s
+# (casefold also turns ß into ss; listed for intent), the Maltese h.
+# Transliterated to what a person typing an ASCII slug writes.
+_FOLD_TABLE = str.maketrans({
+    "Ł": "l", "ł": "l", "Ø": "o", "ø": "o", "Æ": "ae", "æ": "ae", "Œ": "oe", "œ": "oe",
+    "Đ": "d", "đ": "d", "Ð": "d", "ð": "d", "Þ": "th", "þ": "th", "ı": "i",
+    "ß": "ss", "ẞ": "ss", "Ħ": "h", "ħ": "h",
+})
 
-    E4 only accepts a lowercase ASCII slug, so `Société Exemple` can only
-    appear in a conforming filename as `societe-exemple` (CR-03).
+# The second customary spelling of a letter, tried on the NEEDLE only:
+# Serbian and Croatian Đ is written `d` or `dj` in ASCII (Đorđe: dorde,
+# djordje), and either may be the slug.
+_FOLD_ALTERNATES = str.maketrans({"Đ": "dj", "đ": "dj"})
+
+
+def fold_ascii(text, alternate=False):
+    """TEXT as an E4 slug would spell it (CR-03).
+
+    The letters NFKD cannot decompose are transliterated first
+    (_FOLD_TABLE; with `alternate`, _FOLD_ALTERNATES wins where it applies),
+    then NFKD, combining marks dropped, casefolded. E4 only accepts a
+    lowercase ASCII slug, so `Société Exemple` can only appear in a
+    conforming filename as `societe-exemple`, and `Łukasz` as `lukasz`.
     """
-    decomposed = unicodedata.normalize("NFKD", text)
+    if alternate:
+        text = text.translate(_FOLD_ALTERNATES)
+    decomposed = unicodedata.normalize("NFKD", text.translate(_FOLD_TABLE))
     return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
 
 
 def filename_pattern(needle):
     """E5's pattern for a file NAME, matched against fold_ascii(path) (CR-03).
 
-    The needle is folded the same way and cut into its alphanumeric tokens,
+    The needle is folded the same way -- once per customary spelling
+    (fold_ascii's `alternate`) -- and cut into its alphanumeric tokens,
     joined by any run of non-alphanumeric characters, possibly empty: the
     only spellings of `Big Telco` that pass E4 are `big-telco` and
     `bigtelco`, and `O'Brien` becomes `obrien` or `o-brien`. The boundary
     stays the [^\\W_] class of boundary_pattern(), so `bigtelcom` is refused.
     """
-    tokens = re.findall(r"[^\W_]+", fold_ascii(needle))
-    if not tokens:
+    bodies = []
+    for alternate in (False, True):
+        tokens = re.findall(r"[^\W_]+", fold_ascii(needle, alternate))
+        body = r"[\W_]*".join(re.escape(token) for token in tokens)
+        if tokens and body not in bodies:
+            bodies.append(body)
+    if not bodies:
         return _NEVER_RE
-    body = r"[\W_]*".join(re.escape(token) for token in tokens)
-    return re.compile(r"(?<![^\W_])" + body + r"(?![^\W_])", re.IGNORECASE)
+    return re.compile(r"(?<![^\W_])(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
 
 
 def check_confidential_names(root, tree, config, findings):
