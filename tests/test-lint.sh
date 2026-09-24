@@ -373,6 +373,24 @@ for ident in E1 E2 E3 E4 E6 E7 E8 E9 C0 W1 W2; do
   assert_no_finding "$ident" 'c1-quoted-leak: nothing but [C1] and [E5]'
 done
 
+# --- The confidentiality gate fails closed on an unreadable line (CR-01, T-02-02) ---
+# A gate line the subset cannot read is a [C1] error, never a [C0] warning:
+# a warning exits 0, and E5 would be silently off with the name list lost.
+for case_name in gate-multiline gate-escape gate-typo gate-quoted-key gate-nocolon gate-indent; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: an unreadable confidential_names line exits 1"
+  assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*confidential_names' "$case_name: [C1] names the gate key"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
+assert_lint "$FIXTURES/gate-col0" 1 'gate-col0: column-0 block items are read, the leak exits 1'
+assert_only E5 'gate-col0: only [E5] fires -- ordinary YAML, no config finding'
+for case_name in gate-dup gate-consent-dup gate-consent-dup-rev gate-json-dup gate-source-broken; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: exits 1"
+  assert_finding C1 "$case_name: the duplicated or broken gate key is a [C1]"
+  assert_finding E5 "$case_name: and the leak check stays armed"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
+assert_lint "$FIXTURES/gate-consent-dup-rev" 1 'gate-consent-dup-rev: exits 1'
+assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-consent-dup-rev: the [C1] names consent_recorded'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

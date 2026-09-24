@@ -441,6 +441,75 @@ write_file "$parent/consent-nosource-leak/outbound/mails/2026-09-17_relance.md" 
 Nous travaillons avec Acme.
 "
 
+# ---------------------------------------------------------------------------
+# The confidentiality gate fails closed (CR-01, T-02-02). A line that carries
+# confidential_names, consent_recorded or consent_source and that the subset
+# parser cannot read must never turn E5 off quietly: it is a C1 error, never
+# a C0 warning. Every case below leaks Acme in a well-formed mail.
+# ---------------------------------------------------------------------------
+
+LEAK_MAIL="${GOOD_MAIL}
+Nous travaillons avec Acme.
+"
+
+# make_gate_case NAME NEW -- the clean tree, its `confidential_names: []`
+# line replaced by NEW (which may span several lines), plus the leaking mail.
+make_gate_case() {
+  make_case "$1"
+  replace_line "$parent/$1/dossier.yaml" 'confidential_names: []' "$2"
+  write_file "$parent/$1/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+}
+
+# --- gate-col0: a block sequence with its items at column 0 -- ordinary YAML, read ---
+make_gate_case gate-col0 "$(printf 'confidential_names:\n- Acme')"
+# --- gate-multiline: a flow sequence spread over three lines -- C1 ---
+make_gate_case gate-multiline "$(printf 'confidential_names: [\n  Acme\n]')"
+# --- gate-escape: a YAML escape the subset does not read -- C1 ---
+# (The backslash comes from printf's octal \134, so this file holds no escape of its own.)
+make_gate_case gate-escape "$(printf 'confidential_names: [ "Acme", "Zo\134x65" ]')"
+# --- gate-typo: a stray token after a quoted name -- C1 ---
+make_gate_case gate-typo 'confidential_names: [ "Acme" , "Beta" x ]'
+# --- gate-quoted-key: the key itself quoted -- C1 ---
+make_gate_case gate-quoted-key '"confidential_names": [ Acme ]'
+# --- gate-nocolon: the colon forgotten -- C1 ---
+make_gate_case gate-nocolon 'confidential_names [ Acme ]'
+# --- gate-indent: the item indentation changes partway through -- C1 ---
+make_gate_case gate-indent "$(printf 'confidential_names:\n  - Beta\n - Acme')"
+# --- gate-dup: the key twice, the second one empty -- C1, first wins, E5 armed ---
+make_gate_case gate-dup "$(printf 'confidential_names: [ Acme ]\nconfidential_names: []')"
+
+# --- gate-consent-dup: consent_recorded twice, false then true, source filled -- C1 AND E5 ---
+# A last-wins reader takes the true and suppresses E5 with exit 0.
+make_named_case gate-consent-dup --confidential-name Acme --consent-source 'mail 2026-09-16 from Jane'
+replace_line "$parent/gate-consent-dup/dossier.yaml" 'consent_recorded: false' \
+  "$(printf 'consent_recorded: false\nconsent_recorded: true')"
+write_file "$parent/gate-consent-dup/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+
+# --- gate-consent-dup-rev: the same, true then false -- C1 AND E5 ---
+# First wins, so the flag reads true; a damaged gate still keeps E5 armed.
+make_named_case gate-consent-dup-rev --confidential-name Acme --consent-source 'mail 2026-09-16 from Jane'
+replace_line "$parent/gate-consent-dup-rev/dossier.yaml" 'consent_recorded: false' \
+  "$(printf 'consent_recorded: true\nconsent_recorded: false')"
+write_file "$parent/gate-consent-dup-rev/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+
+# --- gate-source-broken: consent recorded, its source line unreadable -- C1, E6 AND E5 ---
+make_named_case gate-source-broken --confidential-name Acme --consent-recorded true \
+  --consent-source 'mail 2026-09-16 from Jane'
+replace_line "$parent/gate-source-broken/dossier.yaml" 'consent_source: "mail 2026-09-16 from Jane"' \
+  'consent_source: "mail 2026-09-16 from Jane'
+write_file "$parent/gate-source-broken/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+
+# --- gate-json-dup: a JSON config naming the key twice, the second empty -- C1 AND E5 ---
+# json.loads alone keeps the last value, which would disable E5 with exit 0.
+make_case gate-json-dup
+write_file "$parent/gate-json-dup/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "confidential_names": ["Acme"],
+  "confidential_names": []
+}
+'
+write_file "$parent/gate-json-dup/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- e5-readme: E5, a confidential name in the exempt outbound/README.md (Q-5) ---
 # README.md is exempt from E1-E4 only: a leaked name is a leak wherever it sits.
 # e5-readme-nonames is the same edit with no configured name -- clean, which

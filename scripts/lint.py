@@ -185,6 +185,20 @@ EXIT_NO_DOSSIER = 2
 EXIT_INTERNAL = 3
 
 _KEY_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*):(?:[ \t]+(.*))?")
+
+# The three keys that gate the confidential-name check E5 (spec Sec3.2,
+# T-02-02). A dossier.yaml line carrying one of them that the subset cannot
+# read is an ERROR [C1], never a WARNING [C0]: a warning exits 0, and the
+# lost line may be the whole name list -- E5 silently off (fail closed).
+GATE_KEYS = frozenset(("confidential_names", "consent_recorded", "consent_source"))
+
+# Which key an UNREADABLE top-level line belongs to, used for the severity
+# above only. Looser than _KEY_RE on purpose: it accepts a quoted key and no
+# space after the colon, and a gate key with its colon forgotten still
+# counts as that key.
+_LOOSE_KEY_RE = re.compile(r"""["']?([A-Za-z_][A-Za-z0-9_-]*)["']?[ \t]*:""")
+_GATE_KEY_START_RE = re.compile(
+    r"""["']?(""" + "|".join(sorted(GATE_KEYS)) + r""")(?![A-Za-z0-9_-])""")
 _INT_RE = re.compile(r"[-+]?[0-9]+")
 _LAST_UPDATED_RE = re.compile(r"^[ \t]*Last updated:[ \t]*(.*)$")
 _DATE_PREFIX_RE = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})(?![0-9])")
@@ -418,35 +432,63 @@ def _value_or_empty(text, line):
     return parse_value(text.strip(), line)
 
 
+def _is_seq_item(body):
+    """True when a stripped line is a block-sequence item (`-` or `- ...`)."""
+    return body == "-" or body.startswith("- ")
+
+
+def _owning_key(body, previous):
+    """The top-level key an unreadable column-0 line belongs to (CR-01).
+
+    Its own key when it has one (quoted, or with no space after the colon);
+    a gate key whose colon was forgotten; otherwise the key above it, since a
+    column-0 line with no key of its own is the continuation of that key's
+    value (the `]` closing a multi-line flow sequence, a stray item).
+    """
+    match = _LOOSE_KEY_RE.match(body) or _GATE_KEY_START_RE.match(body)
+    return match.group(1) if match is not None else previous
+
+
 def parse_yaml_subset(text, skipped=None):
     """Parse the dossier.yaml subset into Scalar / Seq / Map values.
 
     Supported (D-22, D-24.1): `key: value`, flow sequences `[ a, b ]`, block
-    sequences `- item`, block sequences of mappings (`counterparts`), a
-    one-level nested mapping, `#` comments (quote-aware), single and double
-    quotes. No implicit int/bool/null/float/date conversion happens here:
-    every scalar comes back as its raw text plus a `quoted` flag, and
-    apply_schema() alone decides a field's type. A line outside the subset
-    is skipped and its number appended to `skipped` -- never a crash.
+    sequences `- item` (indented, or at column 0 right under their key),
+    block sequences of mappings (`counterparts`), a one-level nested
+    mapping, `#` comments (quote-aware), single and double quotes. No
+    implicit int/bool/null/float/date conversion happens here: every scalar
+    comes back as its raw text plus a `quoted` flag, and apply_schema()
+    alone decides a field's type. A line outside the subset is skipped and
+    `(number, key, reason)` appended to `skipped` -- never a crash -- where `key` is
+    the top-level key the line belongs to (None when there is none), so the
+    caller can fail closed on the gate keys (CR-01). A top-level key seen a
+    second time is skipped the same way: the first occurrence wins, and a
+    conforming YAML parser would have rejected the file.
     """
     data = {}
     block_key = None
     block_indent = -1
     item = None
     item_indent = -1
+    owner = None
     for number, raw in enumerate(text.splitlines(), 1):
         line = strip_comment(raw)
         body = line.strip()
         if not body or body in ("---", "..."):
             continue
         indent = len(line) - len(line.lstrip(" \t"))
+        top_level = indent == 0 and not (block_key is not None and _is_seq_item(body))
+        if top_level:
+            owner = _owning_key(body, owner)
         try:
-            if indent == 0:
+            if top_level:
                 block_key, block_indent, item = None, -1, None
                 match = _KEY_RE.fullmatch(body)
                 if match is None:
                     raise ValueError("not a `key: value` line")
                 key, value = match.group(1), match.group(2)
+                if key in data:
+                    raise ValueError("duplicate key")
                 if value is None or value.strip() == "":
                     data[key] = Scalar("", False, number)
                     block_key = key
@@ -456,7 +498,7 @@ def parse_yaml_subset(text, skipped=None):
             if block_key is None:
                 raise ValueError("indented line outside a block")
             current = data[block_key]
-            if body == "-" or body.startswith("- "):
+            if _is_seq_item(body):
                 if isinstance(current, Scalar):
                     current = data[block_key] = Seq((), current.line)
                     block_indent = indent
@@ -486,9 +528,9 @@ def parse_yaml_subset(text, skipped=None):
                 current[match.group(1)] = _value_or_empty(match.group(2), number)
                 continue
             raise ValueError("mapping line at an unsupported indentation")
-        except ValueError:
+        except ValueError as exc:
             if skipped is not None:
-                skipped.append(number)
+                skipped.append((number, owner, str(exc)))
     return data
 
 
@@ -658,8 +700,12 @@ def consent_is_recorded(config):
     """True only when the flag is true AND a source is filled in (spec Sec3.2).
 
     The one condition under which the confidential-name check (E5) is
-    suppressed.
+    suppressed -- and never while a gate key's line was unreadable or
+    duplicated (CR-01): what the file really says is unknown, so the check
+    stays armed.
     """
+    if config.get("gate_damaged"):
+        return False
     return config["consent_recorded"] and config["consent_source"].strip() != ""
 
 
@@ -674,9 +720,23 @@ def load_config(path, findings):
     text = read_text_safe(path, follow_symlink=True)
     if text is None:
         return None
+    gate_damaged = False
     if text.lstrip()[:1] == "{":
+        duplicates = []
+
+        def keep_first(pairs):
+            # json.loads keeps the LAST of two equal keys, silently: a second,
+            # empty confidential_names would switch E5 off (CR-01).
+            obj = {}
+            for key, value in pairs:
+                if key in obj:
+                    duplicates.append(key)
+                else:
+                    obj[key] = value
+            return obj
+
         try:
-            obj = json.loads(text)
+            obj = json.loads(text, object_pairs_hook=keep_first)
         except ValueError as exc:
             findings.append(Finding(CONFIG_NAME, getattr(exc, "lineno", 0), ERROR, "C1",
                                     "dossier.yaml starts with `{` but is not valid JSON"))
@@ -684,14 +744,33 @@ def load_config(path, findings):
         if not isinstance(obj, dict):
             findings.append(Finding(CONFIG_NAME, 0, ERROR, "C1", "dossier.yaml JSON must be an object"))
             obj = {}
+        for key in duplicates:
+            if key in GATE_KEYS:
+                gate_damaged = True
+                findings.append(Finding(CONFIG_NAME, 0, ERROR, "C1",
+                                        "duplicate key {} (the confidentiality gate fails closed)".format(key)))
+            else:
+                findings.append(Finding(CONFIG_NAME, 0, WARNING, "C0",
+                                        "duplicate key {}: the first one is read".format(key)))
         raw = json_to_scalars(obj)
     else:
         skipped = []
         raw = parse_yaml_subset(text, skipped)
-        for number in skipped:
-            findings.append(Finding(CONFIG_NAME, number, WARNING, "C0",
-                                    "line {} skipped: outside the supported YAML subset".format(number)))
-    return apply_schema(raw, findings)
+        for number, key, reason in skipped:
+            if key in GATE_KEYS:
+                # Fail closed (CR-01): this line may have held the names or
+                # the consent, so it can never be a mere warning.
+                gate_damaged = True
+                findings.append(Finding(CONFIG_NAME, number, ERROR, "C1",
+                                        "line {} skipped ({}) on the confidentiality gate key {}: "
+                                        "fix it, the leak check cannot trust it".format(number, reason, key)))
+            else:
+                findings.append(Finding(CONFIG_NAME, number, WARNING, "C0",
+                                        "line {} skipped: {} (outside the supported YAML subset)".format(
+                                            number, reason)))
+    config = apply_schema(raw, findings)
+    config["gate_damaged"] = gate_damaged
+    return config
 
 
 # ---------------------------------------------------------------------------
