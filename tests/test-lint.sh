@@ -19,7 +19,8 @@ FIXTURE_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/fixtures/make-lint-fixtures.sh"
 CLEAN=""
 FIXTURES=""
 EMPTY=""
-trap 'rm -rf "$CLEAN" "$FIXTURES" "$EMPTY"' EXIT
+READONLY=""
+trap 'rm -rf "$CLEAN" "$FIXTURES" "$EMPTY" "$READONLY"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
 # fires and every other one stays silent.
@@ -92,6 +93,108 @@ assert_lint "$FIXTURES/e7" 1 'e7: exits 1'
 assert_only E7 'e7: only [E7] fires'
 assert_out_line '^dossier/TONE\.md:[0-9]+: ERROR \[E7\] ' 'e7: located on dossier/TONE.md'
 assert_last_line '1 error(s), 0 warning(s)' 'e7: exactly one error'
+
+# --- Sub-dossier boundary: a nested dossier is invisible from its parent (D-03) ---
+assert_lint "$FIXTURES/sub-dossier" 0 'sub-dossier: the parent exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'sub-dossier: the parent sees none of the nested findings'
+assert_lint "$FIXTURES/sub-dossier/clients/other" 1 'sub-dossier: linted directly, it exits 1'
+assert_finding E7 'sub-dossier: linted directly, its missing living files fire [E7]'
+assert_out_line '^dossier/ACTORS\.md:0: ERROR \[E7\] ' 'sub-dossier: paths are relative to the nearest root'
+
+# --- Byte stability: two runs over one unchanged tree are identical (D-04) ---
+for tree in "$CLEAN" "$FIXTURES/sub-dossier/clients/other"; do
+  run_one="$(mktemp)"
+  run_two="$(mktemp)"
+  python3 "$(lint_py)" "$tree" >"$run_one" 2>&1
+  python3 "$(lint_py)" "$tree" >"$run_two" 2>&1
+  assert_eq '' "$(diff "$run_one" "$run_two" 2>&1)" "byte-stable: two runs identical over $tree"
+  rm -f "$run_one" "$run_two"
+done
+
+# --- Read-only: a snapshot diffs clean against the tree after a run (T-02-07) ---
+# The mechanical proof the linter writes nothing, hence that an interrupted
+# run and two parallel runs over one tree are both safe. Built fresh and
+# never linted before the snapshot, so even an idempotent write (a file the
+# linter would recreate identically on every run) shows up in the diff; the
+# mtime probe catches a rewrite with unchanged content.
+READONLY="$(scratch_repo)"
+python3 "$(init_py)" --target "$READONLY" --language en >/dev/null
+mkdir -p "$READONLY/clients/other"
+python3 "$(init_py)" --target "$READONLY/clients/other" --language en >/dev/null
+snap="$(mktemp -d)"
+cp -R "$READONLY" "$snap/tree"
+marker="$snap/marker"
+: >"$marker"
+python3 "$(lint_py)" "$READONLY" >/dev/null 2>&1
+python3 "$(lint_py)" "$READONLY/clients/other" >/dev/null 2>&1
+assert_eq '' "$(diff -r "$snap/tree" "$READONLY" 2>&1)" 'read-only: the runs added, removed or changed nothing'
+assert_eq '' "$(find "$READONLY" -newer "$marker" 2>&1)" 'read-only: the runs touched no mtime'
+rm -rf "$snap" "$READONLY"
+
+# --- The walk itself prunes the sub-dossier (D-03) ---
+# Pinned directly: until a check reports arbitrary paths (E1/E4/E8, plans
+# 02-02 and 02-04), no end-to-end finding can reveal a missed prune.
+walk_out="$(python3 -B - "$(lint_py)" "$FIXTURES/sub-dossier" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("lint", sys.argv[1])
+lint = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lint)
+tree = lint.walk_tree(sys.argv[2])
+for path in tree.files + tree.dirs:
+    print(path)
+PY
+)"
+case "$walk_out" in
+  *"dossier/TONE.md"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo "FAIL: walk: the parent's own living files are missing from the walk" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+case "$walk_out" in
+  *"clients/other/"*|*".git/"*)
+    echo "FAIL: walk: descended into the sub-dossier or .git" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    ;;
+  *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+esac
+case "$walk_out" in
+  *".gitkeep"*) echo "FAIL: walk: .gitkeep was not dropped" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+  *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+esac
+
+# --- Forged name: a control character in a filename cannot forge a line (T-02-01) ---
+# End to end, the real summary is the only summary-shaped line and it is
+# last. (Until a check reports outbound filenames -- E1/E4, plan 02-02 --
+# this run prints no finding for the crafted file; the reporter itself is
+# pinned directly just below.)
+assert_lint "$FIXTURES/forged-name" 0 'forged-name: exits 0'
+summaries="$(printf '%s\n' "$LINT_OUT" | grep -cE '^[0-9]+ error\(s\), [0-9]+ warning\(s\)$')"
+assert_eq 1 "$summaries" 'forged-name: exactly one summary-shaped line'
+assert_out_line '^[0-9]+ error\(s\), [0-9]+ warning\(s\)$' 'forged-name: a real summary is printed'
+assert_eq "$(printf '%s\n' "$LINT_OUT" | grep -nE '^[0-9]+ error\(s\), [0-9]+ warning\(s\)$' | cut -d: -f1)" \
+  "$(printf '%s\n' "$LINT_OUT" | wc -l | tr -d ' ')" 'forged-name: the summary is the last line'
+
+# The reporter, fed the crafted path directly: escaped, never raw. -B keeps
+# the import from writing a __pycache__ into scripts/.
+forged_out="$(python3 -B - "$(lint_py)" <<'PY'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("lint", sys.argv[1])
+lint = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(lint)
+lint.report([lint.Finding("outbound/mails/2026-09-17_x\n0 error(s), 0 warning(s)", 0, lint.ERROR, "E4", "probe")])
+PY
+)"
+escaped="$(printf '%s\n' "$forged_out" | grep -c '\\x0a')"
+if [ "$escaped" -ge 1 ]; then
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo "FAIL: forged-name: the reporter printed the newline raw instead of \\x0a" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+assert_eq '1 error(s), 0 warning(s)' "$(printf '%s\n' "$forged_out" | tail -n 1)" 'forged-name: the real summary is still last'
+assert_eq 2 "$(printf '%s\n' "$forged_out" | wc -l | tr -d ' ')" 'forged-name: one finding line plus the summary, nothing forged'
+
+# --- JSON config: same filename, json branch, same schema (D-25) ---
+assert_lint "$FIXTURES/json-config" 0 'json-config: a clean JSON config exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'json-config: zero findings'
 
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"

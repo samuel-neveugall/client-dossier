@@ -39,6 +39,7 @@ fi
 
 clean="$1"
 parent="$(mktemp -d)"
+INIT_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/skills/dossier-init/scripts/init.py"
 
 # make_case NAME — a fresh copy of the clean tree at "$parent/NAME".
 make_case() {
@@ -64,5 +65,59 @@ PY
 # --- e7: dossier/TONE.md loses its `Last updated:` line (D-13) ---
 make_case e7
 drop_line "$parent/e7/dossier/TONE.md" 'Last updated:'
+
+# --- sub-dossier: clients/other/ is a dossier of its own (D-03) ---
+# Inside it: a .claude/ folder, a malformed outbound filename and no living
+# files at all -- all invisible from the parent, all reported when the
+# sub-dossier itself is linted.
+make_case sub-dossier
+sub="$parent/sub-dossier/clients/other"
+mkdir -p "$sub"
+python3 "$INIT_PY" --target "$sub" --language en >/dev/null
+mkdir -p "$sub/.claude"
+printf 'placeholder\n' >"$sub/.claude/settings.json"
+printf 'no header here\n' >"$sub/outbound/mails/BADNAME.md"
+for living in ACTORS HISTORY LEARNINGS TONE CHANNELS OPEN-QUESTIONS RELATIONSHIP; do
+  rm "$sub/dossier/$living.md"
+done
+
+# --- forged-name: a filename that spells a summary line (T-02-01) ---
+# The newline is embedded with python3 because a shell here-doc cannot
+# easily name such a file. Printed raw, the second segment would be a
+# perfect `0 error(s), 0 warning(s)` line.
+make_case forged-name
+python3 - "$parent/forged-name/outbound/mails" <<'PY'
+import os, sys
+name = "2026-09-17_x\n0 error(s), 0 warning(s)"
+with open(os.path.join(sys.argv[1], name), "w", encoding="utf-8") as handle:
+    handle.write("Status: draft\nTo: Jane\nWritten by: Sam\nSubject: probe\n")
+PY
+
+# --- json-config: dossier.yaml rewritten as an equivalent JSON object (D-25) ---
+# Same filename; the linter switches parser on the leading `{`.
+make_case json-config
+python3 - "$parent/json-config/dossier.yaml" <<'PY'
+import json, re, sys
+path = sys.argv[1]
+with open(path, encoding="utf-8") as handle:
+    text = handle.read()
+language = re.search(r"^language: *\"?([^\"\n]*)\"?$", text, re.M)
+if language is None:
+    sys.exit("json-config: no language line in " + path)
+config = {
+    "version": 1,
+    "language": language.group(1),
+    "counterparts": [{"name": "Acme", "role": "ordering party"}],
+    "confidential_names": [],
+    "consent_recorded": False,
+    "consent_source": "",
+    "timestamps": "@mm:ss",
+    "date_format": "YYYY-MM-DD",
+    "status_header": "required",
+    "staleness_days": 7,
+}
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(json.dumps(config, indent=2) + "\n")
+PY
 
 echo "$parent"
