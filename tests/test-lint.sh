@@ -517,6 +517,17 @@ assert_lint "$FIXTURES/os-junk" 0 'os-junk: .DS_Store, Thumbs.db and desktop.ini
 assert_clean 'os-junk: none of them needs a header or a dated name'
 assert_lint "$FIXTURES/os-junk-leak" 1 'os-junk-leak: a name inside desktop.ini exits 1'
 assert_only E5 'os-junk-leak: E5 still reads OS metadata files'
+# --- A symlinked folder is never skipped in silence (WR-02, T-02-03) ---
+# Not followed (it may point outside the dossier), so under outbound/ it is
+# an error: none of E1-E5 reached its files.
+assert_lint "$FIXTURES/symlink-outbound" 1 'symlink-outbound: a symlinked outbound/ exits 1'
+assert_out_line '^outbound:0: ERROR \[E1\] ' 'symlink-outbound: the symlink itself is reported'
+assert_lint "$FIXTURES/symlink-outbound-sub" 1 'symlink-outbound-sub: a symlinked outbound/mails/ exits 1'
+assert_out_line '^outbound/mails:0: ERROR \[E1\] ' 'symlink-outbound-sub: the symlink itself is reported'
+assert_no_finding C1 'symlink-outbound-sub: no config finding'
+# Elsewhere it gates no leak check: an info line, never silence.
+assert_lint "$FIXTURES/symlink-knowledge" 0 'symlink-knowledge: a symlinked knowledge/ exits 0'
+assert_out_line '^info: .*knowledge' 'symlink-knowledge: the unfollowed folder is named on an info line'
 # --- A non-UTF-8 stdout never turns a finding into a crash (WR-06) ---
 # A Windows console or a legacy locale: the E5 line must still be printed
 # (escaped) and the exit code must stay 1, never 3.

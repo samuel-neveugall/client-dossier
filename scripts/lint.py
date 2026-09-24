@@ -990,15 +990,18 @@ class Tree:
 
     `pruned` lists the sub-dossiers skipped as D-03 boundaries, each named
     on an info line so a skipped subtree is never silent (WR-03).
+    `symlinks` lists the directory symlinks the walk did not follow
+    (T-02-03): an E1 error under outbound/, an info line elsewhere (WR-02).
     """
 
-    __slots__ = ("files", "dirs", "file_set", "pruned")
+    __slots__ = ("files", "dirs", "file_set", "pruned", "symlinks")
 
-    def __init__(self, files, dirs, pruned=()):
+    def __init__(self, files, dirs, pruned=(), symlinks=()):
         self.files = files
         self.dirs = dirs
         self.file_set = frozenset(files)
         self.pruned = list(pruned)
+        self.symlinks = list(symlinks)
 
 
 def walk_tree(root):
@@ -1009,7 +1012,9 @@ def walk_tree(root):
     directory that itself holds a dossier.yaml -- a nested dossier is a
     boundary, never descended into and never merged into this one's findings.
     Directory symlinks are listed but never followed (the os.walk default,
-    deliberately not overridden -- T-02-03). `.gitkeep` is dropped
+    deliberately not overridden -- T-02-03: a link may point outside the
+    dossier, or back up into it); each one is recorded in `symlinks` so it
+    is reported, never silently skipped (WR-02). `.gitkeep` is dropped
     everywhere (LINT-01). A dossier.yaml inside the fixed layout (LAYOUT_DIRS)
     is not a boundary: that folder is walked as usual, and under outbound/
     the stray file meets the outbound checks like any other (WR-03).
@@ -1017,6 +1022,7 @@ def walk_tree(root):
     files = []
     dirs = []
     pruned = []
+    symlinks = []
     for dirpath, dirnames, filenames in os.walk(root, topdown=True):
         dirnames.sort()
         filenames.sort()
@@ -1035,10 +1041,12 @@ def walk_tree(root):
         dirnames[:] = kept
         for name in dirnames:
             dirs.append(prefix + name)
+            if os.path.islink(os.path.join(dirpath, name)):
+                symlinks.append(prefix + name)
         for name in filenames:
             if name != GITKEEP:
                 files.append(prefix + name)
-    return Tree(files, dirs, pruned)
+    return Tree(files, dirs, pruned, symlinks)
 
 
 def read_text_safe(path, follow_symlink=False):
@@ -1116,6 +1124,10 @@ def is_absolute_date(text):
     return match is not None and _is_real_date(*match.groups())
 
 
+def _in_outbound(rel):
+    return rel == OUTBOUND_DIR or rel.startswith(OUTBOUND_DIR + "/")
+
+
 def outbound_files(tree):
     """Every walked file under outbound/, in walk order (`.gitkeep` already gone)."""
     prefix = OUTBOUND_DIR + "/"
@@ -1173,7 +1185,15 @@ def check_outbound_headers(root, tree, config, findings):
     incomplete status value. E3: a Deadline: that is not an absolute, real
     date. The field names are grepped in English in every dossier (spec
     Sec3.2); there is no per-format parser and no per-language label table.
+    A symlinked folder under outbound/ (or outbound/ itself) is E1 too: the
+    walk does not follow it (T-02-03), so none of E1-E5 reached its files,
+    and a leak check that did not run must not exit 0 (WR-02).
     """
+    for rel in tree.symlinks:
+        if _in_outbound(rel):
+            findings.append(Finding(rel, 0, ERROR, "E1",
+                                    "folder is a symlink, never followed: none of its files is checked "
+                                    "(status header, name, confidential names); make it a real folder"))
     for rel in outbound_files(tree):
         if not _is_header_target(rel):
             continue
@@ -1625,7 +1645,9 @@ def _run(start):
         check(root, tree, config, findings)
     infos = language_infos(config) + [
         "sub-dossier {}/ skipped: it holds its own {} (lint it separately)".format(rel, CONFIG_NAME)
-        for rel in tree.pruned]
+        for rel in tree.pruned] + [
+        "folder {}/ is a symlink, not followed: its files are not checked".format(rel)
+        for rel in tree.symlinks if not _in_outbound(rel)]
     errors, _warnings = report(findings, infos)
     return EXIT_ERRORS if errors else EXIT_CLEAN
 

@@ -630,6 +630,26 @@ printf '[.ShellClassInfo]\r\nIconResource=C:\\Windows\\system32\\imageres.dll,-3
 make_gate_case os-junk-leak 'confidential_names: [ Acme ]'
 rm "$parent/os-junk-leak/outbound/mails/2026-09-17_relance.md"
 printf '[.ShellClassInfo]\r\nInfoTip=Acme files\r\n' >"$parent/os-junk-leak/outbound/calls/desktop.ini"
+# --- symlink-outbound / symlink-outbound-sub / symlink-knowledge: a symlinked folder (WR-02) ---
+# The walk never follows a directory symlink (T-02-03), so the folder's
+# files meet no check. Under outbound/ that is every leak check gone: the
+# symlink itself must be reported. The real folder sits inside the case
+# tree, outside the layout, where no outbound check looks.
+make_gate_case symlink-outbound 'confidential_names: [ Acme ]'
+write_file "$parent/symlink-outbound/outbound/mails/2026-09-17_nohead.md" 'Hello Jane, Acme here.
+'
+mkdir -p "$parent/symlink-outbound/elsewhere"
+mv "$parent/symlink-outbound/outbound" "$parent/symlink-outbound/elsewhere/outbound-real"
+ln -s elsewhere/outbound-real "$parent/symlink-outbound/outbound"
+make_gate_case symlink-outbound-sub 'confidential_names: [ Acme ]'
+mkdir -p "$parent/symlink-outbound-sub/elsewhere"
+mv "$parent/symlink-outbound-sub/outbound/mails" "$parent/symlink-outbound-sub/elsewhere/mails-real"
+ln -s ../elsewhere/mails-real "$parent/symlink-outbound-sub/outbound/mails"
+make_named_case symlink-knowledge
+printf '%s\n' 'The budget is decided tomorrow.' >>"$parent/symlink-knowledge/knowledge/CONTEXT.md"
+mkdir -p "$parent/symlink-knowledge/elsewhere"
+mv "$parent/symlink-knowledge/knowledge" "$parent/symlink-knowledge/elsewhere/knowledge-real"
+ln -s elsewhere/knowledge-real "$parent/symlink-knowledge/knowledge"
 # --- enc-leak: a finding that a non-UTF-8 stdout cannot encode (WR-06) ---
 # The name is L-with-stroke + ukasz, outside latin-1, so a strict encoder
 # raises on the E5 line itself.
