@@ -141,6 +141,14 @@ _DATE_PREFIX_RE = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})(?![0-9])")
 # calendar is is_absolute_date()'s job.
 _DATE_RE = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})")
 
+# An outbound filename (D-10, A-03): YYYY-MM-DD, `_`, a slug of lowercase
+# ASCII letters and digits joined by single hyphens, `.`, an extension. The
+# slug charset borrows knowledge/decisions/'s convention; it rejects
+# uppercase and a second `_` inside the slug, which is the assumption most
+# likely to need loosening after real use. Always fullmatch'ed, never `$`,
+# which would accept a name ending in a newline.
+_OUTBOUND_NAME_RE = re.compile(r"([0-9]{4}-[0-9]{2}-[0-9]{2})_[a-z0-9]+(?:-[a-z0-9]+)*\.[A-Za-z0-9]+")
+
 # One status-header line, whatever the comment syntax around it (D-07,
 # Pattern 4). Only non-alphanumeric characters may precede the field name
 # (`<!-- `, `# `, `// `, indentation), so a prose line such as "Reply To: x"
@@ -491,8 +499,8 @@ def as_bool(value, field, findings):
         # Fail closed -- the single most security-relevant line in this file:
         # consent_recorded gates the confidential-name leak check, so a
         # malformed flag reads as False and the check stays armed (T-02-02).
-        # Pinned by the c1-yes/c1-quoted fixtures (no E6 follows); the
-        # fixture proving the leak check itself still fires lands in 02-02.
+        # Pinned by the c1-yes/c1-quoted fixtures (no E6 follows) and by
+        # c1-quoted-leak (C1 and E5 together: the leak check still fires).
         return False
     return value.text in TRUE_SCALARS
 
@@ -588,8 +596,8 @@ def apply_schema(raw, findings):
 def consent_is_recorded(config):
     """True only when the flag is true AND a source is filled in (spec Sec3.2).
 
-    The one condition under which the confidential-name check (E5, plan
-    02-02) is suppressed.
+    The one condition under which the confidential-name check (E5) is
+    suppressed.
     """
     return config["consent_recorded"] and config["consent_source"].strip() != ""
 
@@ -779,7 +787,7 @@ def _is_header_target(rel):
 
 # ---------------------------------------------------------------------------
 # CHECKS -- in identifier order. Each takes (root, tree, config, findings).
-# E4 and E5 land later in 02-02; E8, E9, W1 and W2 in plans 02-04 and 02-05.
+# E8, E9, W1 and W2 land in plans 02-04 and 02-05.
 # ---------------------------------------------------------------------------
 
 
@@ -853,6 +861,73 @@ def check_outbound_headers(root, tree, config, findings):
                                         "Deadline: is not an absolute YYYY-MM-DD date"))
 
 
+def check_outbound_names(root, tree, config, findings):
+    """E4: a file directly under outbound/{deliverables,mails,calls}/ is named
+    YYYY-MM-DD_slug.ext with a real calendar date (D-10, A-03).
+
+    Reported at line 0: the finding is about the file as a whole.
+    """
+    for rel in outbound_files(tree):
+        parts = rel.split("/")
+        if len(parts) != 3 or parts[1] not in OUTBOUND_SUBS:
+            continue
+        name = parts[2]
+        if name in EXEMPT_BASENAMES:  # D-06
+            continue
+        match = _OUTBOUND_NAME_RE.fullmatch(name)
+        if match is None or not is_absolute_date(match.group(1)):
+            findings.append(Finding(rel, 0, ERROR, "E4",
+                                    "filename does not match YYYY-MM-DD_slug.ext "
+                                    "(real date, lowercase slug joined by hyphens)"))
+
+
+def boundary_pattern(needle):
+    """A case-insensitive pattern matching NEEDLE as a whole name (D-11, F-02).
+
+    The needle is escaped first: it comes from dossier.yaml, and an unescaped
+    one would let a hostile config inject a regex (T-02-05); escaped, the
+    pattern is a literal between two lookarounds, with nothing to backtrack.
+    The boundary is "a character that is alphanumeric but not `_`", i.e.
+    [^\\W_], on both sides. The obvious (?<!\\w) counts `_` as a word
+    character, and since every outbound filename is YYYY-MM-DD_slug, a name
+    at the head of a slug would never match -- the silent miss measured on
+    2026-09-17_acme-proposal.md. This class still refuses `Acmetal`.
+    """
+    return re.compile(r"(?<![^\W_])" + re.escape(normalise(needle.strip())) + r"(?![^\W_])",
+                      re.IGNORECASE)
+
+
+def check_confidential_names(root, tree, config, findings):
+    """E5: a confidential name in the text or the filename of an outbound file.
+
+    Suppressed only when consent is recorded AND sourced; a malformed
+    consent_recorded reads as False in the schema, so the check stays armed
+    (T-02-02). Both sides are NFC-normalised (P-05). A file that will not
+    decode, is symlinked or is oversized skips the text half only; the
+    filename half always runs (P-07). The message names the needle and the
+    location, never the surrounding sentence (T-02-09).
+    """
+    if consent_is_recorded(config) or not config["confidential_names"]:
+        return
+    needles = [(name, boundary_pattern(name)) for name in config["confidential_names"]]
+    prefix_len = len(OUTBOUND_DIR) + 1
+    for rel in outbound_files(tree):
+        # No EXEMPT_BASENAMES skip here, on purpose: a leaked name is a leak wherever it sits.
+        path_name = normalise(rel[prefix_len:])
+        for name, pattern in needles:
+            if pattern.search(path_name):
+                findings.append(Finding(rel, 0, ERROR, "E5",
+                                        "confidential name '{}' in the file name under outbound/".format(name)))
+        text = read_text_safe(os.path.join(root, *rel.split("/")))
+        if text is None:
+            continue
+        for number, line in enumerate(normalise(text).splitlines(), 1):
+            for name, pattern in needles:
+                if pattern.search(line):
+                    findings.append(Finding(rel, number, ERROR, "E5",
+                                            "confidential name '{}' under outbound/".format(name)))
+
+
 def check_consent_source(root, tree, config, findings):
     """E6: consent_recorded true with an empty or absent consent_source (D-12)."""
     if config["consent_recorded"] and config["consent_source"].strip() == "":
@@ -893,6 +968,8 @@ def check_living_files(root, tree, config, findings):
 
 CHECKS = (
     check_outbound_headers,
+    check_outbound_names,
+    check_confidential_names,
     check_consent_source,
     check_living_files,
 )

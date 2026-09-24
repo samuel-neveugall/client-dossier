@@ -162,10 +162,10 @@ esac
 
 # --- Forged name: a control character in a filename cannot forge a line (T-02-01) ---
 # End to end, the real summary is the only summary-shaped line and it is
-# last. (Until a check reports outbound filenames -- E1/E4, plan 02-02 --
-# this run prints no finding for the crafted file; the reporter itself is
-# pinned directly just below.)
-assert_lint "$FIXTURES/forged-name" 0 'forged-name: exits 0'
+# last. E4 reports the crafted file, so the escaped `\x0a` is also asserted
+# end to end in the E4 section below; the reporter itself is pinned
+# directly just below.
+assert_lint "$FIXTURES/forged-name" 1 'forged-name: exits 1'
 summaries="$(printf '%s\n' "$LINT_OUT" | grep -cE '^[0-9]+ error\(s\), [0-9]+ warning\(s\)$')"
 assert_eq 1 "$summaries" 'forged-name: exactly one summary-shaped line'
 assert_out_line '^[0-9]+ error\(s\), [0-9]+ warning\(s\)$' 'forged-name: a real summary is printed'
@@ -274,6 +274,51 @@ assert_lint "$CLEAN" 0 'clean: outbound/README.md is exempt from E1-E3'
 for ident in E1 E2 E3; do
   assert_no_finding "$ident" 'clean: the shipped outbound README raises no header finding'
 done
+
+# --- E4: the outbound filename convention (D-10, A-03) ---
+assert_lint "$FIXTURES/e4" 1 'e4: a malformed filename exits 1'
+assert_only E4 'e4: only [E4] fires'
+assert_out_line '^outbound/mails/[^:]*:0: ERROR \[E4\] ' 'e4: reported at line 0 of the file'
+assert_lint "$FIXTURES/e4-baddate" 1 'e4-baddate: 2026-13-45 in the filename exits 1'
+assert_only E4 'e4-baddate: the filename date is calendar-validated'
+
+# --- E5: a confidential name under outbound/, in the text or the filename (D-11) ---
+assert_lint "$FIXTURES/e5" 1 'e5: a name in the body exits 1'
+assert_only E5 'e5: only [E5] fires'
+assert_out_line '^outbound/mails/2026-09-17_relance\.md:[1-9][0-9]*: ERROR \[E5\] ' 'e5: reported at the matching, non-zero line'
+assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep -c 'travaillons')" 'e5: the message carries the needle, never the surrounding sentence (T-02-09)'
+
+assert_lint "$FIXTURES/e5-filename" 1 'e5-filename: a name only in the filename exits 1'
+assert_only E5 'e5-filename: only [E5] fires'
+assert_out_line '^outbound/mails/2026-09-17_acme-offer\.md:0: ERROR \[E5\] ' 'e5-filename: reported at line 0'
+
+assert_lint "$FIXTURES/e5-boundary" 0 'e5-boundary: Acmetal and AcmeCorp exit 0'
+assert_last_line '0 error(s), 0 warning(s)' 'e5-boundary: a name inside a longer word is not a match'
+
+assert_lint "$FIXTURES/e5-nfd" 1 'e5-nfd: a decomposed accented name exits 1'
+assert_only E5 'e5-nfd: only [E5] fires -- both sides NFC-normalised'
+
+assert_lint "$FIXTURES/e5-binary" 1 'e5-binary: an undecodable binary does not crash and exits 1'
+assert_only E5 'e5-binary: only [E5] fires'
+assert_out_line '^outbound/deliverables/2026-09-17_acme-scan\.pdf:0: ERROR \[E5\] ' 'e5-binary: the filename half still runs'
+
+assert_lint "$FIXTURES/e5-nonames" 0 'e5-nonames: an empty confidential_names list exits 0'
+assert_no_finding E5 'e5-nonames: [E5] never fires without a configured name'
+
+# --- The consent gate fails closed: a malformed flag leaves E5 armed (T-02-02) ---
+assert_lint "$FIXTURES/c1-quoted-leak" 1 'c1-quoted-leak: exits 1'
+assert_finding C1 'c1-quoted-leak: the malformed flag is reported'
+assert_finding E5 'c1-quoted-leak: and the leak is still reported'
+for ident in E1 E2 E3 E4 E6 E7 E8 E9 C0 W1 W2; do
+  assert_no_finding "$ident" 'c1-quoted-leak: nothing but [C1] and [E5]'
+done
+
+# --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
+assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
+assert_only E4 'forged-name: only [E4] fires'
+assert_eq 1 "$(printf '%s\n' "$LINT_OUT" | grep -c '\\x0a')" 'forged-name: the newline in the name is printed as \x0a'
+assert_eq 1 "$(printf '%s\n' "$LINT_OUT" | grep -cE '^[0-9]+ error\(s\), [0-9]+ warning\(s\)$')" 'forged-name: still exactly one summary-shaped line'
+assert_last_line '1 error(s), 0 warning(s)' 'forged-name: the real summary is last'
 
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"

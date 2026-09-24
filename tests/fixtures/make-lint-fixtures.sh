@@ -302,4 +302,76 @@ make_case binary-ok
 : >"$parent/binary-ok/outbound/deliverables/2026-09-17_audit.pdf"
 write_file "$parent/binary-ok/outbound/deliverables/2026-09-17_audit.md" "$GOOD_MAIL"
 
+# make_named_case NAME [INIT_ARG...] -- a fresh init.py scaffold at
+# "$parent/NAME" with the extra flags given. Used when a case needs a
+# confidential name or a consent: the flags go through the producer, so
+# dossier.yaml keeps init.py's exact bytes instead of a hand edit.
+make_named_case() {
+  local name="$1"
+  shift
+  mkdir -p "$parent/$name"
+  python3 "$INIT_PY" --target "$parent/$name" --language en "$@" >/dev/null
+}
+
+# --- E4: a valid header under a filename that is not YYYY-MM-DD_slug.ext (D-10) ---
+make_case e4
+write_file "$parent/e4/outbound/mails/Relance_Finale.md" "$GOOD_MAIL"
+
+# --- e4-baddate: E4, the right shape with an impossible date (D-10, D-09) ---
+make_case e4-baddate
+write_file "$parent/e4-baddate/outbound/mails/2026-13-45_relance.md" "$GOOD_MAIL"
+
+# --- E5: a confidential name in the body of a well-named mail (D-11) ---
+make_named_case e5 --confidential-name Acme
+write_file "$parent/e5/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Nous travaillons avec Acme.
+"
+
+# --- e5-filename: E5, the name only in the filename (D-11, F-02) ---
+# The name sits at the head of the slug, right after the `_`: the case the
+# naive (?<!\w) boundary silently misses.
+make_named_case e5-filename --confidential-name Acme
+write_file "$parent/e5-filename/outbound/mails/2026-09-17_acme-offer.md" "$GOOD_MAIL"
+
+# --- e5-boundary: the name inside longer words -- clean (D-11) ---
+make_named_case e5-boundary --confidential-name Acme
+write_file "$parent/e5-boundary/outbound/mails/2026-09-17_note.md" "${GOOD_MAIL}
+Acmetal and AcmeCorp are unrelated.
+"
+
+# --- e5-nfd: E5, an accented name written decomposed, configured composed (P-05) ---
+# dossier.yaml carries the NFC spelling (init.py writes what it is given);
+# the body carries the NFD spelling a macOS editor may store.
+make_named_case e5-nfd --confidential-name "$(printf 'Soci\303\251t\303\251 Exemple')"
+python3 - "$parent/e5-nfd/outbound/mails/2026-09-17_relance.md" "$GOOD_MAIL" <<'PY2'
+import sys, unicodedata
+name = unicodedata.normalize("NFD", "Société Exemple")
+assert name != unicodedata.normalize("NFC", name)
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    handle.write(sys.argv[2] + "\nWe met " + name + " today.\n")
+PY2
+
+# --- e5-binary: E5, a binary that will not decode, with the name in its filename (P-07) ---
+# The text half is skipped without a crash; the filename half still runs.
+make_named_case e5-binary --confidential-name Acme
+printf '\377\376\000binary\200' >"$parent/e5-binary/outbound/deliverables/2026-09-17_acme-scan.pdf"
+# Its Markdown source sits beside it (so E9, plan 02-04, stays silent); the
+# name in that sibling's filename is a second, equally legitimate E5.
+write_file "$parent/e5-binary/outbound/deliverables/2026-09-17_acme-scan.md" "$GOOD_MAIL"
+
+# --- e5-nonames: an empty confidential_names list, a counterpart in the body -- clean ---
+make_case e5-nonames
+write_file "$parent/e5-nonames/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Nous travaillons avec Acme.
+"
+
+# --- c1-quoted-leak: a malformed consent flag plus a leak -> C1 AND E5 (T-02-02) ---
+# consent_recorded: "true" (quoted) is a config error read as false, so the
+# leak check stays armed even though a source is filled in.
+make_named_case c1-quoted-leak --confidential-name Acme --consent-source 'mail 2026-09-16 from Jane'
+replace_line "$parent/c1-quoted-leak/dossier.yaml" 'consent_recorded: false' 'consent_recorded: "true"'
+write_file "$parent/c1-quoted-leak/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Nous travaillons avec Acme.
+"
+
 echo "$parent"
