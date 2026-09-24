@@ -453,6 +453,13 @@ assert_lint "$FIXTURES/os-junk" 0 'os-junk: .DS_Store, Thumbs.db and desktop.ini
 assert_clean 'os-junk: none of them needs a header or a dated name'
 assert_lint "$FIXTURES/os-junk-leak" 1 'os-junk-leak: a name inside desktop.ini exits 1'
 assert_only E5 'os-junk-leak: E5 still reads OS metadata files'
+# --- A non-UTF-8 stdout never turns a finding into a crash (WR-06) ---
+# A Windows console or a legacy locale: the E5 line must still be printed
+# (escaped) and the exit code must stay 1, never 3.
+PYTHONIOENCODING=latin-1 assert_lint "$FIXTURES/enc-leak" 1 'enc-leak: a latin-1 stdout still exits 1, not 3'
+assert_only E5 'enc-leak: the [E5] finding is printed'
+assert_out_line 'ERROR \[E5\] .*\\u0141ukasz' 'enc-leak: the unencodable character is escaped, not lost'
+assert_eq '' "$LINT_ERR" 'enc-leak: nothing on stderr'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

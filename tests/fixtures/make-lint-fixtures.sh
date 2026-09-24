@@ -557,6 +557,13 @@ printf '[.ShellClassInfo]\r\nIconResource=C:\\Windows\\system32\\imageres.dll,-3
 make_gate_case os-junk-leak 'confidential_names: [ Acme ]'
 rm "$parent/os-junk-leak/outbound/mails/2026-09-17_relance.md"
 printf '[.ShellClassInfo]\r\nInfoTip=Acme files\r\n' >"$parent/os-junk-leak/outbound/calls/desktop.ini"
+# --- enc-leak: a finding that a non-UTF-8 stdout cannot encode (WR-06) ---
+# The name is L-with-stroke + ukasz, outside latin-1, so a strict encoder
+# raises on the E5 line itself.
+make_named_case enc-leak --confidential-name "$(printf '\305\201ukasz')"
+write_file "$parent/enc-leak/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met $(printf '\305\201ukasz') today.
+"
 # --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
 # str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
 # and the producer do not. A name holding one must neither reach

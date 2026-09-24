@@ -1480,7 +1480,24 @@ def _run(start):
     return EXIT_ERRORS if errors else EXIT_CLEAN
 
 
+def _tolerant_streams():
+    """Escape, never raise on, a character the console cannot encode (WR-06).
+
+    A finding carries confidential names and word-list entries; on a
+    non-UTF-8 stdout (a Windows console or pipe, a legacy locale) a strict
+    encoder would turn that finding into an internal failure (exit 3) and
+    lose it. reconfigure() exists from Python 3.7; a replaced stream
+    without it is left alone.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="backslashreplace")
+        except (AttributeError, ValueError):
+            pass
+
+
 def main(argv=None):
+    _tolerant_streams()
     args = build_parser().parse_args(argv)
     try:
         return _run(args.path)
