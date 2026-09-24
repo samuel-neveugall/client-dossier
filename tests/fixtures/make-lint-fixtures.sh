@@ -397,4 +397,46 @@ printf '\nOur reference client is Acme.\n' >>"$parent/e5-readme/outbound/README.
 make_case e5-readme-nonames
 printf '\nOur reference client is Acme.\n' >>"$parent/e5-readme-nonames/outbound/README.md"
 
+
+# --- e8: E8, a .claude/ folder below the dossier root (D-14, spec Sec4.4 check 7) ---
+# This case is exactly why the fixtures are generated rather than committed
+# (D-29): the repository's .gitignore ignores `.claude/` at any depth, so a
+# committed copy of this tree would silently lose its one violation.
+make_case e8
+mkdir -p "$parent/e8/dossier/.claude"
+printf 'placeholder\n' >"$parent/e8/dossier/.claude/settings.json"
+
+# --- claude-at-root: the root's own .claude/ -- clean (D-14) ---
+# Exactly `<root>/.claude` is the agent folder D-14 permits.
+make_case claude-at-root
+mkdir -p "$parent/claude-at-root/.claude"
+printf 'placeholder\n' >"$parent/claude-at-root/.claude/settings.json"
+
+# --- e9: E9, a rendered deliverable with no source beside it (D-15, spec Sec4.4 check 8) ---
+make_case e9
+: >"$parent/e9/outbound/deliverables/2026-09-17_audit.pdf"
+
+# --- e9-docx: E9, the same rule for the other rendered extension (D-15) ---
+make_case e9-docx
+: >"$parent/e9-docx/outbound/deliverables/2026-09-17_audit.docx"
+
+# --- e9-source-only: a source with no render -- clean (D-15: the reverse is silent) ---
+make_case e9-source-only
+write_file "$parent/e9-source-only/outbound/deliverables/2026-09-17_audit.md" "$GOOD_MAIL"
+
+# --- render-html-ok: a .pdf beside an .html source -- clean (D-15) ---
+make_case render-html-ok
+: >"$parent/render-html-ok/outbound/deliverables/2026-09-17_audit.pdf"
+write_file "$parent/render-html-ok/outbound/deliverables/2026-09-17_audit.html" '<!-- Status: draft -->
+<!-- To: Jane Doe -->
+<!-- Written by: Sam -->
+<p>Audit.</p>
+'
+
+# --- e9-outside-deliverables: a lone .pdf under outbound/mails/ -- clean (D-15 scope) ---
+# E9 is scoped to outbound/deliverables/; a binary elsewhere is outside E1-E3
+# too, and its well-formed name keeps E4 quiet.
+make_case e9-outside-deliverables
+: >"$parent/e9-outside-deliverables/outbound/mails/2026-09-17_audit.pdf"
+
 echo "$parent"

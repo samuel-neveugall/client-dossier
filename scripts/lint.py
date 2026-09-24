@@ -99,6 +99,20 @@ BINARY_EXTS = frozenset((
 # Never descended into (D-03's other half: sub-dossiers are pruned too).
 PRUNED_DIRS = frozenset((".git",))
 
+# The agent folder (D-14, spec Sec4.4 check 7). Allowed at exactly
+# `<root>/.claude` and nowhere below it: a second one under the dossier means
+# an agent configuration that the root's own does not govern.
+AGENT_DIR = ".claude"
+
+# Rendered deliverables that need their source beside them (D-15, spec Sec4.4
+# check 8): a PDF or a Word file cannot be diffed or corrected in place, so
+# the text it was rendered from must sit next to it under the same stem.
+# Compared lowercased.
+RENDERED_EXTS = frozenset((".pdf", ".docx"))
+
+# What counts as that source (D-15, spec Sec4.4 check 8). Compared lowercased.
+RENDER_SOURCE_EXTS = frozenset((".md", ".html"))
+
 # Files larger than this are skipped, never read (T-02-04).
 MAX_READ_BYTES = 5000000
 
@@ -787,7 +801,7 @@ def _is_header_target(rel):
 
 # ---------------------------------------------------------------------------
 # CHECKS -- in identifier order. Each takes (root, tree, config, findings).
-# E8, E9, W1 and W2 land in plans 02-04 and 02-05.
+# W1 and W2 land in plan 02-05.
 # ---------------------------------------------------------------------------
 
 
@@ -966,12 +980,58 @@ def check_living_files(root, tree, config, findings):
             findings.append(Finding(rel, 0, ERROR, "E7", "no {} line".format(LAST_UPDATED_LABEL)))
 
 
+def check_claude_dirs(root, tree, config, findings):
+    """E8: a `.claude/` directory anywhere below the dossier root (D-14).
+
+    Reads the directory list the single walk already produced instead of
+    walking again, so pruning is decided in one place: a sub-dossier's own
+    `.claude/` never reaches this check from the parent, and linted directly
+    it is that root's own folder, which D-14 permits. Reported at line 0,
+    with the directory path: the finding is about the folder as a whole.
+    """
+    for rel in tree.dirs:
+        if rel.rsplit("/", 1)[-1] == AGENT_DIR and rel != AGENT_DIR:
+            findings.append(Finding(rel, 0, ERROR, "E8",
+                                    "{}/ folder below the dossier root".format(AGENT_DIR)))
+
+
+def check_renders(root, tree, config, findings):
+    """E9: a rendered deliverable with no source beside it (D-15).
+
+    Scoped to files directly under outbound/deliverables/. A file whose
+    extension is in RENDERED_EXTS needs a sibling with the same stem and an
+    extension in RENDER_SOURCE_EXTS. The reverse -- a source with no render
+    -- is fine and deliberately silent: a draft is written before it is
+    rendered, so do not add the symmetric rule. Reported at line 0.
+    """
+    prefix = OUTBOUND_DIR + "/deliverables/"
+    stems_with_source = set()
+    renders = []
+    for rel in tree.files:
+        if not rel.startswith(prefix) or "/" in rel[len(prefix):]:
+            continue
+        name = rel[len(prefix):]
+        if name in EXEMPT_BASENAMES:  # D-06
+            continue
+        stem, ext = os.path.splitext(name)
+        if ext.lower() in RENDER_SOURCE_EXTS:
+            stems_with_source.add(stem)
+        elif ext.lower() in RENDERED_EXTS:
+            renders.append((rel, stem))
+    for rel, stem in renders:
+        if stem not in stems_with_source:
+            findings.append(Finding(rel, 0, ERROR, "E9",
+                                    "rendered deliverable without its .md/.html source beside it"))
+
+
 CHECKS = (
     check_outbound_headers,
     check_outbound_names,
     check_confidential_names,
     check_consent_source,
     check_living_files,
+    check_claude_dirs,
+    check_renders,
 )
 
 

@@ -342,6 +342,36 @@ assert_last_line '0 error(s), 0 warning(s)' 'e5-readme-nonames: zero findings'
 assert_lint "$CLEAN" 0 'clean: still exits 0'
 assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep -c '^outbound/README\.md:')" 'clean: no finding of any class on outbound/README.md'
 
+# --- E8: a .claude/ folder below the dossier root (D-14) ---
+assert_lint "$FIXTURES/e8" 1 'e8: dossier/.claude/ exits 1'
+assert_only E8 'e8: only [E8] fires'
+assert_out_line '^dossier/\.claude:0: ERROR \[E8\] ' 'e8: reported at line 0 of dossier/.claude'
+assert_last_line '1 error(s), 0 warning(s)' 'e8: exactly one error'
+# The negative controls that keep E8 from being vacuous: the root's own
+# agent folder, and a sub-dossier's own one seen from either side.
+assert_lint "$FIXTURES/claude-at-root" 0 'claude-at-root: <root>/.claude exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'claude-at-root: the root agent folder raises nothing'
+assert_lint "$FIXTURES/sub-dossier" 0 'sub-dossier: the nested .claude/ is pruned with its dossier'
+assert_no_finding E8 'sub-dossier: no [E8] from the parent'
+assert_lint "$FIXTURES/sub-dossier/clients/other" 1 'sub-dossier: linted directly, still exits 1 (E4, E7)'
+assert_no_finding E8 'sub-dossier: linted directly, its own root .claude/ is permitted'
+
+# --- E9: a rendered deliverable with no .md/.html source beside it (D-15) ---
+assert_lint "$FIXTURES/e9" 1 'e9: a lone .pdf under deliverables/ exits 1'
+assert_only E9 'e9: only [E9] fires'
+assert_out_line '^outbound/deliverables/2026-09-17_audit\.pdf:0: ERROR \[E9\] ' 'e9: reported at line 0 of the render'
+assert_last_line '1 error(s), 0 warning(s)' 'e9: exactly one error'
+assert_lint "$FIXTURES/e9-docx" 1 'e9-docx: a lone .docx under deliverables/ exits 1'
+assert_only E9 'e9-docx: only [E9] fires'
+assert_lint "$FIXTURES/e9-source-only" 0 'e9-source-only: a source with no render exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'e9-source-only: the reverse direction is silent'
+assert_lint "$FIXTURES/render-html-ok" 0 'render-html-ok: a .pdf beside its .html exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'render-html-ok: an .html source satisfies E9'
+assert_lint "$FIXTURES/binary-ok" 0 'binary-ok: a .pdf beside its .md exits 0'
+assert_no_finding E9 'binary-ok: an .md source satisfies E9'
+assert_lint "$FIXTURES/e9-outside-deliverables" 0 'e9-outside-deliverables: a lone .pdf under mails/ exits 0'
+assert_no_finding E9 'e9-outside-deliverables: E9 is scoped to outbound/deliverables/'
+
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"
 assert_lint "$EMPTY" 2 'no dossier: exits 2'
