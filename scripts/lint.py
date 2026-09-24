@@ -451,6 +451,8 @@ def as_bool(value, field, findings):
         # Fail closed -- the single most security-relevant line in this file:
         # consent_recorded gates the confidential-name leak check, so a
         # malformed flag reads as False and the check stays armed (T-02-02).
+        # Pinned by the c1-yes/c1-quoted fixtures (no E6 follows); the
+        # fixture proving the leak check itself still fires lands in 02-02.
         return False
     return value.text in TRUE_SCALARS
 

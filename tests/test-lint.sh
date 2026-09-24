@@ -196,6 +196,45 @@ assert_eq 2 "$(printf '%s\n' "$forged_out" | wc -l | tr -d ' ')" 'forged-name: o
 assert_lint "$FIXTURES/json-config" 0 'json-config: a clean JSON config exits 0'
 assert_last_line '0 error(s), 0 warning(s)' 'json-config: zero findings'
 
+# --- Configuration gate (D-24.4): asserted on identifier AND field name ---
+# Exit 1 alone cannot tell the correct behaviour (a C1 config error) from
+# the bug (silent coercion to true, then an E6 for the empty source): both
+# exit 1. So C1 must fire on a line naming the field, and E6 must not.
+
+# count_out_lines ERE — how many LINT_OUT lines match.
+count_out_lines() {
+  printf '%s\n' "$LINT_OUT" | grep -cE -- "$1"
+}
+
+for case_name in c1-yes c1-quoted; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: exits 1"
+  assert_eq 1 "$(count_out_lines 'ERROR \[C1\] .*consent_recorded')" "$case_name: exactly one [C1] line naming consent_recorded"
+  assert_out_line '^dossier\.yaml:[0-9]+: ERROR \[C1\] ' "$case_name: located in dossier.yaml"
+  assert_only C1 "$case_name: fails closed -- read as false, so no [E6] follows"
+done
+
+assert_lint "$FIXTURES/c1-staleness" 1 'c1-staleness: exits 1'
+assert_out_line 'ERROR \[C1\] .*staleness_days' 'c1-staleness: the [C1] line names staleness_days'
+assert_only C1 'c1-staleness: only [C1] fires'
+
+assert_lint "$FIXTURES/e6" 1 'e6: exits 1'
+assert_out_line '^dossier\.yaml:[0-9]+: ERROR \[E6\] ' 'e6: located at dossier.yaml:<line>'
+assert_only E6 'e6: only [E6] fires, no [C1]'
+
+assert_lint "$FIXTURES/consent-ok" 0 'consent-ok: exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'consent-ok: a recorded, sourced consent is clean'
+
+junk_line="$(wc -l <"$FIXTURES/c0-junk/dossier.yaml" | tr -d ' ')"
+assert_lint "$FIXTURES/c0-junk" 0 'c0-junk: an unparseable line is a warning, exit 0'
+assert_out_line "^dossier\\.yaml:$junk_line: WARNING \\[C0\\] .*$junk_line" 'c0-junk: the [C0] warning names the line number'
+assert_only C0 'c0-junk: only [C0] fires'
+assert_last_line '0 error(s), 1 warning(s)' 'c0-junk: one warning, zero errors'
+
+# A fresh scaffold raises neither configuration identifier.
+assert_lint "$CLEAN" 0 'clean: still exits 0'
+assert_no_finding C1 'clean: no [C1]'
+assert_no_finding C0 'clean: no [C0]'
+
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"
 assert_lint "$EMPTY" 2 'no dossier: exits 2'

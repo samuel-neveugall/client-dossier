@@ -62,6 +62,23 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
 }
 
+# replace_line FILE OLD NEW — replace the one line equal to OLD with NEW;
+# exactly one such line must exist.
+replace_line() {
+  python3 - "$1" "$2" "$3" <<'PY'
+import sys
+path, old, new = sys.argv[1], sys.argv[2], sys.argv[3]
+with open(path, encoding="utf-8") as handle:
+    lines = handle.read().splitlines()
+hits = [i for i, line in enumerate(lines) if line == old]
+if len(hits) != 1:
+    sys.exit("replace_line: {} line(s) equal to {!r} in {}".format(len(hits), old, path))
+lines[hits[0]] = new
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write("\n".join(lines) + "\n")
+PY
+}
+
 # --- e7: dossier/TONE.md loses its `Last updated:` line (D-13) ---
 make_case e7
 drop_line "$parent/e7/dossier/TONE.md" 'Last updated:'
@@ -119,5 +136,32 @@ config = {
 with open(path, "w", encoding="utf-8") as handle:
     handle.write(json.dumps(config, indent=2) + "\n")
 PY
+
+# --- c1-yes: C1, consent_recorded in a YAML 1.1 spelling (D-24.2, D-24.4) ---
+# Must be a config error AND read as false: never coerced to true, so no E6
+# follows and the confidential-name check stays armed (T-02-02).
+make_case c1-yes
+replace_line "$parent/c1-yes/dossier.yaml" 'consent_recorded: false' 'consent_recorded: yes'
+
+# --- c1-quoted: C1, consent_recorded quoted (D-24.2, D-24.4, F-01) ---
+make_case c1-quoted
+replace_line "$parent/c1-quoted/dossier.yaml" 'consent_recorded: false' 'consent_recorded: "true"'
+
+# --- c1-staleness: C1, staleness_days not an integer (D-24.2) ---
+make_case c1-staleness
+replace_line "$parent/c1-staleness/dossier.yaml" 'staleness_days: 7' 'staleness_days: abc'
+
+# --- e6: consent recorded without a source (D-12, spec Sec3.2) ---
+make_case e6
+replace_line "$parent/e6/dossier.yaml" 'consent_recorded: false' 'consent_recorded: true'
+
+# --- consent-ok: consent recorded with its source -- clean (D-12) ---
+make_case consent-ok
+replace_line "$parent/consent-ok/dossier.yaml" 'consent_recorded: false' 'consent_recorded: true'
+replace_line "$parent/consent-ok/dossier.yaml" 'consent_source: ""' 'consent_source: "mail 2026-09-16 from Jane"'
+
+# --- c0-junk: C0, one line outside the YAML subset is skipped (D-22) ---
+make_case c0-junk
+printf 'this line is not yaml\n' >>"$parent/c0-junk/dossier.yaml"
 
 echo "$parent"
