@@ -460,6 +460,22 @@ PYTHONIOENCODING=latin-1 assert_lint "$FIXTURES/enc-leak" 1 'enc-leak: a latin-1
 assert_only E5 'enc-leak: the [E5] finding is printed'
 assert_out_line 'ERROR \[E5\] .*\\u0141ukasz' 'enc-leak: the unencodable character is escaped, not lost'
 assert_eq '' "$LINT_ERR" 'enc-leak: nothing on stderr'
+# --- The gate through every parser branch (WR-09) ---
+assert_lint "$FIXTURES/gate-block" 1 'gate-block: an indented block sequence of names is read'
+assert_only E5 'gate-block: only [E5] fires'
+assert_lint "$FIXTURES/gate-json-armed" 1 'gate-json-armed: JSON names, no consent, exits 1'
+assert_only E5 'gate-json-armed: only [E5] fires'
+assert_lint "$FIXTURES/gate-json-quoted" 1 'gate-json-quoted: a JSON "true" string exits 1'
+assert_out_line '^dossier\.yaml:0: ERROR \[C1\] .*consent_recorded' 'gate-json-quoted: [C1] names consent_recorded'
+assert_finding E5 'gate-json-quoted: fails closed, the leak is still reported'
+for ident in E1 E2 E3 E4 E6 E7 E8 E9 C0 W1 W2; do
+  assert_no_finding "$ident" 'gate-json-quoted: nothing but [C1] and [E5]'
+done
+assert_lint "$FIXTURES/gate-json-nullsource" 1 'gate-json-nullsource: a JSON null consent_source exits 1'
+assert_finding E6 'gate-json-nullsource: [E6] fires'
+assert_finding E5 'gate-json-nullsource: and [E5] fires'
+assert_lint "$FIXTURES/gate-json-ok" 0 'gate-json-ok: a JSON recorded, sourced consent exits 0'
+assert_clean 'gate-json-ok'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

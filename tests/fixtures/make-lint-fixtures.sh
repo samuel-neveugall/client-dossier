@@ -564,6 +564,29 @@ make_named_case enc-leak --confidential-name "$(printf '\305\201ukasz')"
 write_file "$parent/enc-leak/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 We met $(printf '\305\201ukasz') today.
 "
+# --- gate-block / gate-json-*: the gate's parser branches init.py never writes (WR-09) ---
+# init.py always writes a one-line flow list of double-quoted names, so the
+# block-sequence and JSON branches of the gate need fixtures of their own.
+make_gate_case gate-block "$(printf 'confidential_names:\n  - Beta\n  - "Acme"\n  - '"'"'Sam'"'"'')"
+
+# write_json_gate NAME CONSENT_RECORDED CONSENT_SOURCE -- a JSON config
+# naming Acme, the two consent values given as raw JSON, plus the leak.
+write_json_gate() {
+  make_case "$1"
+  write_file "$parent/$1/dossier.yaml" "{
+  \"version\": 1,
+  \"language\": \"en\",
+  \"confidential_names\": [\"Acme\"],
+  \"consent_recorded\": $2,
+  \"consent_source\": $3
+}
+"
+  write_file "$parent/$1/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+}
+write_json_gate gate-json-quoted '"true"' '"mail 2026-09-16 from Jane"'
+write_json_gate gate-json-nullsource 'true' 'null'
+write_json_gate gate-json-ok 'true' '"mail 2026-09-16 from Jane"'
+write_json_gate gate-json-armed 'false' '""'
 # --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
 # str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
 # and the producer do not. A name holding one must neither reach
