@@ -189,6 +189,14 @@ _INT_RE = re.compile(r"[-+]?[0-9]+")
 _LAST_UPDATED_RE = re.compile(r"^[ \t]*Last updated:[ \t]*(.*)$")
 _DATE_PREFIX_RE = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})(?![0-9])")
 
+# W2 (D-18): a bullet is a stripped line starting `- ` or `* `; it is sourced
+# when it ends with one parenthesised run holding no nested parenthesis,
+# optionally followed by a full stop and trailing whitespace.
+_BULLET_PREFIXES = ("- ", "* ")
+_PAREN_SOURCE_RE = re.compile(r"\([^()]+\)\.?\s*$")
+_COMMENT_OPEN = "<!--"
+_COMMENT_CLOSE = "-->"
+
 # An absolute date, whole value: YYYY-MM-DD with ASCII digits only ([0-9],
 # never \d, which also accepts other scripts' digits). Shape only: the
 # calendar is is_absolute_date()'s job.
@@ -1110,6 +1118,69 @@ def check_relative_dates(root, tree, config, findings):
                                             "relative-date word '{}': write the absolute date".format(entry)))
 
 
+def visible_lines(text):
+    """(line number, the line with HTML comments removed), for every line.
+
+    A depth counter survives across lines, so a bullet inside a multi-line
+    `<!--` ... `-->` block is invisible (P-03). Do not lean on the accident
+    that every shipped example line is a whole-line comment: a human writing
+    the block form is what this tracker exists for. An opener inside an open
+    comment deepens it and a stray closer never drives the depth negative,
+    so a malformed file degrades to "more is hidden", never to a crash.
+    """
+    depth = 0
+    for number, line in enumerate(text.splitlines(), 1):
+        out = []
+        i = 0
+        while i < len(line):
+            if line.startswith(_COMMENT_OPEN, i):
+                depth += 1
+                i += len(_COMMENT_OPEN)
+            elif depth and line.startswith(_COMMENT_CLOSE, i):
+                depth -= 1
+                i += len(_COMMENT_CLOSE)
+            else:
+                if not depth:
+                    out.append(line[i])
+                i += 1
+        yield number, "".join(out)
+
+
+def check_bullet_sources(root, tree, config, findings):
+    """W2: a bullet in a living file with no parenthetical source (D-18).
+
+    Iterates the explicit LIVING_FILES tuple, never the folder:
+    dossier/README.md ships seven unsourced bullets and is not a living file
+    (P-02). A bullet is legitimate when it ends with a parenthetical source
+    or carries one of the language's opinion markers, matched with
+    boundary_pattern() so an inflected form is not a marker (spec Sec3.4).
+    Comment text is invisible; a heading is never a bullet. The message
+    carries the location only, never the line (T-02-17).
+    """
+    words = language_words(config)
+    if words is None:
+        return  # D-20: reported once, by language_infos()
+    markers = [boundary_pattern(marker) for marker in words["opinion_markers"]]
+    for name in LIVING_FILES:
+        rel = LIVING_DIR + "/" + name
+        if rel not in tree.file_set:
+            continue  # E7 already reports it
+        text = read_text_safe(os.path.join(root, LIVING_DIR, name))
+        if text is None:
+            continue  # E7 already reports it
+        for number, line in visible_lines(normalise(text)):
+            body = line.strip()
+            if not body.startswith(_BULLET_PREFIXES):
+                continue
+            if _PAREN_SOURCE_RE.search(body) or any(marker.search(body) for marker in markers):
+                continue
+            # WARNING, never ERROR: a rule that has to guess at natural
+            # language must never be the reason a legitimate draft is
+            # rejected (D-16).
+            findings.append(Finding(rel, number, WARNING, "W2",
+                                    "bullet line without a parenthetical source or an opinion marker"))
+
+
 CHECKS = (
     check_outbound_headers,
     check_outbound_names,
@@ -1119,6 +1190,7 @@ CHECKS = (
     check_claude_dirs,
     check_renders,
     check_relative_dates,
+    check_bullet_sources,
 )
 
 

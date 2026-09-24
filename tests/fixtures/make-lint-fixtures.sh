@@ -530,4 +530,50 @@ write_file "$parent/w1-outbound/outbound/mails/2026-09-17_relance.md" "${GOOD_MA
 make_lang_case w1-nolist de
 printf '%s\n' 'Jane calls back tomorrow.' '- An unsourced bullet line' >>"$parent/w1-nolist/dossier/HISTORY.md"
 
+# ---------------------------------------------------------------------------
+# W2 -- bullet lines with no parenthetical source (D-16, D-18). Warnings only.
+# ---------------------------------------------------------------------------
+
+# --- w2-fr: every W2 branch in one living file, plus three out-of-scope files ---
+# Each HISTORY.md line exists to fail one specific way: a sourced bullet, an
+# unsourced one, the `*` marker, an opinion marker, an inflected near-marker
+# (`reconstruite` is not `reconstruit`), a bullet inside a genuine multi-line
+# comment block and one right after it closes. None carries a relative-date
+# word, so W1 stays silent and every warning here is a W2.
+make_lang_case w2-fr fr
+cat >>"$parent/w2-fr/dossier/HISTORY.md" <<'MD'
+- Jane Doe (Acme) rappelle le 2026-10-01 (appel @12:34).
+- Le livrable est attendu le 2026-10-01.
+* Une autre ligne sans source
+- Probablement un budget revu à la hausse.
+- Leur priorité est reconstruite à partir de leurs questions.
+<!--
+- Une piste non vérifiée sur le budget
+-->
+- Une ligne après le commentaire
+MD
+# dossier/README.md is not a living file (P-02): seven unsourced bullets
+# there must stay silent, which is what iterating LIVING_FILES buys.
+i=1
+while [ "$i" -le 7 ]; do
+  printf -- '- Puce de README sans source %s\n' "$i" >>"$parent/w2-fr/dossier/README.md"
+  i=$((i + 1))
+done
+printf '%s\n' '- Une puce de contexte sans source' >>"$parent/w2-fr/knowledge/CONTEXT.md"
+write_file "$parent/w2-fr/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}- Une puce de mail sans source
+"
+
+# --- w2-en: the English opinion markers ---
+make_named_case w2-en
+printf '%s\n' '- Jane asked for the audit (call @12:34).' '- The budget was cut.' \
+  '- Probably a revised budget.' >>"$parent/w2-en/dossier/HISTORY.md"
+
+# --- w2-many: twenty unsourced bullets still exit 0 (D-16, T-02-16) ---
+make_lang_case w2-many fr
+i=1
+while [ "$i" -le 20 ]; do
+  printf -- '- Une ligne sans source numero %s\n' "$i" >>"$parent/w2-many/dossier/HISTORY.md"
+  i=$((i + 1))
+done
+
 echo "$parent"
