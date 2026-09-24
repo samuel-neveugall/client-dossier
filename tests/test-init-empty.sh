@@ -308,4 +308,42 @@ python3 "$(init_py)" \
 assert_eq 2 "$status14" 'init rejects a --status-header value forging a second consent_recorded key'
 rm -rf "$d13" "$d13.stdout" "$d13.stderr"
 
+# Regression (Phase 1 debt (a), D-24.3): `no` is the ISO 639-1 code for
+# Norwegian and also a YAML 1.1 reserved spelling -- emitted bare, a strict
+# parser reads `language: no` back as boolean false. Red without the fix:
+# the allowlist alone let every reserved spelling through unquoted, so the
+# file carried `language: no`.
+d14=$(scratch_repo)
+status15=0
+python3 "$(init_py)" \
+  --target "$d14" \
+  --language no \
+  >"$d14.stdout" 2>"$d14.stderr" || status15=$?
+assert_eq 0 "$status15" 'init exits 0 with --language no'
+assert_grep '^language: "no"$' "$d14/dossier.yaml"
+assert_not_grep '^language: no$' "$d14/dossier.yaml"
+rm -rf "$d14" "$d14.stdout" "$d14.stderr"
+
+# Regression (Phase 1 debt (b), D-24.3): the allowlist was anchored only at
+# the start (`re.match` with `$`, and `$` also matches just before a final
+# newline), so `en` followed by a newline passed it and was written bare,
+# leaving a blank line between `language:` and `counterparts:`. Red without
+# the fix: the line after `language: en` was empty. Command substitution
+# strips trailing newlines, so the payload carries a sentinel `x` that is
+# removed afterwards -- otherwise the case would silently test plain `en`.
+d15=$(scratch_repo)
+status16=0
+lang15="$(printf 'en\nx')"
+lang15="${lang15%x}"
+python3 "$(init_py)" \
+  --target "$d15" \
+  --language "$lang15" \
+  >"$d15.stdout" 2>"$d15.stderr" || status16=$?
+assert_eq 0 "$status16" 'init exits 0 with a trailing newline in --language'
+assert_grep '^language: "en"$' "$d15/dossier.yaml"
+assert_eq "$(printf 'language: "en"\ncounterparts:')" \
+  "$(grep -A1 -- '^language:' "$d15/dossier.yaml")" \
+  'no blank line between language and counterparts after a trailing newline'
+rm -rf "$d15" "$d15.stdout" "$d15.stderr"
+
 finish
