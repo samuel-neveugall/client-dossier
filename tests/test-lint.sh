@@ -595,6 +595,46 @@ fi
 # No committed tests/fixtures/lint/clean/ (D-28 as amended): the clean tree is generated.
 assert_eq '' "$(git -C "$REPO_ROOT" ls-files tests/fixtures/lint/clean/)" 'no committed clean fixture (D-28 as amended)'
 
+# --- ROADMAP criterion 1, exhaustively: what init.py scaffolds lints with zero findings ---
+# Every other check in this suite has a fixture that turns red. "The linter
+# accepts what the scaffolder produces" only turns red if somebody runs it,
+# so it is asserted here, not observed in a summary. The two exemptions that
+# make it true -- dossier/README.md is not a living file (D-06) and a
+# commented example line is not a fact line (D-18) -- are exactly the kind of
+# detail a later simplification removes without noticing. Each case asserts
+# three things, because each alone can be fooled: the exit code, the summary
+# as the last line, and the absence of every one of the thirteen identifiers.
+
+# scaffold_lints_clean LABEL [INIT_ARG...] — scaffold a scratch repository
+# with the given init.py flags, lint it, assert zero findings, tear it down.
+scaffold_lints_clean() {
+  local label="$1" d status=0
+  shift
+  d="$(scratch_repo)"
+  python3 "$(init_py)" --target "$d" "$@" >/dev/null || status=$?
+  assert_eq 0 "$status" "$label: init.py scaffolds"
+  assert_lint "$d" 0 "$label: exits 0"
+  assert_clean "$label"
+  assert_eq 0 "$(count_out_lines '\[(E[1-9]|W[12]|C[01])\]')" "$label: no identifier on any line"
+  rm -rf "$d"
+}
+
+scaffold_lints_clean 'scaffold-en: a default English scaffold' --language en
+# The French one is the case that catches a missing word boundary: the French
+# dossier README says `fichier` three times, and `fichier` holds `hier` (P-04).
+scaffold_lints_clean 'scaffold-fr: a default French scaffold' --language fr
+# Every optional flag, each with a valid value: a fully populated config is
+# as clean as a default one, and the schema's optional fields are exercised.
+scaffold_lints_clean 'scaffold-full: every optional flag supplied' \
+  --language fr \
+  --counterpart 'Acme Consulting|donneur ordre|Jane Doe;jane@acme.example' \
+  --counterpart 'Big Telco|client final' \
+  --confidential-name Acme \
+  --consent-recorded true \
+  --consent-source 'mail 2026-09-16 from Jane' \
+  --timestamps '@hh:mm:ss' \
+  --staleness-days 14
+
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"
 assert_lint "$EMPTY" 2 'no dossier: exits 2'
