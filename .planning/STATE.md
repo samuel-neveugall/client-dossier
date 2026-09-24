@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Linter & Test Harness
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-09-24T19:55:14.384Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-09-24T20:03:27.162Z"
 last_activity: 2026-09-24
 last_activity_desc: Phase 02 execution started
-state_head: a178e8861ab97193dd4eb817787ba11bb480300c
+state_head: 498c85d61a1c4fc7d3fa4628c8f4e5d4c8553ba9
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
   percent: 14
 ---
 
@@ -30,15 +30,16 @@ human and a doctrine check.
 ## Current Position
 
 Phase: 02 (Linter & Test Harness) — EXECUTING
-Plan: 4 of 6 (02-01, 02-02 and 02-03 complete; 02-04 next)
-Status: 02-03 closed Phase 1 debts (a) and (b) in the producer -- `init.py` quotes any value
-whose casefold is a YAML 1.1 reserved spelling (`--language no` -> `language: "no"`) and the
-plain-scalar allowlist uses `fullmatch` (a trailing newline no longer leaves a blank line);
-`en`/`fr`/`es`/`required` output is byte-identical. `tests/test-init-empty.sh` gained d14/d15
-(111 assertions); `bash tests/run.sh` reports 6 files, 0 failed.
-LINT-01..03 stay Pending until E8, E9, W1, W2, the French fixture and the D-24.4 round-trip
-land in 02-04 … 02-06.
-Last activity: 2026-09-24 — 02-03 executed (2 tasks, 2 commits).
+Plan: 5 of 6 (02-01 … 02-04 complete; 02-05 next)
+Status: 02-04 completed the nine error classes -- E8 (a `.claude/` folder below the root, read
+from the walk's pruned directory list) and E9 (a `.pdf`/`.docx` under `outbound/deliverables/`
+with no same-stem `.md`/`.html`). `tests/test-lint.sh` now sweeps e1..e9 for the identifier
+that must fire and the twelve that must not, with an exact `1 error(s), 0 warning(s)` summary;
+the fixture generator states its contract and refuses a bad argument before creating anything
+(497 assertions); `bash tests/run.sh` reports 6 files, 0 failed.
+LINT-01..03 stay Pending until W1, W2, the French fixture and the D-24.4 round-trip land in
+02-05 and 02-06.
+Last activity: 2026-09-24 — 02-04 executed (3 tasks, 3 commits).
 
 Progress: [█░░░░░░░░░] 14%
 
@@ -70,6 +71,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase 02 P01 | 8min | 3 tasks | 4 files |
 | Phase 02 P02 | 7min | 3 tasks | 3 files |
 | Phase 02 P03 | 3min | 2 tasks | 2 files |
+| Phase 02 P04 | 6min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -125,6 +127,9 @@ mission, now validated by the phase's own delivery:
 - [Phase 02]: 02-02: E5 searches the whole path below outbound/ and ignores the README exemption; E1-E4 honour it
 - [Phase 02]: 02-03: the producer quotes any value whose casefold is a YAML 1.1 reserved spelling (YES/No too), and the allowlist uses fullmatch
 - [Phase 02]: 02-03: a bash payload that must end in a newline needs a sentinel, command substitution strips it
+- [Phase 02]: 02-04: E8 reads Tree.dirs from the single walk (pruning decided in one place); E9 is scoped to direct children of outbound/deliverables/, the reverse (source without render) silent
+- [Phase 02]: 02-04: the nine-class sweep checks each e1..e9 fixture against all twelve other identifiers (C0 included) plus an exact 1/0 summary; W1/W2 are already in ALL_IDS for 02-05
+- [Phase 02]: 02-04: generator refusal is proven with a logging mktemp shim on PATH, because macOS mktemp -d ignores TMPDIR
 
 ### Pending Todos
 
@@ -155,6 +160,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-09-24T19:55:14.344Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-09-24T20:03:27.143Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None

@@ -127,7 +127,7 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: 3/6 plans executed
+**Plans**: 4/6 plans executed
 
 Plans:
 **Wave 1**
@@ -146,7 +146,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-04-PLAN.md — E8 and E9, the fixture generator's stated contract, and the nine-class
+- [x] 02-04-PLAN.md — E8 and E9, the fixture generator's stated contract, and the nine-class
   positive-plus-negative isolation sweep
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -289,7 +289,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
-| 2. Linter & Test Harness | 3/6 | In Progress|  |
+| 2. Linter & Test Harness | 4/6 | In Progress|  |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
