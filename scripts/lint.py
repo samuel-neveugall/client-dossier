@@ -93,6 +93,11 @@ EXEMPT_PATHS = frozenset((OUTBOUND_DIR + "/README.md",))
 # needs its status header (E1-E3 above), so a draft saved under that name
 # cannot bypass the header protocol.
 README_NAME = "README.md"
+
+# Metadata the operating system drops into any folder it displays: Finder's
+# .DS_Store, Explorer's Thumbs.db and desktop.ini (WR-05). Not outbound
+# documents, so exempt from E1-E4; still walked, so E5 still reads them.
+OS_METADATA_NAMES = frozenset((".DS_Store", "Thumbs.db", "desktop.ini"))
 GITKEEP = ".gitkeep"
 
 # Rendered binaries carry no text header, so they are outside E1-E3 (D-07,
@@ -999,6 +1004,8 @@ def _is_header_target(rel):
     name = rel.rsplit("/", 1)[-1]
     if rel in EXEMPT_PATHS:  # D-06: outbound/README.md quotes the header verbatim
         return False
+    if name in OS_METADATA_NAMES:  # WR-05
+        return False
     return os.path.splitext(name)[1].lower() not in BINARY_EXTS
 
 
@@ -1088,7 +1095,7 @@ def check_outbound_names(root, tree, config, findings):
         if len(parts) != 3 or parts[1] not in OUTBOUND_SUBS:
             continue
         name = parts[2]
-        if name == README_NAME:  # D-10
+        if name == README_NAME or name in OS_METADATA_NAMES:  # D-10, WR-05
             continue
         match = _OUTBOUND_NAME_RE.fullmatch(name)
         if match is None or not is_absolute_date(match.group(1)):

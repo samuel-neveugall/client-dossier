@@ -545,6 +545,18 @@ write_file "$parent/readme-nested/outbound/mails/README.md" 'Hello Jane,
 
 A draft saved under the wrong name, with no header.
 '
+# --- os-junk / os-junk-leak: files the OS drops into a folder it shows (WR-05) ---
+# Finder writes .DS_Store, Explorer Thumbs.db and desktop.ini: none is an
+# outbound document, so none needs a header or a dated name -- but E5
+# still reads them.
+make_case os-junk
+printf '\000\000\000\001Bud1\000\020\000' >"$parent/os-junk/outbound/mails/.DS_Store"
+printf '\320\317\021\340\241\261\032\341' >"$parent/os-junk/outbound/deliverables/Thumbs.db"
+printf '[.ShellClassInfo]\r\nIconResource=C:\\Windows\\system32\\imageres.dll,-3\r\n' \
+  >"$parent/os-junk/outbound/calls/desktop.ini"
+make_gate_case os-junk-leak 'confidential_names: [ Acme ]'
+rm "$parent/os-junk-leak/outbound/mails/2026-09-17_relance.md"
+printf '[.ShellClassInfo]\r\nInfoTip=Acme files\r\n' >"$parent/os-junk-leak/outbound/calls/desktop.ini"
 # --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
 # str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
 # and the producer do not. A name holding one must neither reach

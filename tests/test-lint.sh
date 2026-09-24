@@ -448,6 +448,11 @@ assert_lint "$FIXTURES/readme-nested" 1 'readme-nested: outbound/mails/README.md
 assert_out_line '^outbound/mails/README\.md:0: ERROR \[E1\] ' 'readme-nested: it needs a status header'
 assert_no_finding E4 'readme-nested: D-10 keeps a README.md exempt from the dated-name rule'
 assert_last_line '1 error(s), 0 warning(s)' 'readme-nested: nothing else fires'
+# --- OS metadata files under outbound/ are not outbound documents (WR-05) ---
+assert_lint "$FIXTURES/os-junk" 0 'os-junk: .DS_Store, Thumbs.db and desktop.ini exit 0'
+assert_clean 'os-junk: none of them needs a header or a dated name'
+assert_lint "$FIXTURES/os-junk-leak" 1 'os-junk-leak: a name inside desktop.ini exits 1'
+assert_only E5 'os-junk-leak: E5 still reads OS metadata files'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'
