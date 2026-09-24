@@ -779,13 +779,15 @@ EOF
 # after a line whose folding changes its length (Æ -> ae, ﬁ -> fi), so a
 # line number taken from the wrong string would show.
 make_named_case e5-text-fold --confidential-name "$(printf 'Soci\303\251t\303\251 Exemple')" \
-  --confidential-name 'Big Telco' --confidential-name 'Łukasz Nowak' --confidential-name "O'Brien"
+  --confidential-name 'Big Telco' --confidential-name 'Łukasz Nowak' --confidential-name "O'Brien" \
+  --confidential-name 'Đorđe Petrović'
 write_file "$parent/e5-text-fold/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 Æsthetics of the ﬁnal draft.
 We met Societe Exemple today.
 Æ ﬁ Æ ﬁ.
 Then Big-Telco called, then BigTelco wrote.
 Lukasz Nowak signed. So did OBrien.
+Djordje Petrovic did not.
 "
 # The folded half must not match more than a spelling of the name: not
 # across a comma, and never for a name whose punctuation carries meaning

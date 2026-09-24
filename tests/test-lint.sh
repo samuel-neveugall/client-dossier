@@ -491,7 +491,9 @@ assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$tf" 'Lukasz
   'e5-text-fold: Lukasz Nowak matches Łukasz Nowak, at its line'
 assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$tf" 'OBrien'): ERROR \\[E5\\] .*'O.Brien'" \
   "e5-text-fold: OBrien matches O'Brien, at its line"
-assert_last_line '4 error(s), 0 warning(s)' 'e5-text-fold: one finding per (line, name)'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$tf" 'Djordje'): ERROR \\[E5\\] .*Petrovi" \
+  'e5-text-fold: Djordje Petrovic matches the dj spelling of Đorđe Petrović'
+assert_last_line '5 error(s), 0 warning(s)' 'e5-text-fold: one finding per (line, name)'
 assert_lint "$FIXTURES/e5-text-fold-boundary" 0 'e5-text-fold-boundary: Big, Telco and a lone c exit 0'
 assert_clean 'e5-text-fold-boundary'
 assert_lint "$FIXTURES/e5-slug-boundary" 0 'e5-slug-boundary: bigtelcom, Bigger Telco and Big Telcom exit 0'
