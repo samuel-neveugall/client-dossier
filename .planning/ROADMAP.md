@@ -127,7 +127,7 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: 1/6 plans executed
+**Plans**: 2/6 plans executed
 
 Plans:
 **Wave 1**
@@ -138,7 +138,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — the five outbound error classes: status block (E1, E2, E3), filename
+- [x] 02-02-PLAN.md — the five outbound error classes: status block (E1, E2, E3), filename
   convention (E4), confidential-name leak in text and in filename (E5), plus the consent gate
   and the README exemption boundary
 - [ ] 02-03-PLAN.md — producer hardening (Phase 1 debts (a) and (b)): reserved YAML spellings
@@ -289,7 +289,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
-| 2. Linter & Test Harness | 1/6 | In Progress|  |
+| 2. Linter & Test Harness | 2/6 | In Progress|  |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |

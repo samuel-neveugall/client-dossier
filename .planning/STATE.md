@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 02
 current_phase_name: Linter & Test Harness
 status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-09-24T19:41:18.310Z"
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-09-24T19:51:54.974Z"
 last_activity: 2026-09-24
 last_activity_desc: Phase 02 execution started
-state_head: b5842b7fb39368eaea86137815c388e89bb3e7a5
+state_head: a30f367c95e63851038516595620a91d9beeb682
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 12
-  completed_plans: 7
+  completed_plans: 8
   percent: 14
 ---
 
@@ -30,12 +30,13 @@ human and a doctrine check.
 ## Current Position
 
 Phase: 02 (Linter & Test Harness) — EXECUTING
-Plan: 2 of 6 (02-01 complete; 02-02 next)
-Status: 02-01 delivered `scripts/lint.py` (root discovery, D-24 schema with C1/C0, pruned
-read-only walk, E6, E7, reporter, exit 0/1/2/3) and `tests/test-lint.sh` (144 assertions);
-`bash tests/run.sh` reports 6 files, 0 failed. LINT-01..03 stay Pending until the remaining
-checks (E1-E5, E8, E9, W1, W2) and the French fixture land in 02-02 … 02-06.
-Last activity: 2026-09-24 — 02-01 executed (3 tasks, 3 commits).
+Plan: 3 of 6 (02-01 and 02-02 complete; 02-03 next)
+Status: 02-02 added the outbound checks to `scripts/lint.py` -- E1/E2/E3 (status block in the
+first 10 lines), E4 (`YYYY-MM-DD_slug.ext`, calendar-validated), E5 (confidential names in text
+and filename, `[^\W_]` boundary, NFC both sides, fail-closed consent gate) -- and
+`tests/test-lint.sh` now holds 403 assertions; `bash tests/run.sh` reports 6 files, 0 failed.
+LINT-01..03 stay Pending until E8, E9, W1, W2 and the French fixture land in 02-04 … 02-06.
+Last activity: 2026-09-24 — 02-02 executed (3 tasks, 3 commits).
 
 Progress: [█░░░░░░░░░] 14%
 
@@ -65,6 +66,7 @@ Progress: [█░░░░░░░░░] 14%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 02 P01 | 8min | 3 tasks | 4 files |
+| Phase 02 P02 | 7min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -115,6 +117,9 @@ mission, now validated by the phase's own delivery:
 - [Phase 02]: 02-01: sanitise_path also escapes C1 controls, surrogate-escaped bytes and U+2028/2029 (T-02-01 hardening beyond 0x00-0x1F/0x7F)
 - [Phase 02]: 02-01: an invalid JSON dossier.yaml is C1 (exit 1), not unreadable (exit 2); a nonexistent PATH exits 2 with its own message
 - [Phase 02]: 02-01: forged-name end-to-end \x0a assertion deferred to 02-02 (needs E4); pinned meanwhile by a direct report() probe, tracked in WINDOWS.md
+- [Phase 02]: 02-02: status-header lines are anchored -- only comment syntax may precede a protocol field, so prose mentioning Deadline: is not a header
+- [Phase 02]: 02-02: an unreadable non-binary outbound file is E1, never silently skipped
+- [Phase 02]: 02-02: E5 searches the whole path below outbound/ and ignores the README exemption; E1-E4 honour it
 
 ### Pending Todos
 
@@ -145,6 +150,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-09-24T19:41:18.293Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-09-24T19:51:54.955Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
