@@ -419,6 +419,11 @@ assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'people
 assert_lint "$FIXTURES/e5-spacing" 1 'e5-spacing: whitespace variants exit 1'
 assert_only E5 'e5-spacing: only [E5] fires'
 assert_last_line '3 error(s), 0 warning(s)' 'e5-spacing: two spaces, a no-break space and a tab all match'
+# --- `''` inside a single-quoted scalar is an escape, not a closing quote (WR-01) ---
+assert_lint "$FIXTURES/gate-sq-names" 1 "gate-sq-names: [ 'O''Brien, Jr', Acme ] is read, the leak exits 1"
+assert_only E5 'gate-sq-names: only [E5] fires, the names line is not skipped'
+assert_lint "$FIXTURES/gate-sq-source" 0 "gate-sq-source: a sourced consent written 'it''s # ok' exits 0"
+assert_clean 'gate-sq-source: the source is read whole, the leak check suppressed'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

@@ -321,13 +321,22 @@ def strip_comment(line):
     out = []
     quote = None
     escaped = False
+    doubled = False
     for i, ch in enumerate(line):
+        if doubled:
+            doubled = False
+            continue
         if quote:
             out.append(ch)
             if escaped:
                 escaped = False
             elif quote == '"' and ch == "\\":
                 escaped = True
+            elif quote == "'" and ch == "'" and line[i + 1:i + 2] == "'":
+                # `''` is the single-quoted scalar's one escape (WR-01): an
+                # apostrophe, not the closing quote.
+                out.append(ch)
+                doubled = True
             elif ch == quote:
                 quote = None
             continue
@@ -388,13 +397,20 @@ def _split_flow(inner):
     buf = []
     quote = None
     escaped = False
+    doubled = False
     for i, ch in enumerate(inner):
+        if doubled:
+            doubled = False
+            continue
         if quote:
             buf.append(ch)
             if escaped:
                 escaped = False
             elif quote == '"' and ch == "\\":
                 escaped = True
+            elif quote == "'" and ch == "'" and inner[i + 1:i + 2] == "'":
+                buf.append(ch)  # `''`: an escaped apostrophe, the quote stays open (WR-01)
+                doubled = True
             elif ch == quote:
                 quote = None
             continue

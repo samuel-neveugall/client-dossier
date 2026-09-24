@@ -510,6 +510,14 @@ write_file "$parent/gate-json-dup/dossier.yaml" '{
 }
 '
 write_file "$parent/gate-json-dup/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-sq-names / gate-sq-source: `''` inside a single-quoted scalar (WR-01) ---
+# Valid YAML: the doubled quote is an escaped apostrophe, so the `,` and
+# the `#` after it are still inside the scalar.
+make_gate_case gate-sq-names "confidential_names: [ 'O''Brien, Jr', Acme ]"
+make_named_case gate-sq-source --confidential-name Acme --consent-recorded true --consent-source 'placeholder'
+replace_line "$parent/gate-sq-source/dossier.yaml" 'consent_source: "placeholder"' \
+  "consent_source: 'mail 2026-09-16 from Jane: it''s # ok'"
+write_file "$parent/gate-sq-source/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
 # str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
 # and the producer do not. A name holding one must neither reach
