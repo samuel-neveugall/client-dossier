@@ -524,6 +524,20 @@ write_file "$parent/gate-json-dup/dossier.yaml" '{
 }
 '
 write_file "$parent/gate-json-dup/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-json-consent-dup: a JSON config with consent_recorded true, then false (WR-04) ---
+# keep_first() reads the true; with a filled source, only the damaged-gate
+# flag keeps E5 armed.
+make_case gate-json-consent-dup
+write_file "$parent/gate-json-consent-dup/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "confidential_names": ["Acme"],
+  "consent_recorded": true,
+  "consent_recorded": false,
+  "consent_source": "mail 2026-09-16 from Jane"
+}
+'
+write_file "$parent/gate-json-consent-dup/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-misindent-block / gate-misindent-scalar: the names line indented by mistake (CR-01) ---
 # Appended after the counterparts block, or after a scalar, one level too
 # deep: a conforming YAML parser rejects both files. The line carries the

@@ -401,6 +401,12 @@ for case_name in gate-dup gate-consent-dup gate-consent-dup-rev gate-json-dup ga
   assert_finding E5 "$case_name: and the leak check stays armed"
   assert_no_finding C0 "$case_name: never a mere [C0] warning"
 done
+# The JSON branch of the same property: first wins reads the true, the
+# damaged gate keeps E5 armed (WR-04).
+assert_lint "$FIXTURES/gate-json-consent-dup" 1 'gate-json-consent-dup: exits 1'
+assert_out_line '^dossier\.yaml:0: ERROR \[C1\] .*consent_recorded' 'gate-json-consent-dup: the [C1] names consent_recorded'
+assert_finding E5 'gate-json-consent-dup: and the leak check stays armed'
+assert_no_finding C0 'gate-json-consent-dup: never a mere [C0] warning'
 # An indented names line is read as its own key, whatever block its
 # indentation puts it in (CR-01).
 for case_name in gate-misindent-block gate-misindent-scalar; do
