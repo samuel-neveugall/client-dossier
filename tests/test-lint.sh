@@ -17,6 +17,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 FIXTURE_SCRIPT="$(dirname "${BASH_SOURCE[0]}")/fixtures/make-lint-fixtures.sh"
 
 CLEAN=""
+CLEAN_FR=""
 FIXTURES=""
 EMPTY=""
 READONLY=""
@@ -24,7 +25,7 @@ GEN_TMP=""
 # The one cleanup for everything this file creates, the generator's parent
 # included: the generator installs no handler of its own, so a failed
 # assertion anywhere below still leaks nothing.
-trap 'rm -rf "$CLEAN" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
+trap 'rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
 # fires and every other one stays silent.
@@ -49,6 +50,13 @@ assert_out_line() {
     echo "FAIL: $label (no output line matches /$regex/)" >&2
     TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
+}
+
+# line_of FILE TEXT — the number of the first line of FILE containing the
+# fixed string TEXT. Locations are derived from the fixture, never
+# hard-coded, so a template gaining a line cannot silently shift them.
+line_of() {
+  grep -n -F -- "$2" "$1" | head -n 1 | cut -d: -f1
 }
 
 # assert_last_line EXPECTED LABEL — the summary is the last line (D-04).
@@ -416,6 +424,72 @@ assert_lint "$FIXTURES/binary-ok" 0 'binary-ok: a .pdf beside its .md exits 0'
 assert_no_finding E9 'binary-ok: an .md source satisfies E9'
 assert_lint "$FIXTURES/e9-outside-deliverables" 0 'e9-outside-deliverables: a lone .pdf under mails/ exits 0'
 assert_no_finding E9 'e9-outside-deliverables: E9 is scoped to outbound/deliverables/'
+
+# --- W1: relative-date words, in dossier/ and knowledge/ only, word-bounded (D-16, D-17) ---
+# A warning never changes the exit code, so every case below exits 0 and the
+# error identifiers stay silent.
+ERROR_IDS="E1 E2 E3 E4 E5 E6 E7 E8 E9 C1"
+
+# assert_no_error LABEL — none of the error identifiers fired.
+assert_no_error() {
+  local label="$1" ident
+  for ident in $ERROR_IDS; do
+    assert_no_finding "$ident" "$label"
+  done
+}
+
+# Criterion 1 in the second shipped language: a French scaffold is as clean
+# as an English one, which a boundary-less `hier` would break three times
+# over (`fichier(s)` in the shipped French templates, P-04).
+CLEAN_FR="$(scratch_repo)"
+python3 "$(init_py)" --target "$CLEAN_FR" --language fr >/dev/null
+assert_lint "$CLEAN_FR" 0 'clean-fr: a fresh French scaffold exits 0'
+assert_clean 'clean-fr'
+
+w1="$FIXTURES/w1-fr"
+assert_lint "$w1" 0 'w1-fr: four relative-date words still exit 0'
+assert_no_error 'w1-fr: no error identifier'
+assert_no_finding W2 'w1-fr: no bullet, so no [W2]'
+assert_out_line "^dossier/HISTORY\\.md:$(line_of "$w1/dossier/HISTORY.md" 'rappelle demain'): WARNING \\[W1\\] .*'demain'" \
+  'w1-fr: demain in dossier/HISTORY.md, at its line'
+assert_out_line "^knowledge/CONTEXT\\.md:$(line_of "$w1/knowledge/CONTEXT.md" 'bougé récemment'): WARNING \\[W1\\] .*'récemment'" \
+  'w1-fr: récemment in knowledge/CONTEXT.md -- knowledge/ is in scope too'
+assert_out_line "^dossier/OPEN-QUESTIONS\\.md:$(line_of "$w1/dossier/OPEN-QUESTIONS.md" 'part la semaine'): WARNING \\[W1\\] .*'la semaine prochaine'" \
+  'w1-fr: a multi-word entry matches as a phrase'
+assert_out_line "^dossier/TONE\\.md:$(line_of "$w1/dossier/TONE.md" 'confirmé aujourd'): WARNING \\[W1\\] .*'aujourd'hui'" \
+  'w1-fr: a typographic apostrophe matches the ASCII entry (P-05)'
+assert_eq 1 "$(grep -c "$(printf '\342\200\231')" "$w1/dossier/TONE.md")" 'w1-fr: the bait really carries U+2019'
+assert_last_line '0 error(s), 4 warning(s)' 'w1-fr: four warnings, zero errors'
+assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep -c 'périmètre')" 'w1-fr: the message names the entry, never the line (T-02-17)'
+
+assert_lint "$FIXTURES/w1-en" 0 'w1-en: two relative-date words still exit 0'
+assert_no_error 'w1-en: no error identifier'
+assert_out_line "^dossier/HISTORY\\.md:$(line_of "$FIXTURES/w1-en/dossier/HISTORY.md" 'back tomorrow'): WARNING \\[W1\\] .*'tomorrow'" \
+  'w1-en: tomorrow in dossier/HISTORY.md'
+assert_out_line "^knowledge/CONTEXT\\.md:$(line_of "$FIXTURES/w1-en/knowledge/CONTEXT.md" 'decided next week'): WARNING \\[W1\\] .*'next week'" \
+  'w1-en: next week in knowledge/CONTEXT.md'
+assert_last_line '0 error(s), 2 warning(s)' 'w1-en: two warnings, zero errors'
+
+assert_grep 'fichiers de la hiérarchie' "$FIXTURES/w1-boundary/dossier/CHANNELS.md"
+assert_lint "$FIXTURES/w1-boundary" 0 'w1-boundary: exits 0'
+assert_clean 'w1-boundary: hier inside fichiers and hiérarchie is no match (P-04)'
+
+assert_grep 'demain' "$FIXTURES/w1-outbound/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/w1-outbound" 0 'w1-outbound: exits 0'
+assert_clean 'w1-outbound: outbound/ is outside the relative-date check'
+
+assert_lint "$FIXTURES/w1-nolist" 0 'w1-nolist: a language with no word list exits 0'
+assert_eq 1 "$(count_out_lines '^info: ')" 'w1-nolist: exactly one informational line'
+assert_out_line "^info: .*'de'" 'w1-nolist: the informational line names the language'
+assert_no_finding W1 'w1-nolist: [W1] skipped'
+assert_no_finding W2 'w1-nolist: [W2] skipped'
+assert_last_line '0 error(s), 0 warning(s)' 'w1-nolist: never an error, never a crash (D-20)'
+case "$(printf '%s\n' "$LINT_OUT" | head -n 1)" in
+  info:*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo "FAIL: w1-nolist: the informational line is not printed first" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+assert_lint "$CLEAN" 0 'clean: still exits 0'
+assert_eq 0 "$(count_out_lines '^info: ')" 'clean: a shipped language prints no informational line'
 
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"

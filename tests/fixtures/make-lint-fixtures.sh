@@ -42,9 +42,11 @@
 #         message on stderr BEFORE anything is created, so an empty input
 #         can never become a set of empty trees the suite would lint clean.
 #
-# Case trees come into existence through exactly two helpers, both keyed by
-# name: make_case (a copy of the clean tree) and make_named_case (a fresh
-# init.py scaffold, for a case whose dossier.yaml needs producer flags).
+# Case trees come into existence through exactly three helpers, all keyed by
+# name: make_case (a copy of the clean tree), make_lang_case (a fresh
+# init.py scaffold in a given content language, for a case whose
+# dossier.yaml needs producer flags or whose prose is not English) and
+# make_named_case (make_lang_case in `en`).
 # Injections use printf, a here-document or a short python3 block, never
 # in-place stream editing (not portable between BSD and GNU, P-11), and fail
 # loudly when the line to change is not found, so a fixture never silently
@@ -344,16 +346,24 @@ make_case binary-ok
 : >"$parent/binary-ok/outbound/deliverables/2026-09-17_audit.pdf"
 write_file "$parent/binary-ok/outbound/deliverables/2026-09-17_audit.md" "$GOOD_MAIL"
 
-# make_named_case NAME [INIT_ARG...] -- a fresh init.py scaffold at
-# "$parent/NAME" with the extra flags given. Used when a case needs a
-# confidential name or a consent: the flags go through the producer, so
-# dossier.yaml keeps init.py's exact bytes instead of a hand edit.
+# make_lang_case NAME LANGUAGE [INIT_ARG...] -- a fresh init.py scaffold at
+# "$parent/NAME" in LANGUAGE, with the extra flags given. Used when a case
+# needs a confidential name, a consent or a content language other than the
+# clean tree's `en`: the flags go through the producer, so dossier.yaml keeps
+# init.py's exact bytes instead of a hand edit.
+make_lang_case() {
+  local name="$1" language="$2"
+  shift 2
+  claim_case "$name"
+  mkdir -p "$parent/$name"
+  python3 "$INIT_PY" --target "$parent/$name" --language "$language" "$@" >/dev/null
+}
+
+# make_named_case NAME [INIT_ARG...] -- make_lang_case in `en`.
 make_named_case() {
   local name="$1"
   shift
-  claim_case "$name"
-  mkdir -p "$parent/$name"
-  python3 "$INIT_PY" --target "$parent/$name" --language en "$@" >/dev/null
+  make_lang_case "$name" en "$@"
 }
 
 # --- E4: a valid header under a filename that is not YYYY-MM-DD_slug.ext (D-10) ---
@@ -481,5 +491,43 @@ write_file "$parent/render-html-ok/outbound/deliverables/2026-09-17_audit.html" 
 # too, and its well-formed name keeps E4 quiet.
 make_case e9-outside-deliverables
 : >"$parent/e9-outside-deliverables/outbound/mails/2026-09-17_audit.pdf"
+
+# ---------------------------------------------------------------------------
+# W1 -- relative-date words (D-16, D-17). Warnings only: every case exits 0.
+# ---------------------------------------------------------------------------
+
+# The typographic apostrophe (U+2019) a smart-quotes editor writes, as bytes
+# so the dialect stays bash 3.2 and the character stays visible here (P-05).
+RSQUO="$(printf '\342\200\231')"
+
+# --- w1-fr: one bait per scope and spelling, none of them a bullet ---
+# dossier/ and knowledge/ are both in scope; a multi-word entry matches as a
+# phrase; the typographic apostrophe matches the list's ASCII entry.
+make_lang_case w1-fr fr
+printf '%s\n' 'Elle rappelle demain pour valider le périmètre.' >>"$parent/w1-fr/dossier/HISTORY.md"
+printf '%s\n' 'Le marché a bougé récemment.' >>"$parent/w1-fr/knowledge/CONTEXT.md"
+printf '%s\n' 'Le devis part la semaine prochaine.' >>"$parent/w1-fr/dossier/OPEN-QUESTIONS.md"
+printf 'Le cadrage a été confirmé aujourd%shui.\n' "$RSQUO" >>"$parent/w1-fr/dossier/TONE.md"
+
+# --- w1-en: the English list, a word and a phrase ---
+make_named_case w1-en
+printf '%s\n' 'Jane calls back tomorrow.' >>"$parent/w1-en/dossier/HISTORY.md"
+printf '%s\n' 'The budget is decided next week.' >>"$parent/w1-en/knowledge/CONTEXT.md"
+
+# --- w1-boundary: `hier` inside `fichiers` and `hiérarchie` -- clean (P-04) ---
+# Sourced, so W2 stays quiet too: the only way this case raises anything is
+# a word match without boundaries.
+make_lang_case w1-boundary fr
+printf '%s\n' '- Les fichiers de la hiérarchie sont classés par canal (mail 2026-09-16 de Jane).' \
+  >>"$parent/w1-boundary/dossier/CHANNELS.md"
+
+# --- w1-outbound: a relative-date word under outbound/ -- clean (spec Sec4.4 check 5 scope) ---
+make_lang_case w1-outbound fr
+write_file "$parent/w1-outbound/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}Je vous rappelle demain.
+"
+
+# --- w1-nolist: a language with no word list -- W1 and W2 skipped, one info line (D-20) ---
+make_lang_case w1-nolist de
+printf '%s\n' 'Jane calls back tomorrow.' '- An unsourced bullet line' >>"$parent/w1-nolist/dossier/HISTORY.md"
 
 echo "$parent"

@@ -134,8 +134,47 @@ DEFAULT_STALENESS_DAYS = 7
 TRUE_SCALARS = frozenset(("true", "True", "TRUE"))
 FALSE_SCALARS = frozenset(("false", "False", "FALSE"))
 
-# LANGUAGE_WORDS lands here in plan 02-05: language DATA (relative-date words,
-# opinion markers), not a protocol-keyword table (D-19).
+# ===========================================================================
+# LANGUAGE DATA -- the only place this file knows the dossier's language.
+#
+# These are word lists for the two prose heuristics, W1 and W2 (D-19, D-21,
+# spec Sec4.4): language DATA, not a protocol-keyword table. A per-language
+# table of labels is forbidden, because the protocol keywords above are
+# English in every dossier and a regex has to find them without reading a
+# mapping -- so never add `Last updated:` or a status field here.
+#
+# Selected by `language:` from dossier.yaml; a language with no entry skips
+# W1 and W2 with one informational line (D-20). Apostrophes are written
+# ASCII: normalise() folds the typographic one on the text side (P-05).
+# Every entry is matched with boundary_pattern(), never as a substring
+# (P-04: `hier` is inside `fichier`). Extendable without a contract change.
+# ===========================================================================
+
+LANGUAGE_WORDS = {
+    "en": {
+        "relative_dates": (
+            "tomorrow", "yesterday", "today", "next week", "last week", "this week",
+            "next month", "last month", "soon", "recently", "in a few days",
+        ),
+        "opinion_markers": (
+            "reconstructed", "I think", "probably", "it seems", "apparently", "maybe",
+        ),
+    },
+    "fr": {
+        "relative_dates": (
+            "demain", "hier", "aujourd'hui", "la semaine prochaine", "la semaine dernière",
+            "cette semaine", "le mois prochain", "le mois dernier", "bientôt", "récemment",
+            "prochainement", "dans quelques jours",
+        ),
+        "opinion_markers": (
+            "reconstruit", "je pense", "probablement", "il semble", "apparemment", "peut-être",
+        ),
+    },
+}
+
+# W1's scope (spec Sec4.4 check 5): the living files and the knowledge base.
+# outbound/ is out of scope -- a mail may well say "tomorrow" to its reader.
+RELATIVE_DATE_DIRS = (LIVING_DIR, "knowledge")
 
 # Severities and exit codes (D-02, D-04, P-08).
 ERROR = "ERROR"
@@ -801,7 +840,6 @@ def _is_header_target(rel):
 
 # ---------------------------------------------------------------------------
 # CHECKS -- in identifier order. Each takes (root, tree, config, findings).
-# W1 and W2 land in plan 02-05.
 # ---------------------------------------------------------------------------
 
 
@@ -1024,6 +1062,54 @@ def check_renders(root, tree, config, findings):
                                     "rendered deliverable without its .md/.html source beside it"))
 
 
+def language_key(config):
+    """The LANGUAGE_WORDS key for this dossier's `language:` value."""
+    return config["language"].strip().lower()
+
+
+def language_words(config):
+    """This dossier's word lists, or None when its language has none (D-20)."""
+    return LANGUAGE_WORDS.get(language_key(config))
+
+
+def language_infos(config):
+    """The one informational line an unlisted language gets (D-20)."""
+    if language_words(config) is not None:
+        return []
+    return ["language '{}' has no word list: relative-date (W1) and bullet-source (W2) "
+            "checks skipped".format(config["language"].strip())]
+
+
+def check_relative_dates(root, tree, config, findings):
+    """W1: a relative-date word in dossier/ or knowledge/ (D-17, spec Sec4.4 check 5).
+
+    Case-insensitive, on normalise()d text, each entry matched with
+    boundary_pattern() -- the confidential-name check's boundary. That reuse
+    is load-bearing: a substring search fires three times on a clean French
+    scaffold, because `hier` is inside `fichier` (P-04). One finding per
+    (line, entry); the message names the entry, never the line (T-02-17).
+    """
+    words = language_words(config)
+    if words is None:
+        return  # D-20: reported once, by language_infos()
+    patterns = [(entry, boundary_pattern(entry)) for entry in words["relative_dates"]]
+    prefixes = tuple(folder + "/" for folder in RELATIVE_DATE_DIRS)
+    for rel in tree.files:
+        if not rel.startswith(prefixes) or os.path.splitext(rel)[1].lower() in BINARY_EXTS:
+            continue
+        text = read_text_safe(os.path.join(root, *rel.split("/")))
+        if text is None:
+            continue
+        for number, line in enumerate(normalise(text).splitlines(), 1):
+            for entry, pattern in patterns:
+                if pattern.search(line):
+                    # WARNING, never ERROR: a rule that has to guess at natural
+                    # language must never be the reason a legitimate draft is
+                    # rejected (D-16).
+                    findings.append(Finding(rel, number, WARNING, "W1",
+                                            "relative-date word '{}': write the absolute date".format(entry)))
+
+
 CHECKS = (
     check_outbound_headers,
     check_outbound_names,
@@ -1032,6 +1118,7 @@ CHECKS = (
     check_living_files,
     check_claude_dirs,
     check_renders,
+    check_relative_dates,
 )
 
 
@@ -1103,7 +1190,7 @@ def _run(start):
     tree = walk_tree(root)
     for check in CHECKS:
         check(root, tree, config, findings)
-    errors, _warnings = report(findings)
+    errors, _warnings = report(findings, language_infos(config))
     return EXIT_ERRORS if errors else EXIT_CLEAN
 
 
