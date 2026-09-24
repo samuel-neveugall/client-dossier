@@ -320,6 +320,28 @@ assert_eq 1 "$(printf '%s\n' "$LINT_OUT" | grep -c '\\x0a')" 'forged-name: the n
 assert_eq 1 "$(printf '%s\n' "$LINT_OUT" | grep -cE '^[0-9]+ error\(s\), [0-9]+ warning\(s\)$')" 'forged-name: still exactly one summary-shaped line'
 assert_last_line '1 error(s), 0 warning(s)' 'forged-name: the real summary is last'
 
+# --- The consent gate, three ways (spec Sec3.2, D-12, T-02-02) ---
+# Suppressed only by a consent that is recorded AND sourced; c1-quoted-leak
+# above is the malformed-flag case.
+assert_lint "$FIXTURES/consent-ok-leak" 0 'consent-ok-leak: a recorded, sourced consent exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'consent-ok-leak: the leak check is suppressed'
+
+assert_lint "$FIXTURES/consent-nosource-leak" 1 'consent-nosource-leak: exits 1'
+assert_finding E6 'consent-nosource-leak: the sourceless consent is reported'
+assert_finding E5 'consent-nosource-leak: and it does not suppress the leak check'
+for ident in E1 E2 E3 E4 E7 E8 E9 C1 C0 W1 W2; do
+  assert_no_finding "$ident" 'consent-nosource-leak: nothing but [E6] and [E5]'
+done
+
+# --- The README exemption boundary: E1-E4 skip it, E5 does not (D-06, Q-5) ---
+assert_lint "$FIXTURES/e5-readme" 1 'e5-readme: a name in outbound/README.md exits 1'
+assert_only E5 'e5-readme: only [E5] fires -- none of E1-E4 on the README'
+assert_out_line '^outbound/README\.md:[1-9][0-9]*: ERROR \[E5\] ' 'e5-readme: reported on outbound/README.md'
+assert_lint "$FIXTURES/e5-readme-nonames" 0 'e5-readme-nonames: the same README with no configured name exits 0'
+assert_last_line '0 error(s), 0 warning(s)' 'e5-readme-nonames: zero findings'
+assert_lint "$CLEAN" 0 'clean: still exits 0'
+assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep -c '^outbound/README\.md:')" 'clean: no finding of any class on outbound/README.md'
+
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"
 assert_lint "$EMPTY" 2 'no dossier: exits 2'

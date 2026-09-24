@@ -374,4 +374,27 @@ write_file "$parent/c1-quoted-leak/outbound/mails/2026-09-17_relance.md" "${GOOD
 Nous travaillons avec Acme.
 "
 
+# --- consent-ok-leak: consent recorded AND sourced suppresses E5 -- clean (spec Sec3.2) ---
+make_named_case consent-ok-leak --confidential-name Acme --consent-recorded true \
+  --consent-source 'mail 2026-09-16 from Jane'
+write_file "$parent/consent-ok-leak/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Nous travaillons avec Acme.
+"
+
+# --- consent-nosource-leak: consent recorded WITHOUT a source -> E6 AND E5 (D-12) ---
+# "A consent without a source is an opinion": it does not buy the suppression.
+make_named_case consent-nosource-leak --confidential-name Acme --consent-recorded true
+write_file "$parent/consent-nosource-leak/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Nous travaillons avec Acme.
+"
+
+# --- e5-readme: E5, a confidential name in the exempt outbound/README.md (Q-5) ---
+# README.md is exempt from E1-E4 only: a leaked name is a leak wherever it sits.
+# e5-readme-nonames is the same edit with no configured name -- clean, which
+# proves the README content alone raises nothing.
+make_named_case e5-readme --confidential-name Acme
+printf '\nOur reference client is Acme.\n' >>"$parent/e5-readme/outbound/README.md"
+make_case e5-readme-nonames
+printf '\nOur reference client is Acme.\n' >>"$parent/e5-readme-nonames/outbound/README.md"
+
 echo "$parent"
