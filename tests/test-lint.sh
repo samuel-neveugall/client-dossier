@@ -635,6 +635,37 @@ scaffold_lints_clean 'scaffold-full: every optional flag supplied' \
   --timestamps '@hh:mm:ss' \
   --staleness-days 14
 
+# --- The producer/consumer round trip on a YAML reserved spelling (D-24.4, Phase 1 debt a) ---
+# `no` is a language code and a YAML 1.1 spelling of false. init.py must
+# write it quoted and lint.py must read it back as the two-letter string.
+# The exit code alone cannot see a coercion: a consumer that read a boolean
+# would print one in the informational line, or crash looking a boolean up in
+# LANGUAGE_WORDS -- so the assertion is on the line's content.
+rt="$(scratch_repo)"
+rt_status=0
+python3 "$(init_py)" --target "$rt" --language no >/dev/null || rt_status=$?
+assert_eq 0 "$rt_status" 'round-trip: init.py scaffolds --language no'
+assert_grep '^language: "no"$' "$rt/dossier.yaml"
+assert_lint "$rt" 0 'round-trip: the dossier lints with exit 0'
+assert_eq 1 "$(count_out_lines "^info: language 'no' ")" "round-trip: the info line names the string 'no'"
+assert_eq 0 "$(printf '%s\n' "$LINT_OUT" | grep '^info:' | grep -cE 'False|True|false|true')" \
+  'round-trip: the info line names no boolean'
+assert_clean 'round-trip: the reserved-spelling dossier'
+rm -rf "$rt"
+
+# The complementary negative: an unknown code that is NOT reserved takes the
+# same informational path, so the case above tests the reserved spelling and
+# not merely the unknown-language path.
+rt="$(scratch_repo)"
+rt_status=0
+python3 "$(init_py)" --target "$rt" --language it >/dev/null || rt_status=$?
+assert_eq 0 "$rt_status" 'round-trip: init.py scaffolds --language it'
+assert_grep '^language: it$' "$rt/dossier.yaml"
+assert_lint "$rt" 0 'round-trip: the unreserved unknown language exits 0'
+assert_eq 1 "$(count_out_lines "^info: language 'it' ")" "round-trip: the info line names 'it'"
+assert_clean 'round-trip: the unreserved unknown-language dossier'
+rm -rf "$rt"
+
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"
 assert_lint "$EMPTY" 2 'no dossier: exits 2'
