@@ -443,6 +443,11 @@ assert_out_line '^knowledge/CONTEXT\.md:[1-9][0-9]*: WARNING \[W1\] ' 'stray-con
 # A real sub-dossier is still pruned, and never silently (D-03).
 assert_lint "$FIXTURES/sub-dossier" 0 'sub-dossier: the parent still exits 0'
 assert_out_line '^info: .*clients/other' 'sub-dossier: the pruned sub-dossier is named on an info line'
+# --- The README exemption is outbound/README.md only (WR-04, D-06) ---
+assert_lint "$FIXTURES/readme-nested" 1 'readme-nested: outbound/mails/README.md exits 1'
+assert_out_line '^outbound/mails/README\.md:0: ERROR \[E1\] ' 'readme-nested: it needs a status header'
+assert_no_finding E4 'readme-nested: D-10 keeps a README.md exempt from the dated-name rule'
+assert_last_line '1 error(s), 0 warning(s)' 'readme-nested: nothing else fires'
 # --- Forged name, end to end: the crafted filename is now reported by E4 (T-02-01) ---
 assert_lint "$FIXTURES/forged-name" 1 'forged-name: the crafted filename fails E4, exit 1'
 assert_only E4 'forged-name: only [E4] fires'

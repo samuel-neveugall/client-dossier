@@ -79,12 +79,20 @@ LIVING_FILES = (
 OUTBOUND_DIR = "outbound"
 OUTBOUND_SUBS = ("deliverables", "mails", "calls")
 
-# Exempt from the outbound checks E1-E4 (D-06). This exemption is what keeps
+# Exempt from the outbound checks E1-E3 (D-06). This exemption is what keeps
 # a freshly scaffolded dossier clean: outbound/README.md quotes the status
-# header verbatim, placeholders included (P-01). `.gitkeep` is additionally
-# dropped from the walk everywhere (LINT-01); README.md stays visible to E5
-# (Q-5: a leaked name is a leak wherever it sits).
-EXEMPT_BASENAMES = frozenset((".gitkeep", "README.md"))
+# header verbatim, placeholders included (P-01). A PATH, never a basename: a
+# README.md saved in outbound/mails/ or deliverables/ is an outbound file
+# like any other (WR-04). `.gitkeep` is dropped from the walk everywhere
+# (LINT-01); the README stays visible to E5 (Q-5: a leaked name is a leak
+# wherever it sits).
+EXEMPT_PATHS = frozenset((OUTBOUND_DIR + "/README.md",))
+
+# E4 alone keeps D-10's own exemption: a README.md directly under
+# outbound/{deliverables,mails,calls}/ need not carry a dated name. It still
+# needs its status header (E1-E3 above), so a draft saved under that name
+# cannot bypass the header protocol.
+README_NAME = "README.md"
 GITKEEP = ".gitkeep"
 
 # Rendered binaries carry no text header, so they are outside E1-E3 (D-07,
@@ -987,9 +995,9 @@ def outbound_files(tree):
 
 
 def _is_header_target(rel):
-    """E1-E3 scope (D-07): outbound files minus exempt basenames and binaries."""
+    """E1-E3 scope (D-07): outbound files minus the exempt README and binaries."""
     name = rel.rsplit("/", 1)[-1]
-    if name in EXEMPT_BASENAMES:  # D-06: outbound/README.md quotes the header verbatim
+    if rel in EXEMPT_PATHS:  # D-06: outbound/README.md quotes the header verbatim
         return False
     return os.path.splitext(name)[1].lower() not in BINARY_EXTS
 
@@ -1080,7 +1088,7 @@ def check_outbound_names(root, tree, config, findings):
         if len(parts) != 3 or parts[1] not in OUTBOUND_SUBS:
             continue
         name = parts[2]
-        if name in EXEMPT_BASENAMES:  # D-06
+        if name == README_NAME:  # D-10
             continue
         match = _OUTBOUND_NAME_RE.fullmatch(name)
         if match is None or not is_absolute_date(match.group(1)):
@@ -1160,7 +1168,7 @@ def check_confidential_names(root, tree, config, findings):
                for name in config["confidential_names"]]
     prefix_len = len(OUTBOUND_DIR) + 1
     for rel in outbound_files(tree):
-        # No EXEMPT_BASENAMES skip here, on purpose: a leaked name is a leak wherever it sits.
+        # No EXEMPT_PATHS skip here, on purpose: a leaked name is a leak wherever it sits.
         path_name = fold_ascii(normalise(rel[prefix_len:]))
         for name, _pattern, name_pattern in needles:
             if name_pattern.search(path_name):
@@ -1253,7 +1261,7 @@ def check_renders(root, tree, config, findings):
         if not rel.startswith(prefix) or "/" in rel[len(prefix):]:
             continue
         name = rel[len(prefix):]
-        if name in EXEMPT_BASENAMES:  # D-06
+        if name == README_NAME:  # D-06, D-10: a README is never a render's source
             continue
         stem, ext = os.path.splitext(name)
         if ext.lower() in RENDER_SOURCE_EXTS:

@@ -537,6 +537,14 @@ make_gate_case stray-config 'confidential_names: [ Acme ]'
 make_named_case stray-config-knowledge
 : >"$parent/stray-config-knowledge/knowledge/dossier.yaml"
 printf '%s\n' 'The budget is decided tomorrow.' >>"$parent/stray-config-knowledge/knowledge/CONTEXT.md"
+# --- readme-nested: a README.md below outbound/'s root is an outbound file (WR-04, D-06) ---
+# D-06 exempts outbound/README.md only; a draft saved as README.md in a
+# subfolder must still carry its status header (D-10 still spares it E4).
+make_case readme-nested
+write_file "$parent/readme-nested/outbound/mails/README.md" 'Hello Jane,
+
+A draft saved under the wrong name, with no header.
+'
 # --- linebreak-name / linebreak-yaml: Unicode line breaks inside a name (CR-02) ---
 # str.splitlines() treats U+2028, U+2029 and U+0085 as line breaks; YAML 1.2
 # and the producer do not. A name holding one must neither reach
