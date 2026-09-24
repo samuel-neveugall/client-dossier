@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 2
+open_count: 3
 waived_count: 0
 fixed_count: 1
-total_count: 3
-last_updated: 2026-09-24T19:50:52.879Z
+total_count: 4
+last_updated: 2026-09-24T20:15:52.947Z
 ---
 
 # Broken Windows Ledger
@@ -18,6 +18,7 @@ last_updated: 2026-09-24T19:50:52.879Z
 | 1 | 01 | deviation | .claude-plugin/plugin.json |  | claude plugin validate . --strict exits 1 (author + CLAUDE.md-at-root warnings) while the manifest must stay at exactly 3 keys per this plan's own acceptance check; unresolved, needs a human/planner decision before Phase 7 manifests | open |  | 2026-09-16T17:42:04.517Z |  |
 | 2 | 01 | deviation | skills/dossier-init/scripts/init.py |  | Global vibeflow 300-line file-size guard hook (not part of this project) forced tracing debt via vibeflow:allow-large-file marker instead of restructuring init.py mid-plan-01-02; TEMPLATE_MAP growth is a locked downstream contract | open |  | 2026-09-16T17:54:14.478Z |  |
 | 3 | 02 | deviation | tests/test-lint.sh |  | 02-01 Task 2 forged-name: no check reports an outbound filename before E1/E4 (plan 02-02), so the end-to-end run cannot yet show \\x0a; pinned by a direct report() probe plus a one-summary-line-and-last assertion. 02-02 should add grep -c '\\x0a' >= 1 on the forged-name run once E4 fires. | fixed |  | 2026-09-24T19:40:23.545Z | 2026-09-24T19:50:52.879Z |
+| 4 | 02 | deviation | scripts/lint.py |  | scripts/lint.py ends Phase 2 at 1279 lines, over the global vibeflow 300-line file-size guard hook (not part of this project), traced via the vibeflow:allow-large-file marker; the single-file layout is deliberate (Q-6): a bare-skills install copies scripts/ wholesale and runs lint.py by path, so a second importable module would turn sys.path into a distribution concern (DIST-03); splitting is a Phase 7 conversation alongside the manifest work | open |  | 2026-09-24T20:15:52.947Z |  |
 
 ````json
 [
@@ -58,6 +59,19 @@ last_updated: 2026-09-24T19:50:52.879Z
     "reason": "",
     "recorded_at": "2026-09-24T19:40:23.545Z",
     "resolved_at": "2026-09-24T19:50:52.879Z",
+    "milestone": null
+  },
+  {
+    "id": 4,
+    "kind": "deviation",
+    "phase": "02",
+    "file": "scripts/lint.py",
+    "line": null,
+    "description": "scripts/lint.py ends Phase 2 at 1279 lines, over the global vibeflow 300-line file-size guard hook (not part of this project), traced via the vibeflow:allow-large-file marker; the single-file layout is deliberate (Q-6): a bare-skills install copies scripts/ wholesale and runs lint.py by path, so a second importable module would turn sys.path into a distribution concern (DIST-03); splitting is a Phase 7 conversation alongside the manifest work",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-24T20:15:52.947Z",
+    "resolved_at": null,
     "milestone": null
   }
 ]

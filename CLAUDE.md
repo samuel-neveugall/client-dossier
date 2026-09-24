@@ -100,9 +100,19 @@ status → manifests and distribution.
   minimal `.claude-plugin/plugin.json` exists from Phase 1 for that purpose; the full
   manifests come in Phase 7.
 
-Commands that exist today: `bash tests/run.sh` (the full test suite), `claude plugin validate . --strict`
-(the manifest), and `claude --plugin-dir .` (load the plugin from the working copy during
-development). Add more here as they are created.
+### Commands
+
+- `python3 scripts/lint.py [PATH]` — lint the dossier holding `PATH` (default: the current
+  directory; the linter walks upward to the nearest `dossier.yaml`). Exit codes: 0 no error
+  (warnings allowed), 1 at least one error, 2 no `dossier.yaml` found upward or unreadable,
+  3 internal error. The linter is read-only and takes no other flag in v1: there is no fix or
+  repair mode.
+- `bash tests/run.sh` — the full test suite; every `tests/test-*.sh` file, one summary line.
+- `bash tests/test-lint.sh` — the lint tests alone.
+- `claude plugin validate . --strict` — the manifest.
+- `claude --plugin-dir .` — load the plugin from the working copy during development.
+
+Add more here as they are created.
 
 ## Decisions (spec §11, settled 2026-09-16)
 
