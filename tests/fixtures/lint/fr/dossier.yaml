@@ -1,0 +1,14 @@
+# dossier.yaml
+version: 1
+language: fr
+counterparts:
+  - name: "Acme"
+    role: "donneur d'ordre"
+    contacts: [ "Jane Doe" ]
+confidential_names: []
+consent_recorded: false
+consent_source: ""
+timestamps: "@mm:ss"
+date_format: "YYYY-MM-DD"
+status_header: required
+staleness_days: 7

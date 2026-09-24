@@ -529,6 +529,72 @@ assert_lint "$FIXTURES/w2-many" 0 'w2-many: twenty warnings never change the exi
 assert_last_line '0 error(s), 20 warning(s)' 'w2-many: twenty warnings, zero errors'
 assert_eq 20 "$(count_out_lines ' WARNING \[W2\] ')" 'w2-many: every one of the twenty is a [W2]'
 
+# --- ROADMAP criterion 3: the committed French fixture (D-28 as amended) ---
+# The one committed lint fixture, asserted where it lives rather than on a
+# generated copy. Locations, not counts: "seven warnings" would pass with one
+# class firing seven times and the other never.
+FR="$REPO_ROOT/tests/fixtures/lint/fr"
+frh="$FR/dossier/HISTORY.md"
+assert_grep '^language: fr$' "$FR/dossier.yaml"
+# The English protocol label, exactly once per living file, never translated.
+for living in ACTORS HISTORY LEARNINGS TONE CHANNELS OPEN-QUESTIONS RELATIONSHIP; do
+  assert_eq 1 "$(grep -cE '^Last updated: [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$FR/dossier/$living.md")" \
+    "fr: dossier/$living.md carries one English Last updated: line"
+  assert_not_grep 'Dernière mise à jour' "$FR/dossier/$living.md"
+done
+assert_lint "$FR" 0 'fr: the committed French fixture exits 0'
+assert_no_error 'fr: no error identifier at all'
+assert_no_finding E7 'fr: the English Last updated: label is found inside French content'
+assert_eq 0 "$(count_out_lines ' ERROR ')" 'fr: no ERROR line'
+assert_finding W1 'fr: [W1] is raised'
+assert_finding W2 'fr: [W2] is raised'
+assert_last_line '0 error(s), 7 warning(s)' 'fr: seven warnings, zero errors'
+
+# fr_at FILE TEXT IDENT LABEL / fr_none FILE TEXT LABEL — IDENT fires / nothing
+# fires at the line of dossier-relative FILE holding TEXT.
+fr_at() {
+  local n
+  n="$(line_of "$FR/$1" "$2")"
+  assert_out_line "^$(printf '%s' "$1" | sed 's/\./\\./g'):$n: WARNING \\[$3\\] " "$4"
+}
+fr_none() {
+  local n
+  n="$(line_of "$FR/$1" "$2")"
+  [ -n "$n" ] || n='missing'
+  assert_eq 0 "$(count_out_lines "^$(printf '%s' "$1" | sed 's/\./\\./g'):$n: ")" "$3"
+}
+fr_at dossier/HISTORY.md 'rappelle demain' W1 'fr: demain raises [W1]'
+fr_at dossier/HISTORY.md 'rappelle demain' W2 'fr: ... and [W2] on the same unsourced line'
+fr_at dossier/HISTORY.md 'la semaine prochaine (appel' W1 'fr: a sourced phrase raises [W1]'
+assert_eq 0 "$(count_out_lines "^dossier/HISTORY\\.md:$(line_of "$frh" 'la semaine prochaine (appel'): WARNING \\[W2\\] ")" \
+  'fr: ... and no [W2], it is sourced'
+fr_none dossier/HISTORY.md 'Probablement un budget' 'fr: an opinion marker raises nothing'
+fr_at dossier/HISTORY.md 'reconstruite' W2 'fr: an inflected near-marker raises [W2]'
+fr_at dossier/HISTORY.md 'confirmé le cadrage' W1 'fr: a typographic apostrophe raises [W1]'
+assert_eq 1 "$(grep -c "$(printf '\342\200\231')" "$frh")" 'fr: the apostrophe bait really is U+2019'
+fr_none dossier/HISTORY.md 'gelé jusqu' 'fr: a bullet inside the multi-line comment raises nothing'
+fr_at dossier/HISTORY.md 'proposition chiffrée' W2 'fr: the bullet after the comment block raises [W2]'
+fr_at knowledge/CONTEXT.md 'bougé récemment' W1 'fr: knowledge/ is in [W1] scope'
+# The P-04 bait: sourced, only substrings of `hier`, so nothing at all.
+assert_eq 1 "$(grep -rn 'fichier' "$FR/dossier/" | grep -c 'hiérarchie')" 'fr: the fichiers/hiérarchie bait line is present'
+fr_none dossier/CHANNELS.md 'fichiers de la hiérarchie' 'fr: the fichiers/hiérarchie bait line raises nothing (P-04)'
+# A genuine multi-line comment: the opener and the closer on different lines.
+assert_eq 1 "$(grep -cx -- '<!--' "$frh")" 'fr: HISTORY.md holds a bare <!-- opener line'
+assert_eq 1 "$(grep -cx -- '-->' "$frh")" 'fr: ... and a bare --> closer line'
+
+# Committed means tracked: an ignored file vanishes on a fresh clone and
+# takes criterion 3 with it.
+fr_tracked="$(git -C "$REPO_ROOT" ls-files tests/fixtures/lint/fr/)"
+fr_count="$(printf '%s\n' "$fr_tracked" | grep -c 'fixtures/lint/fr/')"
+if [ "$fr_count" -ge 20 ]; then
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo "FAIL: fr: only $fr_count fixture files are tracked by git (want >= 20)" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+# No committed tests/fixtures/lint/clean/ (D-28 as amended): the clean tree is generated.
+assert_eq '' "$(git -C "$REPO_ROOT" ls-files tests/fixtures/lint/clean/)" 'no committed clean fixture (D-28 as amended)'
+
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 EMPTY="$(mktemp -d)"
 assert_lint "$EMPTY" 2 'no dossier: exits 2'
