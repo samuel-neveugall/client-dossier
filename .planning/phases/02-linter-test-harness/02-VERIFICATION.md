@@ -1,33 +1,60 @@
 ---
 phase: 02-linter-test-harness
-verified: 2026-09-24T21:30:00Z
+verified: 2026-09-25T00:00:00Z
 status: human_needed
-score: 4/4 must-haves verified
-covered_files: [".planning/REQUIREMENTS.md", ".planning/WINDOWS.md", ".planning/phases/02-linter-test-harness/02-01-PLAN.md", ".planning/phases/02-linter-test-harness/02-01-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-02-PLAN.md", ".planning/phases/02-linter-test-harness/02-02-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-03-PLAN.md", ".planning/phases/02-linter-test-harness/02-03-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-04-PLAN.md", ".planning/phases/02-linter-test-harness/02-04-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-05-PLAN.md", ".planning/phases/02-linter-test-harness/02-05-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-06-PLAN.md", ".planning/phases/02-linter-test-harness/02-06-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-REVIEW-FIX.iter1.md", ".planning/phases/02-linter-test-harness/02-REVIEW-FIX.md", "CLAUDE.md", "scripts/lint.py", "skills/dossier-init/scripts/init.py", "tests/fixtures/make-adopt-fixture.sh", "tests/fixtures/make-lint-fixtures.sh", "tests/lib.sh", "tests/run.sh", "tests/test-init-adopt.sh", "tests/test-init-empty.sh", "tests/test-init-fr.sh", "tests/test-init-pointer.sh", "tests/test-lint.sh", "tests/test-skill-shape.sh"]
-covered_digest: "v1:sha256:7e661b7c93c8613fcc11229749b82af47d108b9bc159c4fb6dc1852c05dcf6c6"
+score: 13/13 must-haves verified (re-verification round: 4 ROADMAP criteria + 2 carried Phase 1
+  debts + 7 UAT gap-closure truths, all independently re-checked against df7f9ea; see
+  "Re-verification 2026-09-25 (gap closure)" below)
+covered_files: [".planning/REQUIREMENTS.md", ".planning/WINDOWS.md", ".planning/phases/02-linter-test-harness/02-01-PLAN.md", ".planning/phases/02-linter-test-harness/02-01-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-02-PLAN.md", ".planning/phases/02-linter-test-harness/02-02-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-03-PLAN.md", ".planning/phases/02-linter-test-harness/02-03-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-04-PLAN.md", ".planning/phases/02-linter-test-harness/02-04-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-05-PLAN.md", ".planning/phases/02-linter-test-harness/02-05-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-06-PLAN.md", ".planning/phases/02-linter-test-harness/02-06-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-07-PLAN.md", ".planning/phases/02-linter-test-harness/02-07-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-08-PLAN.md", ".planning/phases/02-linter-test-harness/02-08-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-09-PLAN.md", ".planning/phases/02-linter-test-harness/02-09-SUMMARY.md", ".planning/phases/02-linter-test-harness/02-CONTEXT.md", ".planning/phases/02-linter-test-harness/02-REVIEW-FIX.iter1.md", ".planning/phases/02-linter-test-harness/02-REVIEW-FIX.iter2.md", ".planning/phases/02-linter-test-harness/02-REVIEW-FIX.md", ".planning/phases/02-linter-test-harness/02-REVIEW.iter3.md", ".planning/phases/02-linter-test-harness/02-REVIEW.md", ".planning/phases/02-linter-test-harness/02-UAT.md", "CLAUDE.md", "scripts/lint.py", "skills/dossier-init/scripts/init.py", "tests/fixtures/make-adopt-fixture.sh", "tests/fixtures/make-lint-fixtures.sh", "tests/lib.sh", "tests/run.sh", "tests/test-init-adopt.sh", "tests/test-init-empty.sh", "tests/test-init-fr.sh", "tests/test-init-pointer.sh", "tests/test-lint.sh", "tests/test-skill-shape.sh"]
+covered_digest: "v1:sha256:a8986a2adf6e854052c810442ab933c8cd6817a7569b94a9345f1a04be9da7a0"
 behavior_unverified: 0
 overrides_applied: 0
+re_verification:
+  previous_status: human_needed
+  previous_score: 4/4 must-haves verified
+  gaps_closed:
+    - "G-02-2 — near-miss confidential_names gate key beside the exact key: re-scoped by Samuel's CR-02 / CR-02 bis arbitrage (OSA-distance dual-clause rule) rather than the original UAT wording; the new rule's ground-truth boundary independently reproduced (confidental_name, confidential_nam, confidentail_names, confidentialnames -> C1/exit 1 beside the exact key; confidential_notes, non_confidential_names -> clean/exit 0)"
+    - "G-02-4a — case-variant outbound folder (Outbound/) on this case-insensitive filesystem: ERROR [E1], exit 1, name never escapes"
+    - "G-02-4b — Unicode Cf format characters (ZWSP, BOM, soft hyphen, ZWNJ, word joiner) inside a confidential name in an outbound body: all 5 independently reproduced as ERROR [E5]"
+    - "G-02-4c — HTML character references (&amp;, &#39;, &eacute;, decimal refs) in an outbound .html file: independently reproduced as ERROR [E5] for AT&T, O'Brien, Société Exemple"
+    - "G-02-4d — gate_damaged / nested-key recursion pinned by tests: independently re-ran both WR-02 mutations (forcing gate_damaged to False, dropping visit() recursion) against the current scripts/lint.py and confirmed each is killed (4 and 2 test failures respectively), then confirmed the unmutated suite is clean again"
+    - "G-02-4e — unreadable folder / .git under outbound/: independently reproduced ERROR [E1] for both a chmod-000 folder and a .git folder under outbound/mails/, and confirmed the same conditions outside outbound/ (sources/, knowledge/) downgrade to an info: line with exit 0, and a root .git stays silently pruned"
+    - "G-02-4f — confidential name hard-wrapped inside a quoted mail reply (nested \"> > \" and bare \">\" prefixes): independently reproduced ERROR [E5] at the name's own line"
+  gaps_remaining: []
+  regressions: []
 human_verification:
-  - test: "Confirm D-FIX-8 (02-REVIEW-FIX.md, iteration 2): an unparseable/misindented line in dossier.yaml now reports [C1] (error, exit 1) instead of the locked-decision D-22 behaviour of 'unknown or unparseable lines are skipped with a warning' (which would have been [C0], exit 0)."
-    expected: "Samuel confirms this narrowing of D-22 is intentional and accepted (fail-closed on the confidentiality gate), or asks for it to be reverted to a warning for lines under a clearly non-gate key."
-    why_human: "This is a deliberate deviation from a locked spec decision (D-22), flagged by the executor itself as 'requires human verification' — a policy choice, not a mechanical defect. Behaviour is internally consistent and covered by tests (gate-misindent-block, gate-misindent-scalar, c1-counterpart-broken)."
-  - test: "Confirm D-FIX-9/D-FIX-10 (02-REVIEW-FIX.md): the difflib-ratio-0.8 near-miss threshold for misspelt gate keys (e.g. confidential_names vs confidential-names, nested confidential_names under counterparts) and the stricter plain-scalar rejection (values containing ': ', or starting with '- ', '? ', ': ') are the right boundaries."
-    expected: "Samuel agrees the 0.8 threshold and the plain-scalar restrictions do not produce unwanted false positives on real dossier.yaml files, or requests the threshold/rules be tuned."
-    why_human: "Explicitly flagged 'requires human verification (the near-miss threshold is a judgement call)' by the executor. Mechanically tested and passing, but the boundary itself is a design judgement, not a fact verifiable by grep."
-  - test: "Confirm D-FIX-3/WR-03 (02-REVIEW-FIX.md): the E5 confidential-name text check now also matches the ASCII-folded spelling of a name in prose (accents dropped, punctuation-joined, e.g. 'Big. Telco' or 'jane.doe' matching 'Jane Doe'), which the fix report itself frames as a 'match more' choice made to keep the confidentiality gate closed, with named false-positive risks (e.g. 'Élan' matching common word 'elan')."
-    expected: "Samuel accepts the broadened matching (fewer missed leaks, occasional false positive) as the right default for a confidentiality linter, or asks to narrow it (e.g. drop '.' from the separator set)."
-    why_human: "Explicitly flagged 'requires human verification ... settles D-FIX-3 on the match more side' by the executor. This is a security/UX tradeoff, not a bug."
+  - test: "Live re-test of UAT test 2 (G-02-2) against the current code: exercise the CR-02 bis OSA-distance dual-clause rule (CONFIDENTIAL_NAMES_TYPO_CUTOFF=1, CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD=2, CONFIDENTIAL_NAMES_WORD_CUTOFF=1) on a few of Samuel's own real dossier.yaml-shaped inputs, not just the fixture set and the arbitrage relayed over SendMessage."
+    expected: "Samuel confirms the boundary (confidental_name / confidential_nam / confidentail_names / confidentialnames forced to C1 beside the exact key; confidential_notes / non_confidential_names left silent) matches intent on real content, and explicitly accepts the documented residual limit (a double typo landing inside the last word itself, beyond CONFIDENTIAL_NAMES_WORD_CUTOFF of both \"name\" and \"names\", still reads as a different legitimate key and stays silent — see 02-CONTEXT.md's \"Gap closure decisions, round 3\" and 02-REVIEW-FIX.md's CR-02 bis entry)."
+    why_human: "This is a security/precision policy tradeoff (which typos of a confidentiality-gate key get caught vs. which legitimate extension keys stay silent), arbitraged by Samuel via a relayed SendMessage exchange rather than a hands-on session against the running linter. The task brief is explicit that Samuel's own re-test of UAT items 2 and 4 is required and does not belong to this verifier."
+  - test: "Live re-test of UAT test 4 (G-02-4a..f) against the current code: drive scripts/lint.py by hand against a real Outbound/ folder, a name pasted with an invisible Unicode character, an outbound .html file with entity-encoded names, and a quoted mail reply, rather than only trusting the fixtures and this verifier's own scripted reproductions above."
+    expected: "Samuel confirms each of the six fixes (case-variant folders, Cf format characters, HTML entities, gate_damaged/nested-key mutation coverage, unreadable-folder/.git reporting, quoted-reply wrapping) behaves as expected on content shaped like a real dossier, and that no fix introduces an unwanted false positive on legitimate content."
+    why_human: "Same class as UAT test 2: these were reported and closed as a batch (\"tout\") without Samuel re-running the fixed linter by hand yet. Mechanically correct and covered by fixtures/mutation testing (see gaps_closed above), but the acceptance itself is Samuel's, not a mechanical fact."
+  - test: "Confirm the three items of accepted, tracked debt should stay open debt rather than block or require a further fix round: WR-01 (format_readings()/yaml_quote() cover Unicode category Cf only, not the wider Default_Ignorable_Code_Point set — CGJ, variation selectors, Mongolian free variation selectors, Hangul fillers); OBS-01 (no runtime rejection of a confidential_names entry starting with '>', same class as the now-fixed WR-04); and CR-02 bis's own documented residual limit (a double typo landing inside the last word itself, beyond the word-cutoff, stays silent beside the exact key)."
+    expected: "Samuel accepts these three as tracked debt for a future round (as 02-REVIEW-FIX.md's Follow-up section and 02-CONTEXT.md's CR-02 bis entry already frame them), or orders a further fix round."
+    why_human: "Explicitly named as open, self-flagged debt by the executor/reviewer rather than settled gaps — a scope decision, not a defect this verifier can resolve by inspection."
 ---
 
 # Phase 2: Linter & Test Harness Verification Report
 
 **Phase Goal:** Anyone (human or agent) can mechanically verify a dossier obeys the plugin's
 rules with zero setup beyond python3.
+**Current status:** human_needed (unchanged across both rounds — see "Re-verification
+2026-09-25 (gap closure)" below for what changed and what remains for Samuel).
+
+---
+
+## Initial Verification — 2026-09-24T21:30:00Z
+
+*(Preserved verbatim from the original verification pass. Superseded in points 5 and 6 of its
+own Human Verification list — items 1 and 3 there correspond to UAT tests 1 and 3, which
+Samuel passed; item 2 corresponds to UAT test 2, on which Samuel reported "corrige" and which
+this round's gap closure addresses — see the new section below.)*
+
 **Verified:** 2026-09-24T21:30:00Z
 **Status:** human_needed
 **Re-verification:** No — initial verification
 
-## Goal Achievement
+### Goal Achievement
 
 ### Observable Truths
 
@@ -100,7 +127,7 @@ conversation per the plan's own Q-6 decision. Not a gap against this phase's goa
 verification works correctly regardless of file length); listed here for visibility only, not
 as a blocking finding.
 
-### Human Verification Required
+### Human Verification Required (as of 2026-09-24)
 
 Three items, all inherited from `02-REVIEW-FIX.md`'s own "Decisions for Samuel" section, where
 the executor itself marked the underlying fix `status: fixed: requires human verification`.
@@ -115,6 +142,7 @@ human is a **policy/design judgement**, not a defect:
    D-22 for the confidentiality gate specifically, or requests a revert/refinement.
    **Why human:** Explicit deviation from a locked spec decision; a policy call the executor
    flagged rather than settled unilaterally.
+   **Resolved 2026-09-25:** UAT test 1 — Samuel: pass.
 
 2. **D-FIX-9 / D-FIX-10 — near-miss gate-key threshold and stricter plain-scalar rejection**
    **Test:** Review the `difflib` ratio-0.8 threshold for flagging a misspelt/misplaced gate
@@ -124,34 +152,212 @@ human is a **policy/design judgement**, not a defect:
    for tuning.
    **Why human:** Explicitly flagged by the executor as "a judgement call" — not verifiable by
    inspecting code correctness alone.
+   **Resolved 2026-09-25:** UAT test 2 — Samuel: issue ("corrige" — apply the WR-01 fix). This
+   drove the CR-02 / CR-02 bis gap-closure work; see the new section below — a fresh human
+   sign-off is requested on the replacement rule, not the original 0.8-ratio one.
 
 3. **D-FIX-3 / WR-03 — E5 text-match broadened to ASCII-folded spellings**
    **Test:** Review the "match more" tradeoff: the confidential-name text check now also
    matches accent-dropped/punctuation-joined spellings in prose (e.g. `jane.doe` matches
-   `Jane Doe`), with named false-positive risks (e.g. `Élan` matching the common word "elan").
+   `Jane Doe`), with named false-positive risks (e.g. `Élan` matching common word "elan").
    **Expected:** Samuel accepts broader matching as the safer default for a confidentiality
    linter, or asks to narrow the separator set.
    **Why human:** Explicitly flagged by the executor as settling an open design question "on
    the match more side" — a security/precision tradeoff, not a bug.
+   **Resolved 2026-09-25:** UAT test 3 — Samuel: pass.
 
-None of these three items block the phase goal ("mechanically verify... with zero setup beyond
-python3") — the mechanism works, passes 1290 assertions, and each item is a request for Samuel
-to bless (or adjust) a specific judgement call the executor made while closing the
-confidentiality gate.
+### Gaps Summary (as of 2026-09-24)
 
-### Gaps Summary
-
-No gaps found. All 4 ROADMAP success criteria for Phase 2, both carried-over Phase 1 debts, and
-LINT-01/02/03 are verified directly against the codebase (not taken from SUMMARY.md claims):
-clean scaffolds lint 0/0, all nine error classes fire correctly and only correctly, the French
-fixture warns without erroring and still finds `Last updated:`, and the full bash+python3 suite
-(6 files, 1290 lint-specific assertions) passes end to end when run fresh by this verifier.
-Status is `human_needed` solely because three design judgements made during the review-fix
-loop — all already self-flagged by the executor — deviate from or narrow prior locked
-decisions and need Samuel's sign-off before the confidentiality-gate behaviour is considered
-final.
+No gaps found at the time. All 4 ROADMAP success criteria for Phase 2, both carried-over Phase
+1 debts, and LINT-01/02/03 were verified directly against the codebase. Status was
+`human_needed` solely for the three design judgements above. UAT (2026-09-24 to 2026-09-25)
+subsequently surfaced 7 further gaps (G-02-2, G-02-4a..f) not caught by this initial pass — see
+the new section below for their closure and current state.
 
 ---
 
-_Verified: 2026-09-24T21:30:00Z_
-_Verifier: Claude (gsd-verifier)_
+## Re-verification 2026-09-25 (gap closure)
+
+**Verified:** 2026-09-25 (session date; repository "today" is 2026-09-25 per system context)
+**Branch / HEAD:** `feat/phase-02-gap-closure` @ `df7f9ea`
+**Status:** human_needed (unchanged from the initial round — the reason has shifted, not
+disappeared)
+**Re-verification:** Yes — after gap-closure round (plans 02-07, 02-08, 02-09; review-fix
+rounds CR-01, CR-02, CR-02 bis, CR-03, WR-02, IN-01, IN-02)
+
+### What changed since 2026-09-24
+
+Samuel's UAT (`02-UAT.md`) ran against the initial verification and reported:
+- Test 1 (D-FIX-8): pass.
+- Test 2 (D-FIX-9/D-FIX-10, near-miss threshold): issue — "corrige" (apply the WR-01 fix).
+- Test 3 (D-FIX-3/WR-03): pass.
+- Test 4 (iteration-3 residual findings CR-01/CR-02/CR-03/WR-02..04): issue — "tout" (fix all
+  in the same round as WR-01).
+
+This produced 7 gaps (G-02-2, G-02-4a, G-02-4b, G-02-4c, G-02-4d, G-02-4e, G-02-4f), closed by
+plans 02-07 (near-miss gate-key rule), 02-08 (case-variant folders, unreadable/`.git`
+reporting), and 02-09 (quoted replies, HTML entities, Unicode format characters), then by
+review-fix rounds CR-01/CR-02/CR-02 bis/CR-03/WR-02/IN-01/IN-02 recorded in `02-REVIEW-FIX.md`.
+**Important scoping note:** G-02-2's originally-reported truth ("a near-miss is ignored as soon
+as the exact key is present") was explicitly superseded by Samuel's own CR-02 and CR-02 bis
+arbitrage, recorded in `02-CONTEXT.md`'s two "Gap closure decisions" sections — the correct
+target for re-verification is that replacement rule, not the original wording. This report
+verifies against the replacement rule.
+
+### Mechanics run fresh by this verifier (not taken from any SUMMARY.md)
+
+| Check | Command | Result |
+|---|---|---|
+| Full test suite | `bash tests/run.sh` | `ok tests/test-init-adopt.sh` / `ok tests/test-init-empty.sh` / `ok tests/test-init-fr.sh` / `ok tests/test-init-pointer.sh` / `ok tests/test-lint.sh` / `ok tests/test-skill-shape.sh` — **`TOTAL: 6 files, 0 failed`, exit 0** |
+| Lint-specific assertion count | `bash tests/test-lint.sh` | **`PASS 1494 FAIL 0`** (up from 1290 at the initial verification, 1479→1494 across the gap-closure and CR-02 bis commits) |
+| Fresh `en` scaffold | `init.py --language en --target $TMPD/clean-en` then `lint.py $TMPD/clean-en` | `0 error(s), 0 warning(s)`, exit 0 |
+| Fresh `fr` scaffold | `init.py --language fr --target $TMPD/clean-fr` then `lint.py $TMPD/clean-fr` | `0 error(s), 0 warning(s)`, exit 0 |
+| Debt markers in changed files | `grep -nE "TBD\|FIXME\|XXX\|TODO\|HACK\|PLACEHOLDER" scripts/lint.py skills/dossier-init/scripts/init.py tests/lib.sh tests/test-lint.sh tests/fixtures/make-lint-fixtures.sh` | No matches |
+
+### G-02-2 (superseded target: CR-02 bis) — independently reproduced
+
+Built a throwaway dossier from a real `init.py` scaffold, inserted each near-miss key beside
+the untouched `confidential_names: []`, and ran `scripts/lint.py` directly (not the fixture
+suite) against Samuel's own ground-truth list from `02-CONTEXT.md`:
+
+| Key beside `confidential_names: []` | Expected | Observed |
+|---|---|---|
+| `confidental_name` | C1, exit 1 | `dossier.yaml:6: ERROR [C1] key 'confidental_name' looks like a misspelling of confidential_names: ...`, exit 1 |
+| `confidential_nam` | C1, exit 1 | Same pattern, exit 1 |
+| `confidentail_names` | C1, exit 1 | Same pattern, exit 1 |
+| `confidentialnames` | C1, exit 1 | Same pattern, exit 1 |
+| `confidential_notes` | clean, exit 0 | No C1 finding, exit 0 |
+| `non_confidential_names` | clean, exit 0 | No C1 finding, exit 0 |
+
+All six match Samuel's arbitrage exactly. Also confirmed the C1 message no longer says "rename
+the key to..." (`grep -c "rename the key\|rename it to" scripts/lint.py` → 0 matches) — the
+02-07 must-have on message wording holds.
+
+### G-02-4a — independently reproduced
+
+Scaffolded a clean dossier, `mv`'d `outbound/` to `Outbound/`, added a leaking name under
+`Outbound/mails/`. This filesystem is case-insensitive (confirmed: creating `CaseTest` and
+`casetest` in the same directory collided). Result: `Outbound:0: ERROR [E1] folder is spelt
+Outbound but the layout name is outbound: ...`, exit 1 — the leak never reaches exit 0. Also
+confirmed the non-case-variant lookalikes `outbound-old/` and `Outbounds/` raise nothing (exit
+0) on a fresh scaffold, matching the 02-08 must-have's negative case.
+
+### G-02-4b — independently reproduced
+
+Scaffolded with `--confidential-name Globex`, wrote one line per Cf character (U+200B ZWSP,
+U+FEFF BOM, U+00AD soft hyphen, U+200C ZWNJ, U+2060 word joiner) splitting "Globex" mid-word in
+an outbound mail body. All 5 lines fired `ERROR [E5] confidential name 'Globex' under
+outbound/` at their own correct line number.
+
+### G-02-4c — independently reproduced
+
+Scaffolded with three confidential names (`AT&T`, `O'Brien`, `Société Exemple`), wrote an
+outbound `.html` file with each name HTML-entity-encoded (`AT&amp;T`, `O&#39;Brien`,
+`Soci&eacute;t&eacute; Exemple`). All three fired `ERROR [E5]` on the same line.
+
+### G-02-4d — independently mutation-tested (not just re-read)
+
+Rather than trusting that the `gate-key-beside-consent` and `gate-json-deep` fixtures exist
+(confirmed present, 7 and 3 references respectively across `make-lint-fixtures.sh` /
+`test-lint.sh`), this verifier reproduced both WR-02 mutations against the current
+`scripts/lint.py` and reverted them:
+- Forcing `config["gate_damaged"] = False` at its assignment site → `PASS 1490 FAIL 4` (the
+  four failures are exactly `gate-consent-dup-rev`, `gate-json-consent-dup`,
+  `gate-key-beside-consent`, `gate-skip-armed` — all expecting E5 to stay armed).
+- Replacing the nested `visit(entry, where + "." + key)` recursive call with `pass` →
+  `PASS 1492 FAIL 2` (`gate-json-deep`'s exit-code and C1-naming assertions).
+- Both mutations reverted; `bash tests/test-lint.sh` returned to `PASS 1494 FAIL 0` afterward,
+  confirming the revert left no residue.
+
+### G-02-4e — independently reproduced
+
+- `chmod 000` on a folder under `outbound/mails/` → `ERROR [E1] folder cannot be read: ...`,
+  exit 1 (this shell is not running as root, so the permission actually blocked the walk).
+- A `.git/` folder created under `outbound/mails/` → `ERROR [E1] folder is a .git folder, never
+  walked: ...`, exit 1.
+- The same two conditions (`chmod 000`, a `.git/` folder) placed under `sources/received/` and
+  `knowledge/` instead → `info:` lines only (`info: folder sources/received/locked/ cannot be
+  read: ...`, `info: folder knowledge/.git/ is a .git folder, never walked: ...`), exit 0 — the
+  02-08 must-have's outbound-vs-elsewhere distinction holds exactly.
+- A real `git init` at the dossier root produced no finding at all (root `.git` stays silently
+  pruned, as required so ordinary git-tracked dossiers are unaffected).
+
+### G-02-4f — independently reproduced
+
+Wrote an outbound mail reply with a nested `> > ` prefix, a mid-word wrap crossing a `> `
+prefix, and a bare `>` (no space) continuation, all wrapping the confidential name `Jane Doe`
+across lines. Result: `ERROR [E5] confidential name 'Jane Doe' under outbound/` fired at the
+line where the name's first token appears, exit 1.
+
+### 02-09 producer-side truth — independently reproduced
+
+`skills/dossier-init/scripts/init.py`'s `yaml_quote("Glo<U+200B>bex")` (imported and called
+directly, not via a fixture) returns `'"Glo bex"'` — the Cf character is written as a literal
+space, confirming the must-have "init.py writes every format character of a quoted field as a
+space."
+
+### Known accepted debt (listed, not counted as a gap)
+
+Per the task brief, these three items are **tracked debt**, explicitly self-flagged by the
+executor/reviewer as out of this round's scope, not silent gaps:
+
+1. **WR-01 residual** — `format_readings()`/`yaml_quote()` cover Unicode category **Cf** only.
+   The wider `Default_Ignorable_Code_Point` set (Combining Grapheme Joiner, variation
+   selectors, Mongolian free variation selectors, Hangul fillers) can still hide a name.
+   Documented in `02-REVIEW-FIX.md`'s "Follow-up" section as open debt for the next planning
+   pass.
+2. **OBS-01** — no runtime rejection of a `confidential_names` entry starting with `>` (same
+   class as the now-fixed WR-04, the quoted-reply case). Documented in `02-REVIEW-FIX.md`'s
+   "Review round 2" section as a no-op observation, tracked alongside WR-01.
+3. **CR-02 bis's documented residual limit** — a double typo landing *inside* the last word
+   itself (beyond `CONFIDENTIAL_NAMES_WORD_CUTOFF` of both `"name"` and `"names"`) is, by
+   design, still read as a legitimate different key and stays silent beside the exact
+   `confidential_names` key. Documented in `02-CONTEXT.md`'s "Gap closure decisions, round 3"
+   section as a deliberate, reversible boundary, not an oversight.
+
+None of these three block the phase goal; all are visible, cross-referenced, and reversible per
+their own documentation.
+
+### Requirements / Artifacts / Key Links (re-check)
+
+No change to the Phase 2 requirement set (LINT-01/02/03) or to the artifacts/key-links table of
+the initial verification — `scripts/lint.py`, `skills/dossier-init/scripts/init.py`,
+`tests/run.sh`/`tests/test-lint.sh` all still exist, are still substantive, and are still
+wired exactly as described above; the gap-closure round only changed their internal contents.
+The 02-07/02-08/02-09 `must_haves.artifacts` patterns (`"looks like a misspelling of"`,
+`gate-key-beside-consent`, `gate-json-deep`, `onerror`, `case-outbound`, `unreadable-outbound`,
+`html.unescape`, `unicodedata`, `e5-html-entities`, `format-body`) were each grepped directly
+and found present in their declared files.
+
+### Anti-Patterns Found (re-check)
+
+None. `grep -nE "TBD|FIXME|XXX|TODO|HACK|PLACEHOLDER"` across every file touched by this
+gap-closure round (`scripts/lint.py`, `skills/dossier-init/scripts/init.py`, `tests/lib.sh`,
+`tests/test-lint.sh`, `tests/fixtures/make-lint-fixtures.sh`) returns no matches.
+
+### Gaps Summary (re-verification)
+
+All 7 gaps from `02-UAT.md` are independently confirmed closed against the current codebase
+(`df7f9ea`), using reproductions built by this verifier rather than the fixture suite alone, and
+including a live mutation-and-revert of the two WR-02 test-coverage mutations. `bash
+tests/run.sh` and `bash tests/test-lint.sh` are green (`TOTAL: 6 files, 0 failed`; `PASS 1494
+FAIL 0`), and fresh `en`/`fr` scaffolds still lint completely clean. **No automated truth
+failed** — there is no `gaps:` block in this report.
+
+Status stays `human_needed`, per the task brief's explicit instruction, because:
+- The CR-02 bis boundary (the rule that now governs G-02-2) is a security/precision policy
+  tradeoff Samuel arbitraged by a relayed message exchange, not by driving the fixed linter
+  himself — the same category of judgement that made the initial verification `human_needed`.
+- UAT test 4's six fixes were accepted as a batch ("tout") before they existed; Samuel has not
+  yet re-run his own UAT tests 2 and 4 against the code that actually implements them.
+- Three items of debt (WR-01, OBS-01, CR-02 bis's residual limit) are open by design and need
+  Samuel's sign-off to stay deferred rather than trigger a further fix round.
+
+See the `human_verification` list in this report's frontmatter for the exact items Samuel needs
+to check by hand.
+
+---
+
+_Initial verification: 2026-09-24T21:30:00Z — Claude (gsd-verifier)_
+_Re-verification (gap closure): 2026-09-25 — Claude (gsd-verifier), branch
+`feat/phase-02-gap-closure` @ `df7f9ea`_
