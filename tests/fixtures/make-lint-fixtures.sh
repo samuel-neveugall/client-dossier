@@ -754,6 +754,32 @@ write_file "$parent/case-lookalike/outbound-old/notes.md" 'Not a layout folder.
 '
 write_file "$parent/case-lookalike/Outbounds/notes.md" 'Not a layout folder either.
 '
+# ---------------------------------------------------------------------------
+# unreadable-outbound / unreadable-knowledge / git-outbound / git-knowledge:
+# a folder the walk cannot list, or a .git folder, inside the fixed layout
+# is reported rather than skipped in silence (G-02-4e, WR-03 of the
+# iteration-3 review). The chmod that makes a folder unreadable is the
+# test's job, never the generator's (a mode-000 folder would make this very
+# tree undeletable by anyone who forgets to restore it) -- the two
+# unreadable cases only lay out the leak; tests/test-lint.sh does the
+# locking.
+# ---------------------------------------------------------------------------
+
+# --- unreadable-outbound: tests/test-lint.sh chmod 000s outbound/mails ---
+make_named_case unreadable-outbound --confidential-name Acme
+write_file "$parent/unreadable-outbound/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+
+# --- unreadable-knowledge: tests/test-lint.sh chmod 000s knowledge/watch ---
+make_case unreadable-knowledge
+
+# --- git-outbound: a .git folder under outbound/, never walked but reported ---
+make_named_case git-outbound --confidential-name Acme
+write_file "$parent/git-outbound/outbound/mails/.git/2026-09-17_relance.md" "$LEAK_MAIL"
+
+# --- git-knowledge: same, elsewhere in the layout -- an info line, not E1 ---
+make_case git-knowledge
+write_file "$parent/git-knowledge/knowledge/.git/HEAD" 'ref: refs/heads/main
+'
 # --- enc-leak: a finding that a non-UTF-8 stdout cannot encode (WR-06) ---
 # The name is L-with-stroke + ukasz, outside latin-1, so a strict encoder
 # raises on the E5 line itself.

@@ -111,7 +111,11 @@ BINARY_EXTS = frozenset((
     ".odt", ".pptx", ".xlsx",
 ))
 
-# Never descended into (D-03's other half: sub-dossiers are pruned too).
+# Never descended into (D-03's other half: sub-dossiers are pruned too). A
+# name in here is silently pruned only outside the fixed layout; inside it,
+# walk_tree still never descends into it but records its path instead of
+# dropping it, so it can be reported rather than pruned in silence
+# (D-GAP-3, G-02-4e).
 PRUNED_DIRS = frozenset((".git",))
 
 # The fixed-layout folders (spec Sec3.2). No sub-dossier can legitimately
@@ -1046,16 +1050,25 @@ class Tree:
     on an info line so a skipped subtree is never silent (WR-03).
     `symlinks` lists the directory symlinks the walk did not follow
     (T-02-03): an E1 error under outbound/, an info line elsewhere (WR-02).
+    `unreadable` lists the folders os.walk could not list at all (a
+    permission error from os.scandir): an E1 error under outbound/, an info
+    line elsewhere (D-GAP-3, G-02-4e) -- never dropped in silence, the same
+    treatment as a symlink. `git_dirs` lists the `.git` folders met inside
+    the fixed layout: still never descended into (walking a repository's
+    object store would otherwise bury the finding under one per object
+    file), but recorded and reported the same way as `unreadable`.
     """
 
-    __slots__ = ("files", "dirs", "file_set", "pruned", "symlinks")
+    __slots__ = ("files", "dirs", "file_set", "pruned", "symlinks", "unreadable", "git_dirs")
 
-    def __init__(self, files, dirs, pruned=(), symlinks=()):
+    def __init__(self, files, dirs, pruned=(), symlinks=(), unreadable=(), git_dirs=()):
         self.files = files
         self.dirs = dirs
         self.file_set = frozenset(files)
         self.pruned = list(pruned)
         self.symlinks = list(symlinks)
+        self.unreadable = list(unreadable)
+        self.git_dirs = list(git_dirs)
 
 
 def walk_tree(root):
@@ -1072,12 +1085,26 @@ def walk_tree(root):
     everywhere (LINT-01). A dossier.yaml inside the fixed layout (LAYOUT_DIRS)
     is not a boundary: that folder is walked as usual, and under outbound/
     the stray file meets the outbound checks like any other (WR-03).
+
+    A folder os.scandir cannot list raises inside os.walk; the `onerror`
+    callback records its path in `unreadable` instead of the default
+    (silent drop, D-GAP-3, G-02-4e) -- it was already listed as an entry of
+    its parent, so it still shows up in `dirs`, just with none of its own
+    children walked. `.git` is still never descended into anywhere, but a
+    `.git` met inside the fixed layout is recorded in `git_dirs` rather than
+    dropped in silence like one met outside it (D-GAP-3).
     """
     files = []
     dirs = []
     pruned = []
     symlinks = []
-    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+    unreadable = []
+    git_dirs = []
+
+    def _onerror(err):
+        unreadable.append(os.path.relpath(err.filename, root).replace(os.sep, "/"))
+
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True, onerror=_onerror):
         dirnames.sort()
         filenames.sort()
         rel_dir = os.path.relpath(dirpath, root)
@@ -1086,6 +1113,8 @@ def walk_tree(root):
         kept = []
         for name in dirnames:
             if name in PRUNED_DIRS:
+                if in_layout:
+                    git_dirs.append(prefix + name)
                 continue
             if (not in_layout and not (prefix == "" and name in LAYOUT_DIRS)
                     and os.path.isfile(os.path.join(dirpath, name, CONFIG_NAME))):
@@ -1100,7 +1129,7 @@ def walk_tree(root):
         for name in filenames:
             if name != GITKEEP:
                 files.append(prefix + name)
-    return Tree(files, dirs, pruned, symlinks)
+    return Tree(files, dirs, pruned, symlinks, unreadable, git_dirs)
 
 
 def read_text_safe(path, follow_symlink=False):
@@ -1245,13 +1274,26 @@ def check_outbound_headers(root, tree, config, findings):
     rule covers a folder spelt as a case variant of a fixed layout name, or
     of an OUTBOUND_SUBS name directly under outbound/ (D-GAP-2, CR-01,
     G-02-4a): on a case-insensitive filesystem it is the very folder an
-    agent writes to, yet none of E1-E5 would otherwise read it.
+    agent writes to, yet none of E1-E5 would otherwise read it. Two more
+    routes to the same failure (D-GAP-3, G-02-4e): a folder os.walk could
+    not list at all, and a `.git` folder met inside the fixed layout -- both
+    are never walked, so under outbound/ both are E1 too.
     """
     for rel in tree.symlinks:
         if _in_outbound(rel):
             findings.append(Finding(rel, 0, ERROR, "E1",
                                     "folder is a symlink, never followed: none of its files is checked "
                                     "(status header, name, confidential names); make it a real folder"))
+    for rel in tree.unreadable:
+        if _in_outbound(rel):
+            findings.append(Finding(rel, 0, ERROR, "E1",
+                                    "folder cannot be read: none of its files is checked (status header, "
+                                    "name, confidential names); fix its permissions"))
+    for rel in tree.git_dirs:
+        if _in_outbound(rel):
+            findings.append(Finding(rel, 0, ERROR, "E1",
+                                    "folder is a .git folder, never walked: none of its files is checked "
+                                    "(status header, name, confidential names); move it out of outbound/"))
     for rel in tree.dirs:
         parent, _, name = rel.rpartition("/")
         expected = LAYOUT_DIRS if parent == "" else (OUTBOUND_SUBS if parent == OUTBOUND_DIR else ())
@@ -1761,7 +1803,11 @@ def _run(start):
         "sub-dossier {}/ skipped: it holds its own {} (lint it separately)".format(rel, CONFIG_NAME)
         for rel in tree.pruned] + [
         "folder {}/ is a symlink, not followed: its files are not checked".format(rel)
-        for rel in tree.symlinks if not _in_outbound(rel)]
+        for rel in tree.symlinks if not _in_outbound(rel)] + [
+        "folder {}/ cannot be read: its files are not checked".format(rel)
+        for rel in tree.unreadable if not _in_outbound(rel)] + [
+        "folder {}/ is a .git folder, never walked: its files are not checked".format(rel)
+        for rel in tree.git_dirs if not _in_outbound(rel)]
     errors, _warnings = report(findings, infos)
     return EXIT_ERRORS if errors else EXIT_CLEAN
 

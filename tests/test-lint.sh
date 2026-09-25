@@ -22,10 +22,17 @@ FIXTURES=""
 EMPTY=""
 READONLY=""
 GEN_TMP=""
+# Folders this file chmod 000s to exercise the unreadable-folder checks
+# (G-02-4e, T-02-28): space-separated, appended to as each one is locked.
+# Restored here too, not only right after the lint run that needed them
+# locked, so a failed assertion never leaves a mode-000 folder behind.
+LOCKED_DIRS=""
 # The one cleanup for everything this file creates, the generator's parent
 # included: the generator installs no handler of its own, so a failed
-# assertion anywhere below still leaks nothing.
-trap 'rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
+# assertion anywhere below still leaks nothing. Unlocking runs first: rm -rf
+# on a mode-000 folder fails silently and leaks it.
+trap 'for _d in $LOCKED_DIRS; do chmod u+rwx "$_d" 2>/dev/null || true; done
+rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
 # fires and every other one stays silent.
@@ -604,6 +611,44 @@ assert_last_line '1 error(s), 0 warning(s)' 'case-knowledge: nothing else fires'
 
 assert_lint "$FIXTURES/case-lookalike" 0 'case-lookalike: outbound-old/ and Outbounds/ exit 0'
 assert_clean 'case-lookalike: an exact case-insensitive match is required, never a prefix'
+# --- An unreadable folder or a .git folder under outbound/ is never skipped
+# in silence; elsewhere in the layout it is named on an info line, never
+# dropped (G-02-4e, WR-03) ---
+# The generator lays out the leak; locking the folder is this test's job
+# (the generator never changes a mode, T-02-28). Each locked folder is
+# recorded in LOCKED_DIRS so the EXIT trap can still unlock it if an
+# assertion aborts the script before the per-case unlock below runs.
+dir="$FIXTURES/unreadable-outbound/outbound/mails"
+chmod 000 "$dir" 2>/dev/null
+LOCKED_DIRS="$LOCKED_DIRS $dir"
+if ls "$dir" >/dev/null 2>&1; then
+  echo "SKIP: unreadable-outbound: $dir is still listable after chmod 000 (root, or a permission-less filesystem)" >&2
+else
+  assert_lint "$FIXTURES/unreadable-outbound" 1 'unreadable-outbound: exits 1'
+  assert_out_line '^outbound/mails:0: ERROR \[E1\] ' 'unreadable-outbound: the folder itself is reported'
+  assert_last_line '1 error(s), 0 warning(s)' 'unreadable-outbound: nothing else fires -- its files are never walked'
+fi
+chmod u+rwx "$dir" 2>/dev/null
+
+dir="$FIXTURES/unreadable-knowledge/knowledge/watch"
+chmod 000 "$dir" 2>/dev/null
+LOCKED_DIRS="$LOCKED_DIRS $dir"
+if ls "$dir" >/dev/null 2>&1; then
+  echo "SKIP: unreadable-knowledge: $dir is still listable after chmod 000 (root, or a permission-less filesystem)" >&2
+else
+  assert_lint "$FIXTURES/unreadable-knowledge" 0 'unreadable-knowledge: exits 0'
+  assert_out_line '^info: .*knowledge/watch' 'unreadable-knowledge: the folder is named on an info line'
+  assert_last_line '0 error(s), 0 warning(s)' 'unreadable-knowledge: nothing else fires'
+fi
+chmod u+rwx "$dir" 2>/dev/null
+
+assert_lint "$FIXTURES/git-outbound" 1 'git-outbound: a .git folder under outbound/ exits 1'
+assert_out_line '^outbound/mails/\.git:0: ERROR \[E1\] ' 'git-outbound: the .git folder itself is reported'
+assert_last_line '1 error(s), 0 warning(s)' 'git-outbound: nothing else fires -- it is never walked'
+
+assert_lint "$FIXTURES/git-knowledge" 0 'git-knowledge: a .git folder elsewhere in the layout exits 0'
+assert_out_line '^info: .*knowledge/\.git' 'git-knowledge: the .git folder is named on an info line'
+assert_last_line '0 error(s), 0 warning(s)' 'git-knowledge: nothing else fires'
 # --- A non-UTF-8 stdout never turns a finding into a crash (WR-06) ---
 # A Windows console or a legacy locale: the E5 line must still be printed
 # (escaped) and the exit code must stay 1, never 3.
