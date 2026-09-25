@@ -708,6 +708,52 @@ printf '%s\n' 'The budget is decided tomorrow.' >>"$parent/symlink-knowledge/kno
 mkdir -p "$parent/symlink-knowledge/elsewhere"
 mv "$parent/symlink-knowledge/knowledge" "$parent/symlink-knowledge/elsewhere/knowledge-real"
 ln -s elsewhere/knowledge-real "$parent/symlink-knowledge/knowledge"
+# ---------------------------------------------------------------------------
+# case-outbound / case-outbound-sub / case-knowledge / case-lookalike: a case
+# variant of a fixed layout name fails closed (G-02-4a, CR-01 of the
+# iteration-3 review). An adopted repository on a case-insensitive
+# filesystem (the macOS default) may keep `Outbound/`; init.py's
+# `makedirs(exist_ok=True)` keeps it too. Until the rename is applied, the
+# linter must not exit 0 while a leak sits under it. Every rename below goes
+# through a temporary name in two `mv` steps: a one-step case-only rename is
+# a no-op on a case-insensitive filesystem, so these fixtures mean the same
+# thing there and on a case-sensitive one.
+# ---------------------------------------------------------------------------
+
+# --- case-outbound: outbound/ itself renamed to Outbound/ (top-level LAYOUT_DIRS) ---
+# outbound/mails/acme.md is headerless and outbound/mails/2026-09-17_relance.md
+# is a well-formed leak: once the folder is Outbound/, neither is selected by
+# the exact `outbound/` prefix any outbound check uses, so only the folder's
+# own case-variant finding fires.
+make_named_case case-outbound --confidential-name Acme
+write_file "$parent/case-outbound/outbound/mails/acme.md" 'We met Acme.
+'
+write_file "$parent/case-outbound/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+mv "$parent/case-outbound/outbound" "$parent/case-outbound/outbound-tmp-rename"
+mv "$parent/case-outbound/outbound-tmp-rename" "$parent/case-outbound/Outbound"
+
+# --- case-outbound-sub: outbound/mails/ renamed to outbound/Mails/ (OUTBOUND_SUBS) ---
+# outbound/ itself keeps its correct spelling, so the leak is still under the
+# exact `outbound/` prefix: E1-E3 and E5 still read it, only E4 (which needs
+# the exact sub name) stays silent.
+make_named_case case-outbound-sub --confidential-name Acme
+write_file "$parent/case-outbound-sub/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+mv "$parent/case-outbound-sub/outbound/mails" "$parent/case-outbound-sub/outbound/mails-tmp-rename"
+mv "$parent/case-outbound-sub/outbound/mails-tmp-rename" "$parent/case-outbound-sub/outbound/Mails"
+
+# --- case-knowledge: knowledge/ renamed to Knowledge/ (top-level LAYOUT_DIRS) ---
+make_case case-knowledge
+mv "$parent/case-knowledge/knowledge" "$parent/case-knowledge/knowledge-tmp-rename"
+mv "$parent/case-knowledge/knowledge-tmp-rename" "$parent/case-knowledge/Knowledge"
+
+# --- case-lookalike: folder names that only start with a layout name -- clean ---
+# The rule is an exact case-insensitive match, never a prefix or substring
+# match: neither name here is a case variant of outbound/.
+make_case case-lookalike
+write_file "$parent/case-lookalike/outbound-old/notes.md" 'Not a layout folder.
+'
+write_file "$parent/case-lookalike/Outbounds/notes.md" 'Not a layout folder either.
+'
 # --- enc-leak: a finding that a non-UTF-8 stdout cannot encode (WR-06) ---
 # The name is L-with-stroke + ukasz, outside latin-1, so a strict encoder
 # raises on the E5 line itself.

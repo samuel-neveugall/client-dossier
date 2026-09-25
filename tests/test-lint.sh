@@ -583,6 +583,27 @@ assert_no_finding C1 'symlink-outbound-sub: no config finding'
 # Elsewhere it gates no leak check: an info line, never silence.
 assert_lint "$FIXTURES/symlink-knowledge" 0 'symlink-knowledge: a symlinked knowledge/ exits 0'
 assert_out_line '^info: .*knowledge' 'symlink-knowledge: the unfollowed folder is named on an info line'
+# --- A case variant of a fixed layout folder fails closed (G-02-4a, CR-01) ---
+# An adopted repository on a case-insensitive filesystem (the macOS default)
+# may keep Outbound/; init.py's makedirs(exist_ok) keeps it too. Until the
+# rename is applied, the linter must not exit 0 while a leak sits under it.
+assert_lint "$FIXTURES/case-outbound" 1 'case-outbound: a case-variant Outbound/ exits 1'
+assert_out_line '^Outbound:0: ERROR \[E1\] ' 'case-outbound: the folder itself is reported'
+assert_last_line '1 error(s), 0 warning(s)' \
+  'case-outbound: nothing else fires -- the exact-prefix outbound/ checks never see its files'
+assert_no_finding C1 'case-outbound: no config finding'
+
+assert_lint "$FIXTURES/case-outbound-sub" 1 'case-outbound-sub: a case-variant outbound/Mails/ exits 1'
+assert_out_line '^outbound/Mails:0: ERROR \[E1\] ' 'case-outbound-sub: the folder itself is reported'
+assert_finding E5 'case-outbound-sub: E5 still reads it -- the file sits under the correctly-spelled outbound/'
+assert_no_finding E4 'case-outbound-sub: E4 stays silent -- Mails is not the exact outbound sub name'
+
+assert_lint "$FIXTURES/case-knowledge" 1 'case-knowledge: a case-variant Knowledge/ exits 1'
+assert_out_line '^Knowledge:0: ERROR \[E1\] ' 'case-knowledge: the folder itself is reported'
+assert_last_line '1 error(s), 0 warning(s)' 'case-knowledge: nothing else fires'
+
+assert_lint "$FIXTURES/case-lookalike" 0 'case-lookalike: outbound-old/ and Outbounds/ exit 0'
+assert_clean 'case-lookalike: an exact case-insensitive match is required, never a prefix'
 # --- A non-UTF-8 stdout never turns a finding into a crash (WR-06) ---
 # A Windows console or a legacy locale: the E5 line must still be printed
 # (escaped) and the exit code must stay 1, never 3.

@@ -116,7 +116,12 @@ PRUNED_DIRS = frozenset((".git",))
 
 # The fixed-layout folders (spec Sec3.2). No sub-dossier can legitimately
 # live in one of them or below, so a dossier.yaml there is never a D-03
-# boundary: pruning on it would hide the folder from every check (WR-03).
+# boundary: pruning on it would hide the folder from every check (WR-03). A
+# folder spelt as a case variant of one of these names, or of an
+# OUTBOUND_SUBS name directly under outbound/, is ERROR [E1] at the folder
+# (D-GAP-2, CR-01, G-02-4a): on a case-insensitive filesystem it is the same
+# folder the agent writes to, and its files would otherwise meet no check
+# at all.
 LAYOUT_DIRS = frozenset(("sources", LIVING_DIR, "outbound", "knowledge"))
 
 # The agent folder (D-14, spec Sec4.4 check 7). Allowed at exactly
@@ -1236,13 +1241,27 @@ def check_outbound_headers(root, tree, config, findings):
     Sec3.2); there is no per-format parser and no per-language label table.
     A symlinked folder under outbound/ (or outbound/ itself) is E1 too: the
     walk does not follow it (T-02-03), so none of E1-E5 reached its files,
-    and a leak check that did not run must not exit 0 (WR-02).
+    and a leak check that did not run must not exit 0 (WR-02). The same
+    rule covers a folder spelt as a case variant of a fixed layout name, or
+    of an OUTBOUND_SUBS name directly under outbound/ (D-GAP-2, CR-01,
+    G-02-4a): on a case-insensitive filesystem it is the very folder an
+    agent writes to, yet none of E1-E5 would otherwise read it.
     """
     for rel in tree.symlinks:
         if _in_outbound(rel):
             findings.append(Finding(rel, 0, ERROR, "E1",
                                     "folder is a symlink, never followed: none of its files is checked "
                                     "(status header, name, confidential names); make it a real folder"))
+    for rel in tree.dirs:
+        parent, _, name = rel.rpartition("/")
+        expected = LAYOUT_DIRS if parent == "" else (OUTBOUND_SUBS if parent == OUTBOUND_DIR else ())
+        for fixed in sorted(expected):
+            if name != fixed and name.casefold() == fixed.casefold():
+                findings.append(Finding(rel, 0, ERROR, "E1",
+                                        "folder is spelt {} but the layout name is {}: none of its files "
+                                        "is checked (status header, name, confidential names); rename it "
+                                        "(git mv, in two steps on a case-insensitive filesystem)".format(
+                                            name, fixed)))
     for rel in outbound_files(tree):
         if not _is_header_target(rel):
             continue
