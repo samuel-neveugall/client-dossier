@@ -516,12 +516,23 @@ for ch in '\342\200\213' '\357\273\277' '\342\201\240' '\342\200\214' '\302\255'
   assert_eq 0 "$(grep -c -F -- "$(printf "$ch")" "$fni")" \
     "format-name-init: init.py writes no raw format character into dossier.yaml ($ch)"
 done
-for name in 'Acme Corp' 'Big Telco' 'Nord Star' 'Red Fox' 'Glo bex'; do
+# Every name whose two readings differ once whitespace is collapsed gets both
+# as separate list entries (CR-03 of the iteration-4 review): the space
+# reading (what a human reads back) and the deletion reading (the only one
+# an exact-pass-only name like Procter & Gamble or AT&T can ever match on).
+for name in 'Acme Corp' 'AcmeCorp' 'Big Telco' 'Nord Star' 'Red Fox' 'RedFox' \
+  'Glo bex' 'Globex' 'Pro cter & Gamble' 'Procter & Gamble' 'AT &T' 'AT&T'; do
   assert_grep "\"$name\"" "$fni"
 done
 assert_lint "$FIXTURES/format-name-init" 1 'format-name-init: init.py -> lint.py round trip, every leak exits 1'
 assert_only E5 'format-name-init: only [E5] fires'
-assert_last_line '10 error(s), 0 warning(s)' 'format-name-init: five names, each in a body line and a conforming slug'
+fnirelance="$FIXTURES/format-name-init/outbound/mails/2026-09-17_relance.md"
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fnirelance" "We met Procter"): ERROR \\[E5\\] .*'Procter & Gamble'" \
+  'format-name-init: Procter & Gamble (the deletion reading -- the space reading never occurs in prose) is found'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fnirelance" "We met Procter"): ERROR \\[E5\\] .*'AT&T'" \
+  'format-name-init: AT&T (the deletion reading) is found'
+assert_last_line '14 error(s), 0 warning(s)' \
+  'format-name-init: five names each in a body line and a conforming slug (Globex/Glo bex match twice, once per reading, since the contiguous filename and body spelling admit both), plus Procter & Gamble and AT&T in the body only'
 fb="$FIXTURES/format-body/outbound/mails/2026-09-17_relance.md"
 assert_lint "$FIXTURES/format-body" 1 'format-body: a format character embedded, between two words, or decoded from &shy; hides nothing'
 assert_only E5 'format-body: only [E5] fires'

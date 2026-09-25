@@ -185,6 +185,18 @@ class MarkerSectionError(Exception):
 _SCALAR_BREAKS_RE = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 
 
+def _fold_format_chars(value, delete=False):
+    """Map (default) or delete every Unicode format character (category Cf).
+
+    Shared by yaml_quote() (always maps to space) and
+    _confidential_yaml_entries() (needs both readings) -- CR-03 of the
+    iteration-4 review.
+    """
+    if delete:
+        return "".join(ch for ch in value if unicodedata.category(ch) != "Cf")
+    return "".join(" " if unicodedata.category(ch) == "Cf" else ch for ch in value)
+
+
 def yaml_quote(value):
     """Return a double-quoted YAML scalar, safe for any user-supplied string.
 
@@ -197,16 +209,45 @@ def yaml_quote(value):
     Cf). A Word manual line break is U+2028, a spreadsheet cell pastes a
     tab, and a format character commonly arrives through copy-paste from a
     web page or a chat app. Runs of whitespace then collapse to one space
-    and the ends are trimmed -- a soft hyphen inside a word becomes a
-    visible space in dossier.yaml, cosmetic only: scripts/lint.py's folded
-    pass still matches the word run together. Last, backslashes and double
-    quotes are escaped -- in that order, so a backslash inserted by the
-    first escape is never re-escaped by the second.
+    and the ends are trimmed. For every scalar except confidential_names
+    this is the only reading written -- the space reading is what a human
+    reads back, and scripts/lint.py's folded E5 pass separately matches the
+    word run together for names whose text is foldable. For names that are
+    not foldable (an `&`, `+` or other punctuation next to the format
+    character defeats the folded pass -- CR-03 of the iteration-4 review),
+    render_dossier_yaml() calls _confidential_yaml_entries() instead of this
+    function alone, which also emits the deletion reading as a second list
+    entry. Last, backslashes and double quotes are escaped -- in that
+    order, so a backslash inserted by the first escape is never re-escaped
+    by the second.
     """
-    value = "".join(" " if unicodedata.category(ch) == "Cf" else ch for ch in value)
+    value = _fold_format_chars(value)
     cleaned = " ".join(_SCALAR_BREAKS_RE.sub(" ", value).split())
     cleaned = cleaned.replace("\\", "\\\\").replace('"', '\\"')
     return '"' + cleaned + '"'
+
+
+def _confidential_yaml_entries(name):
+    """Return one or two quoted YAML list entries for a confidential name.
+
+    CR-03 of the iteration-4 review: yaml_quote() alone only ever writes
+    the space reading of a Unicode format character. scripts/lint.py's
+    folded E5 pass covers the deletion reading too, but only for names
+    `folded_text_pattern()` accepts as foldable -- `&`, `+` and other
+    punctuation next to the format character (`Pro<SHY>cter & Gamble`,
+    `AT<SHY>&T`) reject the folded pass, so the deletion reading is the
+    only one that would ever match there, and it was never written. Emit
+    both readings as separate confidential_names entries whenever they
+    differ once each side's whitespace is collapsed the same way; a name
+    with no format character, or one at a word boundary where deleting and
+    spacing land on the same normalised text, still gets one entry, byte
+    for byte what yaml_quote() already produced.
+    """
+    spaced = _fold_format_chars(name)
+    deleted = _fold_format_chars(name, delete=True)
+    if " ".join(spaced.split()) == " ".join(deleted.split()):
+        return [yaml_quote(name)]
+    return [yaml_quote(name), yaml_quote(deleted)]
 
 
 # T-01-01 requires every scalar fed by user input to pass through
@@ -306,7 +347,9 @@ def render_dossier_yaml(cfg):
 
     confidential_names = cfg["confidential_names"]
     if confidential_names:
-        quoted_names = ", ".join(yaml_quote(n) for n in confidential_names)
+        quoted_names = ", ".join(
+            entry for n in confidential_names for entry in _confidential_yaml_entries(n)
+        )
         lines.append("confidential_names: [ {} ]".format(quoted_names))
     else:
         lines.append("confidential_names: []")

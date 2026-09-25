@@ -881,13 +881,18 @@ Red Fox signed.
 Finally Globex agreed.
 "
 
-# format-name-init (producer side, round trip): the same five names through init.py.
-# dossier.yaml must hold the space reading of each, never the raw format character
-# (D-FIX-12 extended).
+# format-name-init (producer side, round trip): the same five names through init.py, plus two
+# names whose punctuation (`&`) defeats the folded pass -- Pro<SHY>cter & Gamble and AT<SHY>&T
+# (CR-03 of the iteration-4 review). dossier.yaml must hold both the space and the deletion
+# reading of each name whose two readings differ, never the raw format character (D-FIX-12
+# extended, CR-03): the deletion reading is the only one an exact-pass-only name like these two
+# can ever match on.
 make_named_case format-name-init --confidential-name "Acme${ZWSP}Corp" --confidential-name "Big Telco${BOM}" \
-  --confidential-name "${WJ}Nord Star" --confidential-name "Red${ZWNJ}Fox" --confidential-name "Glo${SHY}bex"
+  --confidential-name "${WJ}Nord Star" --confidential-name "Red${ZWNJ}Fox" --confidential-name "Glo${SHY}bex" \
+  --confidential-name "Pro${SHY}cter & Gamble" --confidential-name "AT${SHY}&T"
 write_file "$parent/format-name-init/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 We met Acme Corp, Big Telco, Nord Star, Red Fox and Globex today.
+We met Procter & Gamble and AT&T.
 "
 for slug in acme-corp big-telco nord-star red-fox globex; do
   write_file "$parent/format-name-init/outbound/mails/2026-09-17_${slug}.md" "$GOOD_MAIL"
