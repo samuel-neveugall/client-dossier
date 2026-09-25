@@ -703,7 +703,7 @@ dir="$FIXTURES/unreadable-outbound/outbound/mails"
 chmod 000 "$dir" 2>/dev/null
 LOCKED_DIRS="$LOCKED_DIRS $dir"
 if ls "$dir" >/dev/null 2>&1; then
-  echo "SKIP: unreadable-outbound: $dir is still listable after chmod 000 (root, or a permission-less filesystem)" >&2
+  skip "unreadable-outbound: $dir is still listable after chmod 000 (root, or a permission-less filesystem)"
 else
   assert_lint "$FIXTURES/unreadable-outbound" 1 'unreadable-outbound: exits 1'
   assert_out_line '^outbound/mails:0: ERROR \[E1\] ' 'unreadable-outbound: the folder itself is reported'
@@ -715,7 +715,7 @@ dir="$FIXTURES/unreadable-knowledge/knowledge/watch"
 chmod 000 "$dir" 2>/dev/null
 LOCKED_DIRS="$LOCKED_DIRS $dir"
 if ls "$dir" >/dev/null 2>&1; then
-  echo "SKIP: unreadable-knowledge: $dir is still listable after chmod 000 (root, or a permission-less filesystem)" >&2
+  skip "unreadable-knowledge: $dir is still listable after chmod 000 (root, or a permission-less filesystem)"
 else
   assert_lint "$FIXTURES/unreadable-knowledge" 0 'unreadable-knowledge: exits 0'
   assert_out_line '^info: .*knowledge/watch' 'unreadable-knowledge: the folder is named on an info line'
