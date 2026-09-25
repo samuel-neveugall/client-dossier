@@ -591,6 +591,32 @@ write_file "$parent/gate-json-nested/dossier.yaml" '{
 }
 '
 write_file "$parent/gate-json-nested/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-extras / gate-key-extras-leak: legitimate extension keys beside the exact
+# gate keys are ignored, not reported (D-22, 2026-09-25 UAT test 2, G-02-2) ---
+# consent_scope, confidential_notes and the rest of WR-01's measured mappings sit right next
+# to confidential_names, consent_recorded and consent_source -- at top level and nested under
+# a counterpart. The exact gate key is present each time, so a near-miss beside it is a
+# different, legitimate key, not a misspelling.
+build_gate_key_extras() {
+  make_named_case "$1" --confidential-name Acme --counterpart 'Acme|ordering party'
+  printf 'consent_scope: "mails only"\nconsent_sources: "see HISTORY"\nconsent_required: true\nconsent_revoked: false\nconsent_recorded_at: "2026-09-16"\nconfidential: "internal"\nconfidential_notes: "ask Jane first"\nnon_confidential_names: [ Beta ]\n' \
+    >>"$parent/$1/dossier.yaml"
+  replace_line "$parent/$1/dossier.yaml" '    role: "ordering party"' \
+    "$(printf '    role: "ordering party"\n    confidential_notes: "ask Jane first"')"
+}
+build_gate_key_extras gate-key-extras
+build_gate_key_extras gate-key-extras-leak
+write_file "$parent/gate-key-extras-leak/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-nested-typo: a JSON nested near-miss stays C1 while the exact gate key it
+# resembles is absent from the top level (D-22, D-GAP-1, G-02-2) ---
+make_case gate-nested-typo
+write_file "$parent/gate-nested-typo/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "counterparts": [{"name": "Jane", "confidental_names": ["Acme"]}]
+}
+'
+write_file "$parent/gate-nested-typo/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-skip-armed: consent recorded and sourced, plus one unreadable line (CR-01) ---
 # Any skipped line may have been the gate, so the leak check stays armed.
 make_named_case gate-skip-armed --confidential-name Acme --consent-recorded true \

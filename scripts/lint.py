@@ -222,7 +222,12 @@ GATE_KEYS = frozenset(("confidential_names", "consent_recorded", "consent_source
 
 # How close an unknown key must be to a gate key to be read as a misspelling
 # of it (difflib ratio, WR-01). `confidental_names` scores 0.97; every other
-# key of spec Sec3.2 (and name/role/contacts) scores under 0.5.
+# key of spec Sec3.2 (and name/role/contacts) scores under 0.5. A near-miss
+# is C1 only while the gate key it resembles is absent from the top level
+# (D-22, D-GAP-1, 2026-09-25 UAT G-02-2): a legitimate extension key such as
+# `consent_scope` or `confidential_notes` sitting beside the exact gate key
+# is a different, known key, and is ignored -- not every near-miss is an
+# error.
 GATE_KEY_CUTOFF = 0.8
 
 # Which key an UNREADABLE line belongs to, used to word the C1 message.
@@ -511,17 +516,34 @@ def _fold_key(text):
 
 
 def gate_key_for(key):
-    """The gate key KEY spells, exactly or nearly, else None (WR-01).
+    """The gate key KEY spells, exactly or nearly, else None.
 
     Nearly: after _fold_key (`Confidential-Names`), or within
     GATE_KEY_CUTOFF of one (`confidental_names`). A key that is not the
     exact spelling is never READ as the gate -- the caller reports it.
+    `_skipped_key()` uses this to word an unreadable line's message; that
+    line is C1 whatever the wording (D-FIX-8). `_misplaced_gate_keys()`
+    applies its own presence rule on top of this call (D-22, D-GAP-1): a
+    near-miss is reported only while the exact gate key is absent.
     """
     folded = _fold_key(key)
     if folded in GATE_KEYS:
         return folded
     close = difflib.get_close_matches(folded, sorted(GATE_KEYS), n=1, cutoff=GATE_KEY_CUTOFF)
     return close[0] if close else None
+
+
+def _certain_gate_key_for(key):
+    """The gate key KEY certainly spells: equal to it after _fold_key, else None.
+
+    A case, hyphen or space variant of a gate key (`Confidential-Names`,
+    `confidential-names`) always means that gate key, whatever else is
+    present in the config (D-GAP-1) -- unlike a difflib-only near-miss,
+    which `gate_key_for()` also returns but which `_misplaced_gate_keys()`
+    reports only while the exact gate key is absent.
+    """
+    folded = _fold_key(key)
+    return folded if folded in GATE_KEYS else None
 
 
 def _skipped_key(body, owner):
@@ -793,13 +815,27 @@ def _schema_counterparts(value, findings):
 
 
 def _misplaced_gate_keys(raw, findings):
-    """C1 for every key that spells a gate key without being it (WR-01).
+    """C1 for every key that certainly spells a gate key without being it,
+    or that only resembles one while the exact key is absent (D-22, D-GAP-1,
+    2026-09-25 UAT G-02-2).
 
-    A misspelt top-level key (`confidential-names`, `Confidential_names`,
-    `confidental_names`) and a gate key nested anywhere below the top level
-    (a counterparts entry, a mapping) are both keys D-22 would otherwise
-    ignore in silence, with E5 off. Returns True when one was found, so the
-    caller keeps the leak check armed.
+    The presence rule applies at every depth (top level and, through
+    visit(), any nesting below it). Let G be the gate key a key resembles:
+
+    - A key equal to G after _fold_key (case, `-`, space -- `confidential-
+      names`, `Confidential_names`) certainly means G, and is reported
+      whatever else is present in the config.
+    - A key that only difflib-resembles G (`confidental_names`) is reported
+      only while G is not itself a key of `raw`, the top-level mapping the
+      parser produced. When G is present, the near-miss is a different,
+      legitimate key (`consent_scope` beside `consent_source`) and D-22
+      ignores it -- at every depth, so a counterpart-level `confidential_
+      notes` beside a top-level `confidential_names` is silent too.
+    - A key exactly equal to a gate key at the top level is never reported
+      (unchanged).
+
+    Returns True when at least one key was reported, so the caller keeps
+    `config["gate_damaged"]` -- and with it E5 -- armed exactly then.
     """
     found = False
 
@@ -807,12 +843,20 @@ def _misplaced_gate_keys(raw, findings):
         nonlocal found
         if isinstance(value, dict):
             for key, entry in value.items():
-                gate = gate_key_for(key)
-                if gate is not None:
+                certain = _certain_gate_key_for(key)
+                if certain is not None:
                     found = True
                     findings.append(Finding(CONFIG_NAME, _line_of(entry), ERROR, "C1",
                                             "{} is written under {}: it is read only at the top level, "
-                                            "the confidentiality gate fails closed".format(gate, where)))
+                                            "the confidentiality gate fails closed".format(certain, where)))
+                elif key not in GATE_KEYS:
+                    near = gate_key_for(key)
+                    if near is not None and near not in raw:
+                        found = True
+                        findings.append(Finding(CONFIG_NAME, _line_of(entry), ERROR, "C1",
+                                                "'{}' at {} looks like a misspelling of {}, which is read "
+                                                "only at the top level: the confidentiality gate fails "
+                                                "closed until it is corrected".format(key, where, near)))
                 visit(entry, where + "." + key)
         elif isinstance(value, list):
             for entry in value:
@@ -820,12 +864,17 @@ def _misplaced_gate_keys(raw, findings):
 
     for key, value in raw.items():
         if key not in GATE_KEYS:
-            gate = gate_key_for(key)
+            gate = _certain_gate_key_for(key)
+            if gate is None:
+                near = gate_key_for(key)
+                if near is not None and near not in raw:
+                    gate = near
             if gate is not None:
                 found = True
                 findings.append(Finding(CONFIG_NAME, _line_of(value), ERROR, "C1",
-                                        "key '{}' is not {}: write the key exactly, "
-                                        "the confidentiality gate fails closed".format(key, gate)))
+                                        "key '{}' looks like a misspelling of {}: it is not read as the "
+                                        "gate, the confidentiality gate fails closed until it is "
+                                        "corrected".format(key, gate)))
         visit(value, key)
     return found
 

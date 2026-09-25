@@ -421,6 +421,25 @@ for case_name in gate-key-dash gate-key-case gate-key-typo gate-key-space gate-n
   assert_out_line '^dossier\.yaml:[0-9]+: ERROR \[C1\] .*confidential_names' "$case_name: [C1] names the gate key"
   assert_no_finding C0 "$case_name: never a mere [C0] warning"
 done
+# A top-level near-miss, certain or difflib-only, is worded "looks like a misspelling of"
+# (D-22, G-02-2): the old wording invited a gate-weakening rename.
+for case_name in gate-key-dash gate-key-case gate-key-typo gate-json-key-case; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: a names line the schema cannot read as the gate exits 1"
+  assert_out_line 'ERROR \[C1\] .*looks like a misspelling of confidential_names' \
+    "$case_name: the [C1] message says it looks like a misspelling"
+done
+# A legitimate extension key beside the exact gate keys is ignored, not reported (D-22,
+# 2026-09-25 UAT test 2, G-02-2): consent_scope, confidential_notes and the rest of WR-01's
+# measured mappings, at top level and nested under a counterpart, lint clean.
+assert_lint "$FIXTURES/gate-key-extras" 0 'gate-key-extras: extension keys beside the exact gate keys exit 0'
+assert_clean 'gate-key-extras'
+assert_lint "$FIXTURES/gate-key-extras-leak" 1 'gate-key-extras-leak: the same config with a leak exits 1'
+assert_only E5 'gate-key-extras-leak: the extension keys neither fail the run nor switch [E5] off'
+# A JSON nested near-miss stays C1 while the exact gate key it resembles is absent from the
+# top level (D-22, D-GAP-1, G-02-2).
+assert_lint "$FIXTURES/gate-nested-typo" 1 'gate-nested-typo: a nested near-miss with the gate key absent exits 1'
+assert_out_line '^dossier\.yaml:0: ERROR \[C1\] .*confidential_names' 'gate-nested-typo: [C1] names the gate key'
+assert_no_finding C0 'gate-nested-typo: never a mere [C0] warning'
 assert_lint "$FIXTURES/gate-key-consent" 1 'gate-key-consent: a misspelt consent_recorded exits 1'
 assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-key-consent: [C1] names consent_recorded'
 assert_finding E5 'gate-key-consent: the leak check stays armed'
