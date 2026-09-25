@@ -636,6 +636,25 @@ make_gate_case gate-key-beside-names-drop \
   "$(printf 'confidential_name: [ "Acme" ]\nconfidential_names: []')"
 make_gate_case gate-key-beside-names-swap \
   "$(printf 'confidentail_names: [ "Acme" ]\nconfidential_names: []')"
+# --- gate-key-beside-names-double / gate-key-beside-names-double2: a DOUBLE typo of
+# confidential_names -- two edits from the exact key -- still stays C1 beside it (CR-02 bis
+# gap closure, arbitrage Samuel, relayed by the main session via SendMessage, 2026-09-25,
+# option (2)). `confidental_name` is missing the "i" of "confidential" AND the trailing "s"
+# of "names" (whole-key OSA distance 2, same distance as confidential_notes in
+# gate-key-extras above); `confidential_nam` is missing the trailing "es" of "names" (also
+# OSA distance 2). Both are told apart from a legitimate different key such as
+# confidential_notes by their LAST `_`-separated word alone: "name" and "nam" are each within
+# one OSA edit of "name" or "names", while confidential_notes' last word "notes" is not
+# (see CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD / CONFIDENTIAL_NAMES_WORD_CUTOFF in lint.py).
+make_gate_case gate-key-beside-names-double \
+  "$(printf 'confidental_name: [ "Acme" ]\nconfidential_names: []')"
+make_gate_case gate-key-beside-names-double2 \
+  "$(printf 'confidential_nam: [ "Acme" ]\nconfidential_names: []')"
+# --- gate-key-beside-names-nounderscore: confidentialnames (no separator at all) stays C1
+# beside the exact key too -- whole-key OSA distance 1 (a missing `_`), caught by the plain
+# CONFIDENTIAL_NAMES_TYPO_CUTOFF clause alone (it has no `_`, so no last word to test) ---
+make_gate_case gate-key-beside-names-nounderscore \
+  "$(printf 'confidentialnames: [ "Acme" ]\nconfidential_names: []')"
 # --- gate-nested-typo: a JSON nested near-miss stays C1 while the exact gate key it
 # resembles is absent from the top level (D-22, D-GAP-1, G-02-2) ---
 make_case gate-nested-typo

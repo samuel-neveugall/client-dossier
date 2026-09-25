@@ -473,6 +473,22 @@ for case_name in gate-key-beside-names-drop gate-key-beside-names-swap; do
     "$case_name: [C1] names confidential_names even though it is present"
   assert_no_finding C0 "$case_name: never a mere [C0] warning"
 done
+# A DOUBLE typo of confidential_names -- two edits from the exact key, the same whole-key OSA
+# distance as the legitimate confidential_notes in gate-key-extras above -- still stays C1
+# beside the exact key, because its LAST `_`-separated word ("name", "nam") is within one OSA
+# edit of "name" or "names" (CR-02 bis gap closure, arbitrage Samuel, relayed by the main
+# session via SendMessage, 2026-09-25, option (2)). confidentialnames (no `_` at all) stays C1
+# too, caught by the plain single-keystroke cutoff alone.
+for case_name in gate-key-beside-names-double gate-key-beside-names-double2 \
+  gate-key-beside-names-nounderscore; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: a double typo of confidential_names beside the exact key exits 1"
+  assert_out_line 'ERROR \[C1\] .*looks like a misspelling of confidential_names' \
+    "$case_name: [C1] names confidential_names even though it is present"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
+# confidential_notes beside the exact gate key stays outside the word-boundary rule above (its
+# last word "notes" is OSA distance 2 from "names" and 3 from "name", both over the cutoff) and
+# is already exercised clean by gate-key-extras above -- not duplicated here.
 # A JSON nested near-miss stays C1 while the exact gate key it resembles is absent from the
 # top level (D-22, D-GAP-1, G-02-2).
 assert_lint "$FIXTURES/gate-nested-typo" 1 'gate-nested-typo: a nested near-miss with the gate key absent exits 1'

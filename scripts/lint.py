@@ -263,6 +263,30 @@ GATE_KEY_CUTOFF = 0.8
 # insertion, deletion, or adjacent swap.
 CONFIDENTIAL_NAMES_TYPO_CUTOFF = 1
 
+# Gap closure CR-02 bis (arbitrage Samuel, relayed by the main session via
+# SendMessage, 2026-09-25): CONFIDENTIAL_NAMES_TYPO_CUTOFF alone lets a
+# double typo in the LAST `_`-separated word through, because it costs two
+# edits against the full key while still obviously meaning "name(s)" --
+# `confidential_nam` (missing "es") and `confidental_name` (missing "i" in
+# "confidential" AND the trailing "s" of "names") both score OSA distance 2
+# against "confidential_names", the same distance as the legitimate
+# `confidential_notes`. The two are told apart by looking at the last word
+# alone: `confidential_notes`' last word is "notes" (OSA 2 from "names", OSA
+# 3 from "name"), while "nam" and "name" are each OSA <= 1 from "name" or
+# "names". So a near-miss also stays C1 when its whole-key OSA distance is
+# <= this looser cutoff AND its last `_`-separated word is within
+# CONFIDENTIAL_NAMES_WORD_CUTOFF of "name" or "names" -- see
+# _forces_c1_despite_presence().
+CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD = 2
+
+# Checked against BOTH "name" and "names" (not "names" alone), because a
+# key's last word may itself be missing the trailing "s": `confidential_nam`
+# has last word "nam", OSA distance 2 from "names" (insert "e", insert "s")
+# but only 1 from "name" (insert "e"). Reading "within 1 of names" alone
+# would miss it and let it through unflagged, which is not what Samuel's
+# arbitrage asks for.
+CONFIDENTIAL_NAMES_WORD_CUTOFF = 1
+
 # Which key an UNREADABLE line belongs to, used to word the C1 message.
 # Looser than _KEY_RE on purpose: it accepts a quoted key and no space after
 # the colon, and a gate key with its colon forgotten still counts as that key.
@@ -604,17 +628,57 @@ def _osa_distance(a, b):
 def _forces_c1_despite_presence(key, near):
     """True when a `confidential_names` near-miss stays C1 even though the
     exact gate key is present in `raw` (gap closure option (a), arbitrage
-    Samuel, relayed by the main session via SendMessage, 2026-09-25).
+    Samuel, relayed by the main session via SendMessage, 2026-09-25; refined
+    CR-02 bis, same arbitrage channel, same date, option (2)).
 
-    Only `confidential_names` near-misses within CONFIDENTIAL_NAMES_TYPO_
-    CUTOFF OSA-distance of it are forced; `consent_recorded` and
-    `consent_source` near-misses keep the unconditional presence exemption
-    from D-22 (a legitimate extension key beside the exact gate key stays
-    silent).
+    Only near-misses of `confidential_names` are ever forced; `consent_
+    recorded` and `consent_source` near-misses keep the unconditional
+    presence exemption from D-22 (a legitimate extension key beside the
+    exact gate key stays silent). A `confidential_names` near-miss is forced
+    when, on the folded key:
+
+    - its whole-key OSA distance to "confidential_names" is <=
+      CONFIDENTIAL_NAMES_TYPO_CUTOFF (a single-keystroke typo anywhere in
+      the key, `confidentail_names`, `confidentialnames`), OR
+    - its whole-key OSA distance is <= CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD
+      AND its last `_`-separated word is within CONFIDENTIAL_NAMES_WORD_
+      CUTOFF of "name" OR "names" (a double typo concentrated in the word
+      that says what the key holds, `confidental_name`, `confidential_nam`).
+
+    The first clause alone is kept (not folded into the second) because it
+    is what still catches `confidentialnames`, which has no `_` and so no
+    last word to test.
+
+    The second clause checks "name" as well as "names" because a key's last
+    word may itself be missing the plural: `confidential_nam` has last word
+    "nam", OSA distance 2 from "names" but only 1 from "name" -- "within 1
+    of names" alone would miss it. Checking both is what separates a typo of
+    "name(s)" from a different, legitimate word: `confidential_notes`' last
+    word "notes" is OSA distance 2 from "names" and 3 from "name", so it
+    stays outside the word cutoff and keeps its presence exemption, same as
+    `non_confidential_names` (whole-key OSA distance 4, outside even the
+    looser cutoff).
+
+    Residual limit (documented, not fixed here): a double typo INSIDE the
+    last word that still lands within 2 keystrokes of "name"/"names" only
+    by chance is not specifically hunted beyond this rule -- e.g.
+    `confidential_nmes` (transposed "am"/"ma", OSA 1 from "names") is
+    actually still caught by the first clause; a harder case such as a
+    last word two-or-more keystrokes from both "name" and "names" is, by
+    design, read as a different key and ignored, per 02-CONTEXT.md.
     """
     if near != "confidential_names":
         return False
-    return _osa_distance(_fold_key(key), near) <= CONFIDENTIAL_NAMES_TYPO_CUTOFF
+    folded = _fold_key(key)
+    whole = _osa_distance(folded, near)
+    if whole <= CONFIDENTIAL_NAMES_TYPO_CUTOFF:
+        return True
+    if whole <= CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD:
+        last_word = folded.rsplit("_", 1)[-1]
+        if (_osa_distance(last_word, "name") <= CONFIDENTIAL_NAMES_WORD_CUTOFF
+                or _osa_distance(last_word, "names") <= CONFIDENTIAL_NAMES_WORD_CUTOFF):
+            return True
+    return False
 
 
 def _skipped_key(body, owner):
