@@ -7,6 +7,9 @@ findings_in_scope: 5
 fixed: 5
 skipped: 2
 status: partial_by_mandate
+amended_at: 2026-09-25
+amended_status: cr02_closed_follow_up
+cr02_status: fixed
 ---
 
 # Phase 2: Code Review Fix Report (iteration 3)
@@ -24,6 +27,9 @@ this file continues the fix-round numbering of 02-REVIEW-FIX.iter1.md /
   mandate item.
 - Fixed: 5 (CR-01, CR-03, WR-02, IN-01, IN-02)
 - Skipped: 2 (CR-02 frozen, WR-01 deferred)
+- **Amended 2026-09-25 (follow-up mandate `fix-cr02`, after Samuel's arbitrage arrived):** CR-02
+  is now fixed too, commit b51b670. 6 of 7 findings closed; only WR-01 stays deferred. See its
+  entry under Fixed Issues (moved out of Skipped Issues) and the Review round 2 section below.
 
 **Where the work and verification ran:** in the main checkout, on branch
 `feat/phase-02-gap-closure`, as instructed. No worktree was created.
@@ -122,6 +128,33 @@ every gate/near-miss fixture. CR-02's frozen presence rule in the same
 function (the `if near is not None and near not in raw:` branch a few lines
 below) was not touched.
 
+### CR-02: The presence rule silently ignores a misspelt `confidential_names` that carries the names (regression against 8c2ed0f)
+
+**Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
+**Commit:** b51b670
+**Status:** fixed (commit) -- option (a), arbitrage Samuel, relayed by the main session via
+SendMessage, 2026-09-25
+**Applied fix:** the presence exemption stays unconditional for `consent_recorded`/
+`consent_source` near-misses (a legitimate extension key such as `consent_scope` beside
+`consent_source` stays a different, known key, per D-22's original intent) but is now
+overridden for a `confidential_names` near-miss that scores as a probable typo: a new
+`_osa_distance()` (Optimal String Alignment -- Levenshtein plus one adjacent-transposition edit)
+and `_forces_c1_despite_presence()` helper, applied identically at both call sites in
+`_misplaced_gate_keys()` (the top-level loop and `visit()`'s nested branch). Plain Levenshtein
+was tried first and rejected: it cannot separate a typo (`confidentail_names`) from a genuinely
+different key (`confidential_notes`) sitting beside the exact one, since both land at edit
+distance 2. OSA scores the transposition in `confidentail_names` as one edit, not two, dropping
+it to distance 1 while `confidential_notes` (two straight substitutions) stays at distance 2.
+`CONFIDENTIAL_NAMES_TYPO_CUTOFF = 1` is the resulting threshold. Full rationale and the
+DP-verification of the Levenshtein/OSA distinction: `02-CONTEXT.md` § Gap closure decisions
+(2026-09-25).
+**Fixture:** `gate-key-beside-names-drop` (`confidential_name`, missing the trailing `s`) and
+`gate-key-beside-names-swap` (`confidentail_names`, the "ia"/"ai" transposition) -- both beside
+`confidential_names: []` -- assert `[C1]` with the "looks like a misspelling of
+confidential_names" message and exit 1. The existing `gate-key-extras` fixture (its top-level
+and counterpart-level `confidential_notes`, at OSA distance 2) needed no change and keeps
+asserting 0 findings / exit 0.
+
 ### IN-02: `LOCKED_DIRS` relies on unquoted word splitting
 
 **File modified:** `tests/test-lint.sh`
@@ -137,20 +170,6 @@ is unbound-variable-fatal on bash < 4.4; the newline/`read -r` form has no
 such edge case.
 
 ## Skipped Issues
-
-### CR-02: The presence rule silently ignores a misspelt `confidential_names` that carries the names (regression against 8c2ed0f)
-
-**Status:** frozen, awaiting Samuel's decision
-**Why:** the mandate explicitly excludes this finding from this round's
-scope ("NE charge PAS / NE TOUCHE PAS ... GELÉE, en attente d'arbitrage de
-Samuel"). The review's own text also flags it as a judgement call, not a
-mechanical bug: exempting a `confidential_names` near-miss from C1 whenever
-the exact key is also present is asymmetric with the `consent_*` case the
-rule was built for, but re-tightening it is a behaviour change to the
-gate's presence rule that needs Samuel's sign-off before it ships, per the
-mandate. Left exactly as it was at `e198d4b` (`scripts/lint.py:862-881`,
-now `scripts/lint.py:862-881` after IN-01's one-line, behaviour-preserving
-edit two lines above it).
 
 ### WR-01: `format_readings` covers category Cf only, so other invisible default-ignorable characters still hide a name
 
@@ -176,16 +195,33 @@ silently.
   proposals. Reverting to the single space reading is the inverse edit to
   `_confidential_yaml_entries()`/its call site in `render_dossier_yaml()`
   alone -- no other file depends on the two-entry shape.
-- **CR-02 stays frozen** by mandate; not re-litigated here.
+- **CR-02 (option (a), arbitrage Samuel, relayed by the main session via SendMessage,
+  2026-09-25):** the presence exemption now has one carve-out, not two competing rules --
+  `confidential_names` near-misses are judged on OSA distance (typo vs. legitimate different
+  key), `consent_recorded`/`consent_source` near-misses keep the original unconditional
+  exemption. See `02-CONTEXT.md` § Gap closure decisions (2026-09-25) for the full rationale,
+  including why plain Levenshtein was rejected in favour of OSA distance.
 
 ## Follow-up
 
-- CR-02 needs Samuel's arbitrage before any change to the presence rule's
-  near-miss exemption ships.
 - WR-01 (the wider Default_Ignorable_Code_Point set) is open debt for the
   next planning pass on this phase or a follow-up gap-closure round.
+
+## Review round 2 (vf-reviewer, HEAD 0bd363a)
+
+- **Verdict:** passed.
+- `git fsck --full --strict`: clean.
+- Range `8c2ed0f..0bd363a`: linear, 20 commits, every commit's trailers exact
+  (`Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` /
+  `Claude-Session: https://claude.ai/code/session_01GWGsAe34jLEPP8p4e45qD9`), no `.gsd/` path
+  committed anywhere in the range.
+- Lint assertions: 1479 PASS.
+- **Observation OBS-01** (minor, no-op): no runtime rejection of a `confidential_name` starting
+  with `>` -- same class as WR-04, already accepted. No action taken this round; tracked as open
+  debt alongside WR-01.
 
 ---
 
 _Fixed: 2026-09-25T14:10:16Z_
 _Fixer: Claude (vf-coder, targeted correction mandate)_
+_CR-02 closed: 2026-09-25, targeted correction mandate (fix-cr02)_

@@ -271,6 +271,46 @@ French fixtures; LINT-03 is `tests/test-lint.sh` asserting exit codes and messag
   `init.py`** into the fixture path (or by copying its exact output) rather than hand-writing
   it, so the two stay in sync.
 
+### Gap closure decisions (2026-09-25)
+
+- **CR-02 (option (a))** (arbitrage Samuel, relayed by the main session via SendMessage,
+  2026-09-25): D-22's presence exemption for a `confidential_names` near-miss (D-GAP-1, UAT
+  G-02-2) was unconditional — any near-miss, typo or legitimate extension key alike, went
+  silent the moment the exact `confidential_names` key sat beside it. That let a real typo of
+  the one key E5 depends on (`confidential_name`, `confidentail_names`) through with nothing
+  said, because the scaffold's own `confidential_names: []` was still present. Option (a) keeps
+  the exemption for `consent_recorded`/`consent_source` near-misses unconditionally (a
+  legitimate extension key such as `consent_scope` beside `consent_source` stays a different,
+  known key, per D-22's original intent) but carves out `confidential_names`: a near-miss of it
+  is C1 even while the exact key is present, when it scores as a probable typo rather than a
+  genuinely different key. Applied identically at both call sites in `_misplaced_gate_keys()`
+  (the top-level loop and `visit()`'s nested branch) via the shared helper
+  `_forces_c1_despite_presence()` — one rule, not two. Reversible: dropping the
+  `_forces_c1_despite_presence()` disjunct from both `or` conditions restores the unconditional
+  exemption.
+- **"Probable typo" is scored by OSA distance, not plain Levenshtein** (Claude's discretion,
+  delegated by the mandate: "choisis la version la plus simple et correcte, et dis laquelle").
+  Plain Levenshtein cannot separate a typo of `confidential_names` from a legitimate different
+  key next to it: `confidentail_names` (the "ia"/"ai" transposition the mandate's own worked
+  example uses) and `confidential_notes` (the real, different extension key the `gate-key-
+  extras` fixture already relies on staying silent) are **both** Levenshtein distance 2 from
+  `confidential_names` — verified independently with two DP implementations. Optimal String
+  Alignment (Levenshtein plus a single adjacent-transposition edit, `_osa_distance()` in
+  `scripts/lint.py`) scores the transposition as one edit instead of two: `confidentail_names`
+  drops to OSA distance 1 (a typo), while `confidential_notes` stays at OSA distance 2 (its tail
+  differs by two straight substitutions, no transposition helps) and keeps the presence
+  exemption, same as `non_confidential_names` (OSA distance 4). `CONFIDENTIAL_NAMES_TYPO_CUTOFF
+  = 1` therefore reads as "one keystroke away downstream of `_fold_key`": one substitution,
+  insertion, deletion, or adjacent swap. Two new fixtures pin the forced side of the boundary
+  (`gate-key-beside-names-drop`, `gate-key-beside-names-swap`, both OSA distance 1, C1 + exit 1
+  even beside the exact key); the existing `gate-key-extras` fixture (OSA distance 2 for its
+  `confidential_notes`) already pins the ignored side and stays at 0 findings / exit 0
+  unmodified.
+- **D-FIX-13** (arbitrage of the manager, reversible: `init.py` writes both Cf readings into
+  `confidential_names`) is already recorded in full in `02-REVIEW-FIX.md`'s Decisions section
+  (CR-03, unrelated to CR-02) — cross-referenced here rather than duplicated, since it predates
+  this gap-closure round and this round makes no further change to it.
+
 ### Claude's Discretion
 
 - Internal structure of `lint.py` (function decomposition, order of checks, single-pass vs
