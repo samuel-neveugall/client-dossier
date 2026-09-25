@@ -22,6 +22,7 @@ import re
 import shlex
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 # The twelve directories the scaffold creates (spec Sec3.2).
@@ -187,15 +188,22 @@ _SCALAR_BREAKS_RE = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 def yaml_quote(value):
     """Return a double-quoted YAML scalar, safe for any user-supplied string.
 
-    Each break or control character (_SCALAR_BREAKS_RE) becomes a space --
-    never deleted: between two words it is a separator, and deleting it
-    fuses `Acme<U+2028>Corp` into `AcmeCorp`, a confidential name nothing
-    would ever match (CR-02). A Word manual line break is U+2028, a
-    spreadsheet cell pastes a tab. Runs of whitespace then collapse to one
-    space and the ends are trimmed. Last, backslashes and double quotes are
-    escaped -- in that order, so a backslash inserted by the first escape is
-    never re-escaped by the second.
+    Every Unicode format character (category Cf: ZWSP, BOM, a soft hyphen,
+    ZWNJ, the word joiner) is mapped to a space first, then each break or
+    control character (_SCALAR_BREAKS_RE) becomes a space too -- never
+    deleted: between two words it is a separator, and deleting it fuses
+    `Acme<U+2028>Corp` or `Acme<ZWSP>Corp` into `AcmeCorp`, a confidential
+    name nothing would ever match (CR-02, D-GAP-6 extending it to category
+    Cf). A Word manual line break is U+2028, a spreadsheet cell pastes a
+    tab, and a format character commonly arrives through copy-paste from a
+    web page or a chat app. Runs of whitespace then collapse to one space
+    and the ends are trimmed -- a soft hyphen inside a word becomes a
+    visible space in dossier.yaml, cosmetic only: scripts/lint.py's folded
+    pass still matches the word run together. Last, backslashes and double
+    quotes are escaped -- in that order, so a backslash inserted by the
+    first escape is never re-escaped by the second.
     """
+    value = "".join(" " if unicodedata.category(ch) == "Cf" else ch for ch in value)
     cleaned = " ".join(_SCALAR_BREAKS_RE.sub(" ", value).split())
     cleaned = cleaned.replace("\\", "\\\\").replace('"', '\\"')
     return '"' + cleaned + '"'

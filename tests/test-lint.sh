@@ -497,6 +497,41 @@ done
 assert_last_line '10 error(s), 0 warning(s)' 'linebreak-words: five names, each in a body and a filename'
 assert_lint "$FIXTURES/linebreak-yaml" 1 'linebreak-yaml: a U+2028 inside a quoted name still reads the line'
 assert_only E5 'linebreak-yaml: only [E5] fires, no [C0] or [C1] for a split line'
+# --- A Unicode format character (Cf) hides no name, hand-written, through init.py, or in the
+# body/path -- neither reading alone is enough (D-GAP-6, G-02-4b, CR-02 of the iteration-3
+# review and D-FIX-12 of its fix round) ---
+fny="$FIXTURES/format-name-yaml/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/format-name-yaml" 1 'format-name-yaml: five hand-written names, each carrying a format character, hide nothing'
+assert_only E5 'format-name-yaml: only [E5] fires'
+for pair in 'Acme Corp:Acme Corp today' 'Big Telco:Big Telco called' 'Nord Star:Nord Star joined' \
+  'Red Fox:Red Fox signed' 'Glo bex:Finally Globex agreed'; do
+  name="${pair%%:*}"
+  frag="${pair#*:}"
+  assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fny" "$frag"): ERROR \\[E5\\] .*'$name'" \
+    "format-name-yaml: '$name' is the space reading of the configured name"
+done
+assert_last_line '5 error(s), 0 warning(s)' 'format-name-yaml: one finding per name'
+fni="$FIXTURES/format-name-init/dossier.yaml"
+for ch in '\342\200\213' '\357\273\277' '\342\201\240' '\342\200\214' '\302\255'; do
+  assert_eq 0 "$(grep -c -F -- "$(printf "$ch")" "$fni")" \
+    "format-name-init: init.py writes no raw format character into dossier.yaml ($ch)"
+done
+for name in 'Acme Corp' 'Big Telco' 'Nord Star' 'Red Fox' 'Glo bex'; do
+  assert_grep "\"$name\"" "$fni"
+done
+assert_lint "$FIXTURES/format-name-init" 1 'format-name-init: init.py -> lint.py round trip, every leak exits 1'
+assert_only E5 'format-name-init: only [E5] fires'
+assert_last_line '10 error(s), 0 warning(s)' 'format-name-init: five names, each in a body line and a conforming slug'
+fb="$FIXTURES/format-body/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/format-body" 1 'format-body: a format character embedded, between two words, or decoded from &shy; hides nothing'
+assert_only E5 'format-body: only [E5] fires'
+for marker in L1 L2 L3 L4 L5 L6 L7 L8; do
+  assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fb" "$marker:"): ERROR \\[E5\\] " \
+    "format-body: $marker's format character hides nothing"
+done
+assert_out_line '^outbound/mails/archive/2026-09-17_ac.*me\.md:0: ERROR \[E5\] ' \
+  "format-body: the name surviving only in a path below E4's scope is still found"
+assert_last_line '9 error(s), 0 warning(s)' 'format-body: eight body lines plus one path, one finding each'
 # --- E5 on multi-word names: slugs and whitespace variants (CR-03) ---
 assert_lint "$FIXTURES/e5-slug" 1 'e5-slug: big-telco in a conforming filename exits 1'
 assert_only E5 'e5-slug: only [E5] fires'

@@ -1495,8 +1495,30 @@ def _decode_html_entities(text):
                       for line in text.split("\n"))
 
 
+def format_readings(text):
+    """The one or two Cf-blind readings of TEXT (D-GAP-6, CR-02 of the iteration-3 review).
+
+    TEXT itself when it holds no character of Unicode category Cf (a format
+    character: ZWSP, BOM, a soft hyphen, ZWNJ, the word joiner, among
+    others). Otherwise two strings, in this order: the deletion reading
+    (every Cf character removed -- what a format character sitting inside a
+    single word needs, `Ac<SHY>me` -> `Acme`) and the space reading (every
+    Cf character replaced by one space -- what one sitting between two
+    words needs, `Big<ZWSP>Telco` -> `Big Telco`). Either reading alone
+    misses a real case, so both are always returned together, without
+    duplicates. Category Cf never contains `\\n`, so neither reading adds
+    or removes one -- callers that need the line contract e5_haystacks()
+    promises may rely on that.
+    """
+    if not any(unicodedata.category(ch) == "Cf" for ch in text):
+        return [text]
+    deleted = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
+    spaced = "".join(" " if unicodedata.category(ch) == "Cf" else ch for ch in text)
+    return [deleted, spaced] if deleted != spaced else [deleted]
+
+
 def e5_haystacks(text):
-    """The ordered list of line-preserving haystacks E5 searches (D-GAP-4, D-GAP-5).
+    """The ordered list of line-preserving haystacks E5 searches (D-GAP-4, D-GAP-5, D-GAP-6).
 
     TEXT is a file's content, already normalise()d with `\\r\\n` and `\\r`
     turned into `\\n`. Every string this returns has exactly as many `\\n`
@@ -1505,7 +1527,7 @@ def e5_haystacks(text):
     own line -- check_confidential_names() runs the exact and the folded
     pass on each one, keeping one newline index per string.
 
-    Two stages so far:
+    Three stages, each built on the last:
     1. A quoted reply's markers are stripped from the start of every line,
        in place -- the stripped text replaces the base rather than joining
        it as a second variant, since a leading `>` never appears inside a
@@ -1517,15 +1539,53 @@ def e5_haystacks(text):
        pasted from a web page, so this applies to every outbound text file,
        not only `.html`. The exact pass is what finds a name holding `&`,
        since folded_text_pattern() deliberately refuses one.
-    A third stage joins these two as a later plan extends this list: a
-    Unicode-format-character-blind reading of every string built so far.
+    3. Every string built so far is replaced, in place, by its
+       format_readings() (D-GAP-6): a soft hyphen, ZWSP, BOM, ZWNJ or word
+       joiner hides no name whichever way it is read, including one
+       decoded from an HTML reference by stage 2 (`&shy;`). Order is kept
+       and duplicates are dropped.
     """
     stripped = _QUOTE_STRIP_RE.sub("", text)
     haystacks = [stripped]
     decoded = _decode_html_entities(stripped)
     if decoded != stripped:
         haystacks.append(decoded)
-    return haystacks
+    result = []
+    for haystack in haystacks:
+        for reading in format_readings(haystack):
+            if reading not in result:
+                result.append(reading)
+    return result
+
+
+def _build_needle(name):
+    """One configured NAME -> (display, exact_patterns, name_pattern, folded_pattern), or
+    None when NAME is made only of format characters (D-GAP-6).
+
+    `display` is the last of format_readings() applied to the normalised
+    name, whitespace collapsed: the deletion reading when the name holds no
+    Cf character, otherwise the space reading -- what every E5 message and
+    the (line, name) de-duplication name the leak as. `exact_patterns` is
+    boundary_pattern() of every reading, distinct patterns only and
+    _NEVER_RE dropped, so the exact pass catches a format character read
+    either way (an embedded one needs the deletion reading, one between two
+    words needs the space reading). `name_pattern` and `folded_pattern` are
+    built from `display` alone: their separator classes already accept an
+    empty run between tokens, so the deletion reading is already covered.
+    """
+    readings = format_readings(normalise(name))
+    display = " ".join(readings[-1].split())
+    if not display:
+        return None
+    exact_patterns = []
+    seen_patterns = set()
+    for reading in readings:
+        pattern = boundary_pattern(reading)
+        if pattern is _NEVER_RE or pattern.pattern in seen_patterns:
+            continue
+        seen_patterns.add(pattern.pattern)
+        exact_patterns.append(pattern)
+    return display, exact_patterns, filename_pattern(display), folded_text_pattern(display)
 
 
 def check_confidential_names(root, tree, config, findings):
@@ -1534,28 +1594,38 @@ def check_confidential_names(root, tree, config, findings):
     Suppressed only when consent is recorded AND sourced; a malformed
     consent_recorded reads as False in the schema, so the check stays armed
     (T-02-02). Both sides are NFC-normalised (P-05). The text half searches
-    every string e5_haystacks() returns for the file (D-GAP-4), so a name
-    wrapped across two lines, or wrapped again inside a quoted reply, is
-    found, and reports the line the match starts on, once per (line, name)
-    across every one of those strings. Each is searched twice: the exact
-    pattern, then folded_text_pattern() on it as fold_ascii() spells it
-    (WR-03). Folding never adds or removes a `\n`, so a line number read off
-    either form of a given string is the same line. The filename half
-    matches the slug spellings E4 allows (filename_pattern). A file that
-    will not decode, is symlinked or is oversized skips the text half only;
-    the filename half always runs (P-07). The message names the needle and
-    the location, never the surrounding sentence (T-02-09).
+    every string e5_haystacks() returns for the file (D-GAP-4, D-GAP-5,
+    D-GAP-6), so a name wrapped across two lines, wrapped again inside a
+    quoted reply, spelt with an HTML character reference, or carrying a
+    Unicode format character is found, and reports the line the match
+    starts on, once per (line, name) across every one of those strings.
+    Each is searched with every exact pattern _build_needle() built for the
+    name, then with folded_text_pattern() on it as fold_ascii() spells it
+    (WR-03). Neither stage of e5_haystacks() nor format_readings() adds or
+    removes a `\n`, so a line number read off any of them is the same line.
+    The filename half matches the slug spellings E4 allows
+    (filename_pattern), searched against every format_readings() of the
+    path below outbound/ too (D-GAP-6), at most one finding per (file,
+    name). A file that will not decode, is symlinked or is oversized skips
+    the text half only; the filename half always runs (P-07). The message
+    names the needle and the location, never the surrounding sentence
+    (T-02-09).
     """
     if consent_is_recorded(config) or not config["confidential_names"]:
         return
-    needles = [(name, boundary_pattern(name), filename_pattern(name), folded_text_pattern(name))
-               for name in config["confidential_names"]]
+    needles = [needle for needle in
+               (_build_needle(name) for name in config["confidential_names"])
+               if needle is not None]
     prefix_len = len(OUTBOUND_DIR) + 1
     for rel in outbound_files(tree):
         # No EXEMPT_PATHS skip here, on purpose: a leaked name is a leak wherever it sits.
-        path_name = fold_ascii(normalise(rel[prefix_len:]))
-        for name, _pattern, name_pattern, _folded in needles:
-            if name_pattern.search(path_name):
+        path_readings = []
+        for reading in format_readings(normalise(rel[prefix_len:])):
+            folded_reading = fold_ascii(reading)
+            if folded_reading not in path_readings:
+                path_readings.append(folded_reading)
+        for name, _exact_patterns, name_pattern, _folded_pattern in needles:
+            if any(name_pattern.search(path_reading) for path_reading in path_readings):
                 findings.append(Finding(rel, 0, ERROR, "E5",
                                         "confidential name '{}' in the file name under outbound/".format(name)))
         text = read_text_safe(os.path.join(root, *rel.split("/")))
@@ -1567,26 +1637,29 @@ def check_confidential_names(root, tree, config, findings):
             newline_idx = None
             folded_haystack = None
             folded_idx = None
-            for name, pattern, _name_pattern, folded_pattern in needles:
-                for folded, regex in ((False, pattern), (True, folded_pattern)):
-                    if regex is _NEVER_RE:
-                        continue
-                    if folded:
-                        if folded_haystack is None:
-                            folded_haystack = fold_ascii(haystack)
-                            folded_idx = [m.start() for m in re.finditer("\n", folded_haystack)]
-                        search_in, idx = folded_haystack, folded_idx
-                    else:
-                        if newline_idx is None:
-                            newline_idx = [m.start() for m in re.finditer("\n", haystack)]
-                        search_in, idx = haystack, newline_idx
-                    for match in regex.finditer(search_in):
-                        number = bisect.bisect_right(idx, match.start()) + 1
+            for name, exact_patterns, _name_pattern, folded_pattern in needles:
+                if exact_patterns and newline_idx is None:
+                    newline_idx = [m.start() for m in re.finditer("\n", haystack)]
+                for regex in exact_patterns:
+                    for match in regex.finditer(haystack):
+                        number = bisect.bisect_right(newline_idx, match.start()) + 1
                         if (number, name) in seen:
                             continue
                         seen.add((number, name))
                         findings.append(Finding(rel, number, ERROR, "E5",
                                                 "confidential name '{}' under outbound/".format(name)))
+                if folded_pattern is _NEVER_RE:
+                    continue
+                if folded_haystack is None:
+                    folded_haystack = fold_ascii(haystack)
+                    folded_idx = [m.start() for m in re.finditer("\n", folded_haystack)]
+                for match in folded_pattern.finditer(folded_haystack):
+                    number = bisect.bisect_right(folded_idx, match.start()) + 1
+                    if (number, name) in seen:
+                        continue
+                    seen.add((number, name))
+                    findings.append(Finding(rel, number, ERROR, "E5",
+                                            "confidential name '{}' under outbound/".format(name)))
 
 
 def check_consent_source(root, tree, config, findings):

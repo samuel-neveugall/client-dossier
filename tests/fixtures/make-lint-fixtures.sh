@@ -843,6 +843,63 @@ replace_line "$parent/linebreak-yaml/dossier.yaml" 'confidential_names: []' \
 write_file "$parent/linebreak-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 Beta asked for the audit.
 "
+# --- format-name-yaml / format-name-init / format-body: a Unicode format character (category
+# Cf) inside a configured name, an outbound body, or a path below outbound/ never hides the
+# name, on either side, and init.py never writes one raw (D-GAP-6, G-02-4b, CR-02 of the
+# iteration-3 review and D-FIX-12 of its fix round, which already does this for line breaks).
+# Built from bytes: bash 3.2 has no \u. ZWSP U+200B, BOM U+FEFF, SHY (soft hyphen) U+00AD,
+# ZWNJ U+200C, WJ (word joiner) U+2060.
+ZWSP="$(printf '\342\200\213')"
+BOM="$(printf '\357\273\277')"
+SHY="$(printf '\302\255')"
+ZWNJ="$(printf '\342\200\214')"
+WJ="$(printf '\342\201\240')"
+
+# format-name-yaml (consumer side, hand-written): five names, each carrying a format character
+# either inside a word (the deletion reading is what matches) or between two words (the space
+# reading is what matches); the message names the space reading (D-GAP-6).
+make_case format-name-yaml
+replace_line "$parent/format-name-yaml/dossier.yaml" 'confidential_names: []' \
+  "confidential_names: [ \"Acme${ZWSP}Corp\", \"Big Telco${BOM}\", \"${WJ}Nord Star\", \"Red${ZWNJ}Fox\", \"Glo${SHY}bex\" ]"
+write_file "$parent/format-name-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Acme Corp today.
+Then Big Telco called.
+Nord Star joined the call.
+Red Fox signed.
+Finally Globex agreed.
+"
+
+# format-name-init (producer side, round trip): the same five names through init.py.
+# dossier.yaml must hold the space reading of each, never the raw format character
+# (D-FIX-12 extended).
+make_named_case format-name-init --confidential-name "Acme${ZWSP}Corp" --confidential-name "Big Telco${BOM}" \
+  --confidential-name "${WJ}Nord Star" --confidential-name "Red${ZWNJ}Fox" --confidential-name "Glo${SHY}bex"
+write_file "$parent/format-name-init/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Acme Corp, Big Telco, Nord Star, Red Fox and Globex today.
+"
+for slug in acme-corp big-telco nord-star red-fox globex; do
+  write_file "$parent/format-name-init/outbound/mails/2026-09-17_${slug}.md" "$GOOD_MAIL"
+done
+
+# format-body (haystack side): eight lines each hide a plain "Acme" or "Big Telco" behind a
+# format character read one of the two ways the readings cover -- embedded inside a word
+# (deletion), or between two words (space) -- plus a boundary that was already open before this
+# fix (L7: a format character already counts as non-word for boundary_pattern(), which a
+# deletion-only fix would break, D-GAP-6), an &shy; HTML reference that needs Task 2's decode
+# and this task's readings together (L8), and the name surviving only in a path below E4's
+# scope.
+make_named_case format-body --confidential-name Acme --confidential-name 'Big Telco'
+write_file "$parent/format-body/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+L1: Ac${SHY}me signed.
+L2: Ac${ZWSP}me signed.
+L3: Ac${WJ}me signed.
+L4: Ac${ZWNJ}me signed.
+L5: Ac${BOM}me signed.
+L6: Big${ZWSP}Telco called.
+L7: Contact${ZWSP}Acme today.
+L8: Ac&shy;me in a pasted snippet.
+"
+write_file "$parent/format-body/outbound/mails/archive/2026-09-17_ac${SHY}me.md" "$GOOD_MAIL"
 # --- Multi-word names: filename slugs and whitespace variants (CR-03) ---
 # E4 only accepts a lowercase ASCII slug joined by hyphens, so the only
 # conforming spelling of a multi-word name in a filename is `big-telco`;
