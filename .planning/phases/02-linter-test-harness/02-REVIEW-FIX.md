@@ -155,6 +155,30 @@ confidential_names" message and exit 1. The existing `gate-key-extras` fixture (
 and counterpart-level `confidential_notes`, at OSA distance 2) needed no change and keeps
 asserting 0 findings / exit 0.
 
+### CR-02 bis: `CONFIDENTIAL_NAMES_TYPO_CUTOFF <= 1` still let a DOUBLE typo of `confidential_names` through unflagged beside the exact key
+
+**Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
+**Commit:** c1ed6bb
+**Status:** fixed (commit) -- option (2), arbitrage Samuel, relayed by the main session via
+SendMessage, 2026-09-25
+**Applied fix:** `_forces_c1_despite_presence()` gained a second clause. A `confidential_names`
+near-miss also forces C1 when its whole-key OSA distance is `<= CONFIDENTIAL_NAMES_TYPO_CUTOFF_
+WORD` (2) AND its last `_`-separated word is within `CONFIDENTIAL_NAMES_WORD_CUTOFF` (1) OSA
+edits of `"name"` **or** `"names"` -- checking both words, not `"names"` alone, because
+`confidential_nam`'s last word `nam` is OSA distance 2 from `"names"` but only 1 from `"name"`;
+`"names"` alone would have missed it. `confidential_name` and `confidential_nam` were previously
+missed because their whole-key OSA distance (2) is the same as the legitimate
+`confidential_notes` extension key's -- the two are told apart only by looking at the last word.
+Full rationale, the ground-truth table, and the residual limit (a double typo landing inside the
+last word itself is only caught when it happens to stay within the cutoff): `02-CONTEXT.md` §
+Gap closure decisions, round 3 -- CR-02 bis (2026-09-25).
+**Fixture:** `gate-key-beside-names-double` (`confidental_name`), `gate-key-beside-names-double2`
+(`confidential_nam`) and `gate-key-beside-names-nounderscore` (`confidentialnames`, already
+covered by the plain single-keystroke clause) -- each beside `confidential_names: []` -- assert
+`[C1]` with the "looks like a misspelling of confidential_names" message and exit 1. The existing
+`gate-key-extras` fixture keeps pinning `confidential_notes` beside the exact key at 0 findings /
+exit 0, unmodified; `02-CONTEXT.md` notes it rather than duplicating a fixture for it.
+
 ### IN-02: `LOCKED_DIRS` relies on unquoted word splitting
 
 **File modified:** `tests/test-lint.sh`
@@ -201,6 +225,14 @@ silently.
   key), `consent_recorded`/`consent_source` near-misses keep the original unconditional
   exemption. See `02-CONTEXT.md` § Gap closure decisions (2026-09-25) for the full rationale,
   including why plain Levenshtein was rejected in favour of OSA distance.
+- **CR-02 bis (option (2), arbitrage Samuel, relayed by the main session via SendMessage,
+  2026-09-25):** replaces the literal wording of CR-02's first answer, which rested on a wrong
+  distance measurement. The carve-out gains a second, looser clause scoped to the near-miss's
+  last `_`-separated word (checked against both `"name"` and `"names"`), so a double typo that
+  still obviously says "the names" (`confidental_name`, `confidential_nam`) stays C1 beside the
+  exact key, while a genuinely different word (`confidential_notes`'s `"notes"`) keeps the
+  exemption. See `02-CONTEXT.md` § Gap closure decisions, round 3 -- CR-02 bis (2026-09-25) for
+  the full rationale, the ground-truth table, and the documented residual limit.
 
 ## Follow-up
 
@@ -225,3 +257,4 @@ silently.
 _Fixed: 2026-09-25T14:10:16Z_
 _Fixer: Claude (vf-coder, targeted correction mandate)_
 _CR-02 closed: 2026-09-25, targeted correction mandate (fix-cr02)_
+_CR-02 bis closed: 2026-09-25, targeted correction mandate (fix-cr02-bis)_

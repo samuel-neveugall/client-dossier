@@ -311,6 +311,54 @@ French fixtures; LINT-03 is `tests/test-lint.sh` asserting exit codes and messag
   (CR-03, unrelated to CR-02) — cross-referenced here rather than duplicated, since it predates
   this gap-closure round and this round makes no further change to it.
 
+### Gap closure decisions, round 3 — CR-02 bis (2026-09-25)
+
+- **CR-02 bis (option (2))** (arbitrage Samuel, relayed by the main session via SendMessage,
+  2026-09-25). This replaces the literal wording of CR-02's first answer ("≤ 2 ; `confidential_
+  notes` is at 4+"), which rested on a wrong distance: `confidential_notes` is at OSA distance
+  2 from `confidential_names`, same as the double typo `confidental_name` — so raising
+  `CONFIDENTIAL_NAMES_TYPO_CUTOFF` to 2 outright would have let `confidential_notes` back in as
+  C1 too, breaking `gate-key-extras`. Measured results the arbitrage fixes as ground truth:
+  `confidental_name`, `confidential_nam`, `confidentail_names`, `confidentialnames` → C1 and
+  exit 1; `confidential_notes` and `non_confidential_names` → stay clean (ignored, D-22's
+  presence exemption applies).
+- **The rule, in the strictest reading that still meets every result above** (manager's
+  precision, applied to `_forces_c1_despite_presence()` in `scripts/lint.py`): on the folded key,
+  a `confidential_names` near-miss stays C1 despite the exact key's presence if
+  `OSA(key, "confidential_names") <= 1`, **OR** (`OSA(key, "confidential_names") <= 2` **AND**
+  the last `_`-separated word of the folded key is `OSA <= 1` of `"name"` **OR** of `"names"`).
+  Two new constants carry the second clause: `CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD = 2` (the
+  looser whole-key ceiling) and `CONFIDENTIAL_NAMES_WORD_CUTOFF = 1` (the last-word ceiling
+  against each of `"name"`/`"names"`).
+- **Why `"name"` is checked in addition to `"names"`** (the manager's precision, attributed
+  explicitly because it is the non-obvious half of the rule and reverses if dropped):
+  `confidential_nam`'s last word is `nam`, which is OSA distance 2 from `"names"` (insert `e`,
+  insert `s`) but only 1 from `"name"` (insert `e`). Reading "within 1 of `names`" alone would
+  let `confidential_nam` through unflagged — not what Samuel's arbitrage asks for, since it is
+  in the expected-C1 list above. Checking both words is what catches it while still holding the
+  line against `confidential_notes` (`notes` is OSA 2 from `names`, 3 from `name` — outside both).
+- **Why the plain `CONFIDENTIAL_NAMES_TYPO_CUTOFF <= 1` clause is kept as its own branch, not
+  folded into the word-boundary check**: `confidentialnames` (no `_` at all) has no last word to
+  test — `_fold_key` leaves it as one token, and `.rsplit("_", 1)` returns the whole string. It
+  needs the whole-key single-keystroke clause to stay C1, exactly as it already did at b7c8b5f
+  before this round.
+- **Verified against the fixed points**: `confidential_notes` beside the exact key — whole-key
+  OSA 2, last word `notes` at OSA 2 from `names` and OSA 3 from `name`, both over
+  `CONFIDENTIAL_NAMES_WORD_CUTOFF` — stays ignored, still pinned by the existing `gate-key-
+  extras` fixture (0 findings, exit 0), not duplicated. `non_confidential_names` — whole-key OSA
+  4, over even the looser `CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD` — stays ignored too.
+- **Residual limit, documented, not fixed by this round**: a double typo landing *inside* the
+  last word itself, rather than in the trailing letters `_fold_key` leaves untouched, is only
+  caught when it happens to still land within `CONFIDENTIAL_NAMES_WORD_CUTOFF` of `"name"` or
+  `"names"` by the rule above — there is no dedicated third clause hunting further into that
+  word. A last word two or more OSA edits from both `"name"` and `"names"` (e.g. a typo mangling
+  more than one letter of the word itself, distinct from the worked cases above) is, by design,
+  still read as a different, legitimate key and stays silent when the exact gate key is present.
+  Applied identically at both call sites of `_misplaced_gate_keys()` (the top-level loop and
+  `visit()`'s nested branch), same as CR-02: one rule via the shared helper, not two. Reversible:
+  reverting `_forces_c1_despite_presence()` to the CR-02 form (drop the `CONFIDENTIAL_NAMES_
+  TYPO_CUTOFF_WORD` branch) restores the narrower single-keystroke-only rule.
+
 ### Claude's Discretion
 
 - Internal structure of `lint.py` (function decomposition, order of checks, single-pass vs
