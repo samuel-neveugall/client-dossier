@@ -23,15 +23,32 @@ EMPTY=""
 READONLY=""
 GEN_TMP=""
 # Folders this file chmod 000s to exercise the unreadable-folder checks
-# (G-02-4e, T-02-28): space-separated, appended to as each one is locked.
-# Restored here too, not only right after the lint run that needed them
-# locked, so a failed assertion never leaves a mode-000 folder behind.
+# (G-02-4e, T-02-28): newline-separated, appended to as each one is locked
+# -- never space-separated (IN-02 of the iteration-4 review): unquoted `for
+# _d in $LOCKED_DIRS` word-splits on any space in $TMPDIR or the fixture
+# parent too, unlocking fragments instead of the real path and leaving the
+# mode-000 folder (and the trap's rm -rf on it) behind. Restored here too,
+# not only right after the lint run that needed them locked, so a failed
+# assertion never leaves a mode-000 folder behind.
 LOCKED_DIRS=""
+
+# unlock_locked_dirs — chmod u+rwx every path recorded in LOCKED_DIRS, one
+# per line, read with IFS= so a path holding a space still comes back whole.
+unlock_locked_dirs() {
+  local _d
+  while IFS= read -r _d; do
+    [ -n "$_d" ] && chmod u+rwx "$_d" 2>/dev/null
+  done <<EOF
+$LOCKED_DIRS
+EOF
+  return 0
+}
+
 # The one cleanup for everything this file creates, the generator's parent
 # included: the generator installs no handler of its own, so a failed
 # assertion anywhere below still leaks nothing. Unlocking runs first: rm -rf
 # on a mode-000 folder fails silently and leaks it.
-trap 'for _d in $LOCKED_DIRS; do chmod u+rwx "$_d" 2>/dev/null || true; done
+trap 'unlock_locked_dirs
 rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
@@ -701,7 +718,8 @@ assert_clean 'case-lookalike: an exact case-insensitive match is required, never
 # assertion aborts the script before the per-case unlock below runs.
 dir="$FIXTURES/unreadable-outbound/outbound/mails"
 chmod 000 "$dir" 2>/dev/null
-LOCKED_DIRS="$LOCKED_DIRS $dir"
+LOCKED_DIRS="$LOCKED_DIRS
+$dir"
 if ls "$dir" >/dev/null 2>&1; then
   skip "unreadable-outbound: $dir is still listable after chmod 000 (root, or a permission-less filesystem)"
 else
@@ -713,7 +731,8 @@ chmod u+rwx "$dir" 2>/dev/null
 
 dir="$FIXTURES/unreadable-knowledge/knowledge/watch"
 chmod 000 "$dir" 2>/dev/null
-LOCKED_DIRS="$LOCKED_DIRS $dir"
+LOCKED_DIRS="$LOCKED_DIRS
+$dir"
 if ls "$dir" >/dev/null 2>&1; then
   skip "unreadable-knowledge: $dir is still listable after chmod 000 (root, or a permission-less filesystem)"
 else
