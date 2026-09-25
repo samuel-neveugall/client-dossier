@@ -552,6 +552,27 @@ assert_last_line '4 error(s), 0 warning(s)' 'e5-wrapped: the plain wrap plus the
 assert_lint "$FIXTURES/e5-spacing" 1 'e5-spacing: whitespace variants exit 1'
 assert_only E5 'e5-spacing: only [E5] fires'
 assert_last_line '3 error(s), 0 warning(s)' 'e5-spacing: two spaces, a no-break space and a tab all match'
+# --- HTML character references never hide a name (D-GAP-5, G-02-4c, CR-03 of the
+# iteration-3 review) ---
+he="$FIXTURES/e5-html-entities/outbound/deliverables/2026-09-17_proposal.html"
+he_mail="$FIXTURES/e5-html-entities/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/e5-html-entities" 1 'e5-html-entities: named and numeric HTML references hide no name'
+assert_only E5 'e5-html-entities: only [E5] fires'
+he_a="$(line_of "$he" 'Prepared for Johnson')"
+he_b="$(line_of "$he" 'Soci')"
+he_c="$(line_of "$he" 'Dear Mr O')"
+he_mail_line="$(line_of "$he_mail" 'Pasted from the portal')"
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_a: ERROR \\[E5\\] .*'Johnson & Johnson'" \
+  'e5-html-entities: Johnson &amp; Johnson decodes to Johnson & Johnson'
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_a: ERROR \\[E5\\] .*'AT&T'" \
+  'e5-html-entities: AT&amp;T decodes to AT&T, same line as Johnson & Johnson'
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_b: ERROR \\[E5\\] .*'Soci" \
+  'e5-html-entities: the eacute and decimal 233 references both decode to Société Exemple'
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_c: ERROR \\[E5\\] .*O.Brien'" \
+  "e5-html-entities: the decimal 39 and rsquo references both decode to O'Brien"
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$he_mail_line: ERROR \\[E5\\] .*'AT&T'" \
+  'e5-html-entities: a pasted amp reference in a Markdown mail decodes too (D-GAP-5)'
+assert_last_line '5 error(s), 0 warning(s)' 'e5-html-entities: one finding per (line, name), decoded references deduplicated'
 # --- `''` inside a single-quoted scalar is an escape, not a closing quote (WR-01) ---
 assert_lint "$FIXTURES/gate-sq-names" 1 "gate-sq-names: [ 'O''Brien, Jr', Acme ] is read, the leak exits 1"
 assert_only E5 'gate-sq-names: only [E5] fires, the names line is not skipped'

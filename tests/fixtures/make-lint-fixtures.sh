@@ -912,6 +912,23 @@ make_named_case e5-text-fold-boundary --confidential-name 'Big Telco' --confiden
 write_file "$parent/e5-text-fold-boundary/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 We asked Big, Telco answered. See section c of the plan, c'est clair.
 "
+# --- e5-html-entities: HTML character references never hide a name (D-GAP-5, G-02-4c, CR-03
+# of the iteration-3 review) --- .html is a sanctioned outbound format, and standard
+# serialisation escapes `&` and often `'` and accented letters as named or numeric references;
+# a decoded haystack must catch them, in an .html deliverable and in a Markdown mail pasted
+# from a web page alike.
+make_named_case e5-html-entities --confidential-name 'Johnson & Johnson' --confidential-name 'AT&T' \
+  --confidential-name "$(printf 'Soci\303\251t\303\251 Exemple')" --confidential-name "O'Brien"
+write_file "$parent/e5-html-entities/outbound/deliverables/2026-09-17_proposal.html" '<!-- Status: draft -->
+<!-- To: Jane Doe -->
+<!-- Written by: Sam -->
+<p>Prepared for Johnson &amp; Johnson and AT&amp;T.</p>
+<p>Soci&eacute;t&eacute; Exemple, Soci&#233;t&#233; Exemple</p>
+<p>Dear Mr O&#39;Brien, Mr O&rsquo;Brien</p>
+'
+write_file "$parent/e5-html-entities/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Pasted from the portal: AT&amp;T
+"
 # The boundary still holds in both halves: longer words are not the name.
 make_named_case e5-slug-boundary --confidential-name 'Big Telco'
 write_file "$parent/e5-slug-boundary/outbound/mails/2026-09-17_bigtelcom-offer.md" "${GOOD_MAIL}

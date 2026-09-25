@@ -28,6 +28,7 @@ import argparse
 import bisect
 import datetime
 import difflib
+import html
 import json
 import os
 import re
@@ -1482,8 +1483,20 @@ def folded_text_pattern(needle):
 _QUOTE_STRIP_RE = re.compile(r"^[ \t]*(?:>[ \t]?)+", re.MULTILINE)
 
 
+def _decode_html_entities(text):
+    """TEXT with every HTML character reference decoded, line by line (D-GAP-5).
+
+    `html.unescape()` runs per line and the result is normalise()d again (a
+    reference can yield a decomposed accent or U+2019): a numeric reference
+    that would otherwise produce a `\\n` (`&#10;`) is turned into a space
+    instead, so the line contract e5_haystacks() promises still holds.
+    """
+    return "\n".join(normalise(html.unescape(line)).replace("\n", " ")
+                      for line in text.split("\n"))
+
+
 def e5_haystacks(text):
-    """The ordered list of line-preserving haystacks E5 searches (D-GAP-4).
+    """The ordered list of line-preserving haystacks E5 searches (D-GAP-4, D-GAP-5).
 
     TEXT is a file's content, already normalise()d with `\\r\\n` and `\\r`
     turned into `\\n`. Every string this returns has exactly as many `\\n`
@@ -1492,14 +1505,27 @@ def e5_haystacks(text):
     own line -- check_confidential_names() runs the exact and the folded
     pass on each one, keeping one newline index per string.
 
-    One stage so far: a quoted reply's markers are stripped from the start
-    of every line, in place -- the stripped text replaces the base rather
-    than joining it as a second variant, since a leading `>` never appears
-    inside a name (D-GAP-4). Two more stages join this one as later plans
-    extend it: an HTML-reference-decoded variant, and a Unicode-format-
-    character-blind reading of every string built so far.
+    Two stages so far:
+    1. A quoted reply's markers are stripped from the start of every line,
+       in place -- the stripped text replaces the base rather than joining
+       it as a second variant, since a leading `>` never appears inside a
+       name (D-GAP-4).
+    2. When decoding HTML character references (`&amp;`, `&#39;`, a named or
+       numeric reference) changes the already-stripped text, a decoded
+       variant is appended (D-GAP-5): `.html` is a sanctioned outbound
+       format, but `&amp;`-style text also reaches Markdown and mail drafts
+       pasted from a web page, so this applies to every outbound text file,
+       not only `.html`. The exact pass is what finds a name holding `&`,
+       since folded_text_pattern() deliberately refuses one.
+    A third stage joins these two as a later plan extends this list: a
+    Unicode-format-character-blind reading of every string built so far.
     """
-    return [_QUOTE_STRIP_RE.sub("", text)]
+    stripped = _QUOTE_STRIP_RE.sub("", text)
+    haystacks = [stripped]
+    decoded = _decode_html_entities(stripped)
+    if decoded != stripped:
+        haystacks.append(decoded)
+    return haystacks
 
 
 def check_confidential_names(root, tree, config, findings):
