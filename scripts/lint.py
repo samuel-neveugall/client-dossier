@@ -860,7 +860,7 @@ def _misplaced_gate_keys(raw, findings):
                     findings.append(Finding(CONFIG_NAME, _line_of(entry), ERROR, "C1",
                                             "{} is written under {}: it is read only at the top level, "
                                             "the confidentiality gate fails closed".format(certain, where)))
-                elif key not in GATE_KEYS:
+                else:
                     near = gate_key_for(key)
                     if near is not None and near not in raw:
                         found = True
