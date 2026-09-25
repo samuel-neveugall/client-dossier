@@ -158,6 +158,12 @@ None - no external service configuration required.
 - Remaining Phase 2 gaps from the 2026-09-25 UAT (G-02-4a case-insensitive `Outbound/`, G-02-4b Unicode format characters, G-02-4c HTML entities, G-02-4e unreadable/`.git` folders under `outbound/`, G-02-4f quoted-reply wrapping) are out of this plan's scope (files_modified: `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh` only for the near-miss rule) and are addressed by sibling gap-closure plans 02-08/02-09.
 - `bash tests/run.sh`: `TOTAL: 6 files, 0 failed`.
 
+## Self-Check: PASSED
+
+- FOUND: `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
+- FOUND commits: `b224542` (Task 1), `91581ea` (Task 2), `f116a8d` (this SUMMARY)
+- `git status --short` after the SUMMARY commit: clean (no leftover mutant files, no uncommitted changes)
+
 ---
 *Phase: 02-linter-test-harness*
 *Completed: 2026-09-25*
