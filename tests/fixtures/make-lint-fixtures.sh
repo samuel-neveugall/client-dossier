@@ -732,6 +732,18 @@ write_file "$parent/case-outbound/outbound/mails/2026-09-17_relance.md" "$LEAK_M
 mv "$parent/case-outbound/outbound" "$parent/case-outbound/outbound-tmp-rename"
 mv "$parent/case-outbound/outbound-tmp-rename" "$parent/case-outbound/Outbound"
 
+# --- case-outbound-config: Outbound/ additionally holds its own dossier.yaml
+# (CR-01 of the iteration-4 review). walk_tree used to test layout
+# membership case-sensitively, so this variant was pruned as a D-03
+# sub-dossier boundary before the case-variant E1 loop above ever saw it --
+# its leak never surfaced. Layout membership is now case-folded, so Outbound/
+# is walked like any other case variant and its own E1 still fires.
+make_named_case case-outbound-config --confidential-name Acme
+write_file "$parent/case-outbound-config/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+cp "$parent/case-outbound-config/dossier.yaml" "$parent/case-outbound-config/outbound/dossier.yaml"
+mv "$parent/case-outbound-config/outbound" "$parent/case-outbound-config/outbound-tmp-rename"
+mv "$parent/case-outbound-config/outbound-tmp-rename" "$parent/case-outbound-config/Outbound"
+
 # --- case-outbound-sub: outbound/mails/ renamed to outbound/Mails/ (OUTBOUND_SUBS) ---
 # outbound/ itself keeps its correct spelling, so the leak is still under the
 # exact `outbound/` prefix: E1-E3 and E5 still read it, only E4 (which needs

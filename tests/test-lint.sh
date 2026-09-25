@@ -663,6 +663,13 @@ assert_last_line '1 error(s), 0 warning(s)' \
   'case-outbound: nothing else fires -- the exact-prefix outbound/ checks never see its files'
 assert_no_finding C1 'case-outbound: no config finding'
 
+# --- Outbound/ holding its own dossier.yaml is still walked, never pruned
+# as a D-03 sub-dossier boundary (CR-01 of the iteration-4 review) ---
+assert_lint "$FIXTURES/case-outbound-config" 1 \
+  'case-outbound-config: a case-variant Outbound/ with its own dossier.yaml still exits 1'
+assert_out_line '^Outbound:0: ERROR \[E1\] ' \
+  'case-outbound-config: the folder itself is reported, not pruned in silence'
+
 assert_lint "$FIXTURES/case-outbound-sub" 1 'case-outbound-sub: a case-variant outbound/Mails/ exits 1'
 assert_out_line '^outbound/Mails:0: ERROR \[E1\] ' 'case-outbound-sub: the folder itself is reported'
 assert_finding E5 'case-outbound-sub: E5 still reads it -- the file sits under the correctly-spelled outbound/'

@@ -128,6 +128,7 @@ PRUNED_DIRS = frozenset((".git",))
 # folder the agent writes to, and its files would otherwise meet no check
 # at all.
 LAYOUT_DIRS = frozenset(("sources", LIVING_DIR, "outbound", "knowledge"))
+_LAYOUT_DIRS_FOLDED = frozenset(d.casefold() for d in LAYOUT_DIRS)
 
 # The agent folder (D-14, spec Sec4.4 check 7). Allowed at exactly
 # `<root>/.claude` and nowhere below it: a second one under the dossier means
@@ -1110,14 +1111,14 @@ def walk_tree(root):
         filenames.sort()
         rel_dir = os.path.relpath(dirpath, root)
         prefix = "" if rel_dir == os.curdir else rel_dir.replace(os.sep, "/") + "/"
-        in_layout = prefix.split("/", 1)[0] in LAYOUT_DIRS
+        in_layout = prefix.split("/", 1)[0].casefold() in _LAYOUT_DIRS_FOLDED
         kept = []
         for name in dirnames:
             if name in PRUNED_DIRS:
                 if in_layout:
                     git_dirs.append(prefix + name)
                 continue
-            if (not in_layout and not (prefix == "" and name in LAYOUT_DIRS)
+            if (not in_layout and not (prefix == "" and name.casefold() in _LAYOUT_DIRS_FOLDED)
                     and os.path.isfile(os.path.join(dirpath, name, CONFIG_NAME))):
                 pruned.append(prefix + name)
                 continue
