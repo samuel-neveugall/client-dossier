@@ -127,7 +127,7 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: 6/6 plans executed
+**Plans**: 6/9 plans executed (3 gap-closure plans added after the 2026-09-25 UAT)
 
 Plans:
 **Wave 1**
@@ -158,6 +158,24 @@ Plans:
 
 - [x] 02-06-PLAN.md — the zero-findings acceptance test in both languages, the
   producer/consumer round trip, and the commands recorded in `CLAUDE.md`
+
+**Wave 6** *(gap closure, UAT 2026-09-25: G-02-2, G-02-4d)*
+
+- [ ] 02-07-PLAN.md — tracer: extension keys beside the exact gate keys are ignored (D-22),
+  certain misspellings stay C1 with E5 armed, the C1 message says "looks like a misspelling of";
+  the two gate lines WR-02 found unpinned are pinned
+
+**Wave 7** *(gap closure: G-02-4a, G-02-4e; blocked on Wave 6 completion)*
+
+- [ ] 02-08-PLAN.md — tracer: a case variant of a layout folder (`Outbound/`, `outbound/Mails/`)
+  fails closed with E1; unreadable folders and `.git` folders under `outbound/` are E1, never
+  skipped in silence
+
+**Wave 8** *(gap closure: G-02-4f, G-02-4c, G-02-4b; blocked on Wave 7 completion)*
+
+- [ ] 02-09-PLAN.md — tracer: E5 searches line-preserving haystack variants, so quoted-reply
+  wraps, HTML character references and Unicode format characters hide no name; `init.py` never
+  writes a format character
 
 ### Phase 3: Protocol Skill & Hooks
 
