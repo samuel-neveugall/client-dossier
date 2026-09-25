@@ -459,6 +459,20 @@ assert_lint "$FIXTURES/gate-key-extras" 0 'gate-key-extras: extension keys besid
 assert_clean 'gate-key-extras'
 assert_lint "$FIXTURES/gate-key-extras-leak" 1 'gate-key-extras-leak: the same config with a leak exits 1'
 assert_only E5 'gate-key-extras-leak: the extension keys neither fail the run nor switch [E5] off'
+# A confidential_names near-miss that is itself a probable typo stays C1 even beside the exact
+# gate key (gap closure option (a), arbitrage Samuel, relayed by the main session via
+# SendMessage, 2026-09-25, CR-02): unlike consent_recorded/consent_source near-misses, and
+# unlike a genuinely different key such as confidential_notes above (OSA distance 2, still
+# ignored), a one-edit-away typo of confidential_names is never silent. The exact key still
+# reads an empty list here (the typo line is where the name sits, and the schema never reads
+# it), so the leak stays undetected by [E5] itself -- the point is [C1] alone already fails
+# the run closed.
+for case_name in gate-key-beside-names-drop gate-key-beside-names-swap; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: a typo of confidential_names beside the exact key exits 1"
+  assert_out_line 'ERROR \[C1\] .*looks like a misspelling of confidential_names' \
+    "$case_name: [C1] names confidential_names even though it is present"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
 # A JSON nested near-miss stays C1 while the exact gate key it resembles is absent from the
 # top level (D-22, D-GAP-1, G-02-2).
 assert_lint "$FIXTURES/gate-nested-typo" 1 'gate-nested-typo: a nested near-miss with the gate key absent exits 1'

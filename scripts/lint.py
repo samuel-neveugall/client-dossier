@@ -238,8 +238,30 @@ GATE_KEYS = frozenset(("confidential_names", "consent_recorded", "consent_source
 # (D-22, D-GAP-1, 2026-09-25 UAT G-02-2): a legitimate extension key such as
 # `consent_scope` or `confidential_notes` sitting beside the exact gate key
 # is a different, known key, and is ignored -- not every near-miss is an
-# error.
+# error. Exception (gap closure option (a), arbitrage Samuel, relayed by the
+# main session via SendMessage, 2026-09-25): a `confidential_names` near-miss
+# that is itself a probable typo -- see CONFIDENTIAL_NAMES_TYPO_CUTOFF below
+# -- stays C1 even while the exact key is present, because leaking the
+# confidential names it lists is the one failure this gate exists to
+# prevent. consent_recorded and consent_source keep the presence exemption
+# unconditionally.
 GATE_KEY_CUTOFF = 0.8
+
+# How a `confidential_names` near-miss earns the exception above: its OSA
+# (Optimal String Alignment) distance to "confidential_names" -- Levenshtein
+# plus a single adjacent-transposition edit -- must be <= this cutoff.
+# Plain Levenshtein cannot separate a typo from a legitimate different key:
+# `confidentail_names` (transposed "ai"/"ia") and `confidential_notes` (a
+# real, different key from the gate-key-extras fixture) are BOTH Levenshtein
+# distance 2 from `confidential_names` -- two substitutions either way.
+# Scoring the transposition as one edit instead of two separates them
+# cleanly: `confidentail_names` becomes OSA distance 1 (a typo), while
+# `confidential_notes` stays at OSA distance 2 (o/t vs a/m, no beneficial
+# transposition) and keeps its presence exemption, same as
+# `non_confidential_names` (OSA distance 4). Cutoff 1 is therefore "one
+# keystroke away downstream of _fold_key" -- a single substitution,
+# insertion, deletion, or adjacent swap.
+CONFIDENTIAL_NAMES_TYPO_CUTOFF = 1
 
 # Which key an UNREADABLE line belongs to, used to word the C1 message.
 # Looser than _KEY_RE on purpose: it accepts a quoted key and no space after
@@ -557,6 +579,44 @@ def _certain_gate_key_for(key):
     return folded if folded in GATE_KEYS else None
 
 
+def _osa_distance(a, b):
+    """Optimal String Alignment distance between A and B: Levenshtein plus a
+    single adjacent-transposition edit, stdlib-only DP (no import beyond
+    what the module already uses). Each character participates in at most
+    one transposition -- the "restricted" variant, simpler than full
+    Damerau-Levenshtein and sufficient for scoring a one-keystroke typo.
+    """
+    m, n = len(a), len(b)
+    d = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        d[i][0] = i
+    for j in range(n + 1):
+        d[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[m][n]
+
+
+def _forces_c1_despite_presence(key, near):
+    """True when a `confidential_names` near-miss stays C1 even though the
+    exact gate key is present in `raw` (gap closure option (a), arbitrage
+    Samuel, relayed by the main session via SendMessage, 2026-09-25).
+
+    Only `confidential_names` near-misses within CONFIDENTIAL_NAMES_TYPO_
+    CUTOFF OSA-distance of it are forced; `consent_recorded` and
+    `consent_source` near-misses keep the unconditional presence exemption
+    from D-22 (a legitimate extension key beside the exact gate key stays
+    silent).
+    """
+    if near != "confidential_names":
+        return False
+    return _osa_distance(_fold_key(key), near) <= CONFIDENTIAL_NAMES_TYPO_CUTOFF
+
+
 def _skipped_key(body, owner):
     """The key an unreadable line is reported under, for the message (CR-01).
 
@@ -842,6 +902,13 @@ def _misplaced_gate_keys(raw, findings):
       legitimate key (`consent_scope` beside `consent_source`) and D-22
       ignores it -- at every depth, so a counterpart-level `confidential_
       notes` beside a top-level `confidential_names` is silent too.
+    - Exception (gap closure option (a), 2026-09-25): a near-miss of
+      `confidential_names` specifically is reported even while the exact
+      key is present, when `_forces_c1_despite_presence()` judges it a
+      probable typo (OSA distance <= CONFIDENTIAL_NAMES_TYPO_CUTOFF) rather
+      than a legitimate different key such as `confidential_notes`.
+      `consent_recorded` and `consent_source` near-misses keep the
+      unconditional presence exemption.
     - A key exactly equal to a gate key at the top level is never reported
       (unchanged).
 
@@ -862,7 +929,7 @@ def _misplaced_gate_keys(raw, findings):
                                             "the confidentiality gate fails closed".format(certain, where)))
                 else:
                     near = gate_key_for(key)
-                    if near is not None and near not in raw:
+                    if near is not None and (near not in raw or _forces_c1_despite_presence(key, near)):
                         found = True
                         findings.append(Finding(CONFIG_NAME, _line_of(entry), ERROR, "C1",
                                                 "'{}' at {} looks like a misspelling of {}, which is read "
@@ -878,7 +945,7 @@ def _misplaced_gate_keys(raw, findings):
             gate = _certain_gate_key_for(key)
             if gate is None:
                 near = gate_key_for(key)
-                if near is not None and near not in raw:
+                if near is not None and (near not in raw or _forces_c1_despite_presence(key, near)):
                     gate = near
             if gate is not None:
                 found = True

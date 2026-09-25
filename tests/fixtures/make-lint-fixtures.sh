@@ -625,6 +625,17 @@ build_gate_key_extras() {
 build_gate_key_extras gate-key-extras
 build_gate_key_extras gate-key-extras-leak
 write_file "$parent/gate-key-extras-leak/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-beside-names-drop / gate-key-beside-names-swap: a confidential_names near-miss
+# that is itself a probable typo stays C1 even though the exact gate key sits right beside it
+# (gap closure option (a), arbitrage Samuel, relayed by the main session via SendMessage,
+# 2026-09-25; CR-02 of 02-REVIEW.md). Both are one OSA edit away from confidential_names --
+# -drop loses the trailing `s` (deletion), -swap transposes the "ia"/"ai" of "confidential"
+# (adjacent transposition) -- unlike confidential_notes in gate-key-extras above, which is a
+# real, different key at OSA distance 2 and keeps the D-22 presence exemption.
+make_gate_case gate-key-beside-names-drop \
+  "$(printf 'confidential_name: [ "Acme" ]\nconfidential_names: []')"
+make_gate_case gate-key-beside-names-swap \
+  "$(printf 'confidentail_names: [ "Acme" ]\nconfidential_names: []')"
 # --- gate-nested-typo: a JSON nested near-miss stays C1 while the exact gate key it
 # resembles is absent from the top level (D-22, D-GAP-1, G-02-2) ---
 make_case gate-nested-typo
