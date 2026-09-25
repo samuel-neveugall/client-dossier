@@ -444,6 +444,19 @@ assert_lint "$FIXTURES/gate-key-consent" 1 'gate-key-consent: a misspelt consent
 assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-key-consent: [C1] names consent_recorded'
 assert_finding E5 'gate-key-consent: the leak check stays armed'
 assert_no_finding C0 'gate-key-consent: never a mere [C0] warning'
+# A certain misspelling of consent_recorded beside a recorded, sourced consent still keeps
+# E5 armed (iteration-3 review WR-02): only gate_damaged explains it, since the exact
+# consent pair alone would suppress the leak check.
+assert_lint "$FIXTURES/gate-key-beside-consent" 1 'gate-key-beside-consent: exits 1'
+assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' \
+  'gate-key-beside-consent: [C1] names consent_recorded'
+assert_finding E5 'gate-key-beside-consent: the leak check stays armed'
+assert_no_finding C0 'gate-key-beside-consent: never a mere [C0] warning'
+# A gate key two levels below the top is still seen: the YAML subset cannot express that
+# depth, but the JSON branch's recursion must (iteration-3 review WR-02).
+assert_lint "$FIXTURES/gate-json-deep" 1 'gate-json-deep: exits 1'
+assert_out_line '^dossier\.yaml:0: ERROR \[C1\] .*confidential_names' 'gate-json-deep: [C1] names the gate key'
+assert_no_finding C0 'gate-json-deep: never a mere [C0] warning'
 assert_lint "$FIXTURES/gate-skip-armed" 1 'gate-skip-armed: an unreadable line beside a sourced consent exits 1'
 assert_finding C1 'gate-skip-armed: the unreadable line is a [C1]'
 assert_finding E5 'gate-skip-armed: and the leak check stays armed'

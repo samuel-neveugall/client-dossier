@@ -574,6 +574,13 @@ make_named_case gate-key-consent --confidential-name Acme --consent-recorded tru
   --consent-source 'mail 2026-09-16 from Jane'
 replace_line "$parent/gate-key-consent/dossier.yaml" 'consent_recorded: true' 'consent-recorded: true'
 write_file "$parent/gate-key-consent/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-beside-consent: a certain misspelling of consent_recorded beside a recorded,
+# sourced consent still keeps E5 armed (iteration-3 review WR-02; kills mutation M1, which
+# forces the near-miss scan's contribution to gate_damaged to False) ---
+make_named_case gate-key-beside-consent --confidential-name Acme --consent-recorded true \
+  --consent-source 'mail 2026-09-16 from Jane'
+printf 'Consent_recorded: false\n' >>"$parent/gate-key-beside-consent/dossier.yaml"
+write_file "$parent/gate-key-beside-consent/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-json-key-case / gate-json-nested: the same two mistakes in a JSON config (WR-01) ---
 make_case gate-json-key-case
 write_file "$parent/gate-json-key-case/dossier.yaml" '{
@@ -591,6 +598,17 @@ write_file "$parent/gate-json-nested/dossier.yaml" '{
 }
 '
 write_file "$parent/gate-json-nested/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-json-deep: a gate key two levels below the top, a depth the YAML subset cannot
+# express (iteration-3 review WR-02; kills mutation M2, which drops visit()'s recursion below
+# the first nesting level) ---
+make_case gate-json-deep
+write_file "$parent/gate-json-deep/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "counterparts": [{"name": "Jane", "meta": {"confidential_names": ["Acme"]}}]
+}
+'
+write_file "$parent/gate-json-deep/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-key-extras / gate-key-extras-leak: legitimate extension keys beside the exact
 # gate keys are ignored, not reported (D-22, 2026-09-25 UAT test 2, G-02-2) ---
 # consent_scope, confidential_notes and the rest of WR-01's measured mappings sit right next
