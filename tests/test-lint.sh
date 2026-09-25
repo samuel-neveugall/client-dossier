@@ -538,10 +538,17 @@ assert_clean 'e5-text-fold-boundary'
 assert_lint "$FIXTURES/e5-slug-boundary" 0 'e5-slug-boundary: bigtelcom, Bigger Telco and Big Telcom exit 0'
 assert_last_line '0 error(s), 0 warning(s)' 'e5-slug-boundary: a longer word is still not the name'
 ew="$FIXTURES/e5-wrapped/outbound/mails/2026-09-17_relance.md"
-assert_lint "$FIXTURES/e5-wrapped" 1 'e5-wrapped: a name split across two lines exits 1'
+assert_lint "$FIXTURES/e5-wrapped" 1 'e5-wrapped: a name split across two lines, or wrapped inside a quoted reply, exits 1'
 assert_only E5 'e5-wrapped: only [E5] fires'
 assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'people at Big'): ERROR \\[E5\\] " \
   'e5-wrapped: reported at the line the name starts on'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'we should meet Big'): ERROR \\[E5\\] " \
+  'e5-wrapped: a single "> " quote marker does not stop the match (D-GAP-4)'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'Earlier still: the Big'): ERROR \\[E5\\] " \
+  'e5-wrapped: a nested "> > " quote marker does not stop the match'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'Tightly quoted: Big'): ERROR \\[E5\\] " \
+  'e5-wrapped: a bare ">" with no space does not stop the match'
+assert_last_line '4 error(s), 0 warning(s)' 'e5-wrapped: the plain wrap plus the three quoted wraps'
 assert_lint "$FIXTURES/e5-spacing" 1 'e5-spacing: whitespace variants exit 1'
 assert_only E5 'e5-spacing: only [E5] fires'
 assert_last_line '3 error(s), 0 warning(s)' 'e5-spacing: two spaces, a no-break space and a tab all match'

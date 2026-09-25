@@ -1472,17 +1472,49 @@ def folded_text_pattern(needle):
     return re.compile(r"(?<![^\W_])(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
 
 
+# A quoted reply's markers, stripped from the START of every line only
+# (multiline mode) before the text is searched: optional leading spaces or
+# tabs, then one or more `>` each optionally followed by one space or tab,
+# which also strips a nested `> > ` in one pass. No `\n` is ever touched, so
+# the line contract e5_haystacks() promises still holds; no configured name
+# begins with `>`, so nothing is lost (D-GAP-4, G-02-4f, WR-04 of the
+# iteration-3 review).
+_QUOTE_STRIP_RE = re.compile(r"^[ \t]*(?:>[ \t]?)+", re.MULTILINE)
+
+
+def e5_haystacks(text):
+    """The ordered list of line-preserving haystacks E5 searches (D-GAP-4).
+
+    TEXT is a file's content, already normalise()d with `\\r\\n` and `\\r`
+    turned into `\\n`. Every string this returns has exactly as many `\\n`
+    as TEXT, and line k of every string comes from line k of TEXT, so a line
+    number computed on any of them from its own newline index is the file's
+    own line -- check_confidential_names() runs the exact and the folded
+    pass on each one, keeping one newline index per string.
+
+    One stage so far: a quoted reply's markers are stripped from the start
+    of every line, in place -- the stripped text replaces the base rather
+    than joining it as a second variant, since a leading `>` never appears
+    inside a name (D-GAP-4). Two more stages join this one as later plans
+    extend it: an HTML-reference-decoded variant, and a Unicode-format-
+    character-blind reading of every string built so far.
+    """
+    return [_QUOTE_STRIP_RE.sub("", text)]
+
+
 def check_confidential_names(root, tree, config, findings):
     """E5: a confidential name in the text or the filename of an outbound file.
 
     Suppressed only when consent is recorded AND sourced; a malformed
     consent_recorded reads as False in the schema, so the check stays armed
     (T-02-02). Both sides are NFC-normalised (P-05). The text half searches
-    the whole file, so a name wrapped across two lines is found, and reports
-    the line the match starts on, once per (line, name). It runs twice: the
-    exact pattern on the NFC text, then folded_text_pattern() on the text as
-    fold_ascii() spells it (WR-03). Folding never adds or removes a `\n`,
-    so a line number read off either string is the same line. The filename half
+    every string e5_haystacks() returns for the file (D-GAP-4), so a name
+    wrapped across two lines, or wrapped again inside a quoted reply, is
+    found, and reports the line the match starts on, once per (line, name)
+    across every one of those strings. Each is searched twice: the exact
+    pattern, then folded_text_pattern() on it as fold_ascii() spells it
+    (WR-03). Folding never adds or removes a `\n`, so a line number read off
+    either form of a given string is the same line. The filename half
     matches the slug spellings E4 allows (filename_pattern). A file that
     will not decode, is symlinked or is oversized skips the text half only;
     the filename half always runs (P-07). The message names the needle and
@@ -1504,25 +1536,31 @@ def check_confidential_names(root, tree, config, findings):
         if text is None:
             continue
         norm = normalise(text).replace("\r\n", "\n").replace("\r", "\n")
-        haystacks = {False: norm}
-        newlines = {}
         seen = set()
-        for name, pattern, _name_pattern, folded_pattern in needles:
-            for folded, regex in ((False, pattern), (True, folded_pattern)):
-                if regex is _NEVER_RE:
-                    continue
-                if folded not in haystacks:
-                    haystacks[True] = fold_ascii(norm)
-                haystack = haystacks[folded]
-                for match in regex.finditer(haystack):
-                    if folded not in newlines:
-                        newlines[folded] = [m.start() for m in re.finditer("\n", haystack)]
-                    number = bisect.bisect_right(newlines[folded], match.start()) + 1
-                    if (number, name) in seen:
+        for haystack in e5_haystacks(norm):
+            newline_idx = None
+            folded_haystack = None
+            folded_idx = None
+            for name, pattern, _name_pattern, folded_pattern in needles:
+                for folded, regex in ((False, pattern), (True, folded_pattern)):
+                    if regex is _NEVER_RE:
                         continue
-                    seen.add((number, name))
-                    findings.append(Finding(rel, number, ERROR, "E5",
-                                            "confidential name '{}' under outbound/".format(name)))
+                    if folded:
+                        if folded_haystack is None:
+                            folded_haystack = fold_ascii(haystack)
+                            folded_idx = [m.start() for m in re.finditer("\n", folded_haystack)]
+                        search_in, idx = folded_haystack, folded_idx
+                    else:
+                        if newline_idx is None:
+                            newline_idx = [m.start() for m in re.finditer("\n", haystack)]
+                        search_in, idx = haystack, newline_idx
+                    for match in regex.finditer(search_in):
+                        number = bisect.bisect_right(idx, match.start()) + 1
+                        if (number, name) in seen:
+                            continue
+                        seen.add((number, name))
+                        findings.append(Finding(rel, number, ERROR, "E5",
+                                                "confidential name '{}' under outbound/".format(name)))
 
 
 def check_consent_source(root, tree, config, findings):

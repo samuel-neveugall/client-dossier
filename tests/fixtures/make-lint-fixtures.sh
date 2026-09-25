@@ -917,11 +917,21 @@ make_named_case e5-slug-boundary --confidential-name 'Big Telco'
 write_file "$parent/e5-slug-boundary/outbound/mails/2026-09-17_bigtelcom-offer.md" "${GOOD_MAIL}
 Bigger Telco and Big Telcom are unrelated.
 "
-# The name hard-wrapped across two lines of a mail body.
+# The name hard-wrapped across two lines of a mail body, then wrapped again
+# inside three styles of quoted reply -- a single '> ', a nested '> > ', and
+# a bare '>' with no space -- none of which may stop the match either
+# (D-GAP-4, G-02-4f, WR-04 of the iteration-3 review).
 make_named_case e5-wrapped --confidential-name 'Big Telco'
 write_file "$parent/e5-wrapped/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 We met the people at Big
 Telco last week.
+
+> On Monday you wrote: we should meet Big
+> Telco next week.
+> > Earlier still: the Big
+> > Telco board met.
+>Tightly quoted: Big
+>Telco again.
 "
 # Two spaces, a no-break space, a tab: one finding each.
 make_named_case e5-spacing --confidential-name 'Big Telco'
