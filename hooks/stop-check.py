@@ -128,6 +128,29 @@ def changed_top_dirs(root):
     return tops
 
 
+# PROVISIONAL (P-02, 03-CONTEXT.md "Pending decisions", awaiting Samuel).
+# status_sentence() makes the Stop reason name the dossier-status skill only
+# when that skill is installed beside this hook, that is when
+# ${CLAUDE_PLUGIN_ROOT}/skills/dossier-status/SKILL.md is a file. Why: D-01
+# wants the reason to name dossier-status as the way to check what is stale,
+# while D-07 forbids pointing the agent at a skill that does not exist yet (it
+# lands in Phase 6); done this way the hook starts naming it the day Phase 6
+# ships the skill, with no edit here. An empty or unset CLAUDE_PLUGIN_ROOT
+# never falls back to a relative path. Reversion path: "always name it" =
+# return the sentence unconditionally; "never name it" = return an empty
+# string; in both cases update the two P-02 assertions in
+# tests/test-hook-stop.sh. Nothing else in the hooks mentions dossier-status.
+def status_sentence():
+    """The sentence naming dossier-status (leading space), or an empty string."""
+    plugin_root = os.environ.get("CLAUDE_PLUGIN_ROOT")
+    if not plugin_root:
+        return ""
+    skill = os.path.join(plugin_root, "skills", "dossier-status", "SKILL.md")
+    if os.path.isfile(skill):
+        return " Run the dossier-status skill to check what is stale."
+    return ""
+
+
 def block_reason(touched):
     """The reason handed to the agent; `touched` names the changed folders."""
     return (
@@ -135,7 +158,7 @@ def block_reason(touched):
         "Before handing back, update the living files the work touched "
         "(one dated, sourced line per fact), or say in one sentence why "
         "none needed it." % touched
-    )
+    ) + status_sentence()
 
 
 def main():

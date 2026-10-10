@@ -239,4 +239,42 @@ expect_silent 'empty stdin' ''
 expect_silent 'JSON that is not an object' '[1, 2, 3]'
 rm -rf "$N"
 
+# --- P-02 (PROVISIONAL): dossier-status sentence ---
+# P-02 (03-CONTEXT.md, awaiting Samuel): the Stop reason names dossier-status
+# only once ${CLAUDE_PLUGIN_ROOT}/skills/dossier-status/SKILL.md exists (D-07:
+# never point at a missing skill). Exactly two cases pin it; if Samuel picks
+# "always name it" or "never name it", these two assertions change with
+# status_sentence() in hooks/stop-check.py and nothing else does.
+D="$(committed_dossier)"
+new_file "$D/outbound/mails/2026-10-10_reply.md"
+STATUS_JSON="$(stop_json "$D" false)"
+
+WITH_STATUS="$(mktemp -d)"
+mkdir -p "$WITH_STATUS/skills/dossier-status"
+printf '%s\n' '---' 'name: dossier-status' '---' >"$WITH_STATUS/skills/dossier-status/SKILL.md"
+CLAUDE_PLUGIN_ROOT="$WITH_STATUS" run_hook stop-check.py "$STATUS_JSON"
+check_common 'P-02, skill present'
+assert_eq block "$(hook_field decision)" 'P-02, skill present: decision is block'
+case "$(hook_field reason)" in
+  *dossier-status*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *)
+    echo "FAIL: P-02, skill present (the reason does not name dossier-status: '$(hook_field reason)')" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    ;;
+esac
+
+WITHOUT_STATUS="$(mktemp -d)"
+CLAUDE_PLUGIN_ROOT="$WITHOUT_STATUS" run_hook stop-check.py "$STATUS_JSON"
+check_common 'P-02, skill absent'
+assert_eq block "$(hook_field decision)" 'P-02, skill absent: decision is block'
+case "$(hook_field reason)" in
+  *dossier-status*)
+    echo "FAIL: P-02, skill absent (the reason names dossier-status: '$(hook_field reason)')" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    ;;
+  *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+esac
+rm -rf "$D" "$WITH_STATUS" "$WITHOUT_STATUS"
+# --- end P-02 (PROVISIONAL) ---
+
 finish
