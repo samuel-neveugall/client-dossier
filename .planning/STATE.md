@@ -12,8 +12,8 @@ progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 21
-  completed_plans: 18
-  percent: 29
+  completed_plans: 21
+  percent: 43
 ---
 
 # Project State
@@ -30,8 +30,8 @@ human and a doctrine check.
 ## Current Position
 
 Phase: 03 (Protocol Skill & Hooks) — EXECUTING
-Plan: 4 of 6
-Status: Ready to execute
+Plan: 6 of 6
+Status: Phase 3 plans complete, awaiting verification
 Phase 2 closed 2026-10-10: recette delegated by Samuel to the agent and run green (`02-UAT.md`
 complete, items 2 and 4 re-tested, 7 gaps resolved by 02-07..02-09); WR-01 (default-ignorable
 characters outside Cf hid a confidential name) fixed by `ce42a6a` on Samuel's call before
@@ -40,7 +40,7 @@ sign-off; `02-VERIFICATION.md` passed 14/14 on `ce42a6a`; `tests/test-lint.sh` 1
 `main` yet — merge awaits Samuel's go.
 Last activity: 2026-10-10 — Phase 03 execution started
 
-Progress: [███░░░░░░░] 29%
+Progress: [████░░░░░░] 43%
 
 ## Performance Metrics
 
@@ -52,22 +52,18 @@ Progress: [███░░░░░░░] 29%
 
 ### Pending Todos
 
-- **Phase 3 paused on Samuel (2026-10-10)** — Q6 (unreachable RED baseline: the scaffold's
-  `sources/README.md` already prevents the edit) and Q7 (fail-open paths of the sources guard, fix
-  vs debt) block 03-05/03-06; Phase 4 cadrage questions Q3-Q5 pending. Details:
-  `.planning/missions/2026-10-10-v1-phases-3-7.md`, `03-REVIEW.md`, `03-SECURITY.md`.
+- Phase 3 executed 2026-10-10: Q6 settled by D-15 (pressured prompt, RED 3/3), Q7 by D-16 (guard hardened); GREEN 3/3 with the plugin. Phase 4 cadrage questions Q3-Q5 pending. Details: `.planning/missions/2026-10-10-v1-phases-3-7.md`, `03-REVIEW.md`, `03-SECURITY.md`.
 
 ### Blockers/Concerns
 
 - Phase 2 is merged into `main` (`6fbd08d`); its planning assumptions and the D-24/D-28
   arbitrations were validated at the 2026-10-10 sign-off.
 - The Stop-hook question (spec §11 #3) is settled by `03-CONTEXT.md` D-01 (ships, block-once);
-  the spec, `CLAUDE.md` and PROJECT.md are amended during Phase 3.
+  the spec, `CLAUDE.md`, PROJECT.md, ROADMAP and REQUIREMENTS were amended in Phase 3 (plans 03-03 and 03-06).
 - `pdftotext` (poppler) is installed on the dev machine (`/opt/homebrew/bin/pdftotext`), checked
   2026-10-10 for Phase 4.
-- `claude plugin validate . --strict` fails on a pre-existing warning about the root `CLAUDE.md`;
-  without `--strict` it passes. `CLAUDE.md`'s command line is stale; fix in Phase 3 or 7.
-- 03-02 Task 3: baseline gate FAILED (RED 0/3, GREEN 2/3 without the plugin; init.py's sources/README.md already prevents the edit). 03-05 cannot start without a recorded RED; Samuel to choose: extend P-01, harder prompt, weaker model, or relax D-10 (see 03-02-SUMMARY.md).
+- Resolved in Phase 3 (03-06): `CLAUDE.md` now documents `claude plugin validate .` (exit 0 observed 2026-10-10); `--strict` stays at exit 1 on the two known warnings (plugin.json `author`, root `CLAUDE.md`) until Phase 7.
+- 03-02 baseline gate resolved: D-15 pressured prompt gave RED 3/3 without the plugin (evidence/red-baseline/); plugin variant GREEN 3/3 (evidence/green-plugin/). P-01/P-02 stay provisional awaiting Samuel.
 
 ## Deferred Items
 
@@ -81,5 +77,5 @@ Progress: [███░░░░░░░] 29%
 ## Session Continuity
 
 Last session: 2026-10-10T13:13:58.213Z
-Stopped at: Completed 03-04-PLAN.md (03-02 still blocked at baseline gate, RED 0/3)
-Resume file: .planning/phases/03-protocol-skill-hooks/03-02-SUMMARY.md
+Stopped at: Completed 03-06-PLAN.md (RED 3/3 baseline, GREEN 3/3 plugin)
+Resume file: .planning/phases/03-protocol-skill-hooks/03-06-SUMMARY.md

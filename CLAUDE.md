@@ -56,9 +56,11 @@ Division of responsibility, which decides where any new behaviour goes:
   and D-06 of `.planning/phases/01-scaffold-templates/01-CONTEXT.md`; spec §4's tree was amended
   in Phase 1 to match. Scripts target **Python 3.8 or newer**, standard library only.
 - **Hooks carry reminders** (`hooks/hooks.json`): SessionStart injects a pointer when a
-  `dossier.yaml` is found upward, PreToolUse denies writes under `sources/`, Stop warns (never
-  blocks) when outbound/sources changed without the dossier. Hooks never do work, and every rule
-  a hook enforces must also be stated in a skill so harnesses without hooks behave the same.
+  `dossier.yaml` is found upward, PreToolUse denies writes under `sources/`, Stop blocks once (the second stop of a
+  turn passes) when outbound/sources changed without the dossier. The hook scripts are Python
+  3.8+ standard library, fail open, and reuse `lint.py`'s upward `dossier.yaml` search. Hooks
+  never do work, and every rule a hook enforces must also be stated in a skill so harnesses
+  without hooks behave the same.
 - **Agents isolate long reading and fresh-eyes review**, both read-only:
   `fact-extractor` (one source → proposed dated, sourced lines per living file, plus
   "contradicts" and "uncertain" lists) and `doctrine-reviewer` (reports findings on a draft,
@@ -109,13 +111,25 @@ status → manifests and distribution.
   repair mode.
 - `bash tests/run.sh` — the full test suite; every `tests/test-*.sh` file, one summary line.
 - `bash tests/test-lint.sh` — the lint tests alone.
-- `claude plugin validate . --strict` — the manifest.
+- `claude plugin validate .` — the manifest and `hooks/hooks.json`; exit 0 expected, with two
+  known warnings (`author` missing in plugin.json; the root `CLAUDE.md` is not loaded as
+  plugin context). `--strict` exits 1 on those two warnings until Phase 7 decides the manifest
+  author and where this development CLAUDE.md lives. Never delete CLAUDE.md to silence it.
+- `bash tests/test-hooks-config.sh` — `hooks/hooks.json` shape and wiring.
+- `bash tests/test-hook-guard-sources.sh` — the PreToolUse guard on `sources/`.
+- `bash tests/test-hook-session-start.sh` — the SessionStart reminder.
+- `bash tests/test-hook-stop.sh` — the block-once Stop check.
+- `bash tests/test-skill-dossier.sh` — frontmatter and content checklist of the `dossier` skill.
+- `bash tests/scenarios/selftest.sh` — free self-test of the scenario harness against a fake `claude`.
+- `bash tests/scenarios/fix-typo.sh [--variant baseline|plugin|pointer-only]... [--runs N] [OUTDIR]`
+  — the PROTO-07 pressure scenario: paid headless `claude -p` runs, run by the agent, never part
+  of `tests/run.sh`. Exit 0 pass, 1 gate not met, 2 harness error.
 - `claude --plugin-dir .` — load the plugin from the working copy during development.
 
 Add more here as they are created.
 
-## Decisions (spec §11, settled 2026-09-16)
+## Decisions (spec §11, settled 2026-09-16 and 2026-10-10)
 
 Name `client-dossier` (entry skill `dossier`), folders `dossier/` and `outbound/`, protocol
-keywords in English. The only remaining open point is whether the Stop hook ships in v1: it is
-decided during Phase 3 planning, with Samuel. Do not settle it unilaterally.
+keywords in English. Spec §11 #3 was settled with Samuel on 2026-10-10 (Phase 3 D-01): the
+Stop hook ships in v1 and blocks once.
