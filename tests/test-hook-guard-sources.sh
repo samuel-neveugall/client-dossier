@@ -134,6 +134,36 @@ expect_deny 'Edit in the inner dossier sources/ (session cwd = outer root)' \
 expect_silent 'Edit in the inner dossier dossier/' \
   "$(hook_json PreToolUse "$d" Edit file_path "$d/clients/acme/dossier/HISTORY.md")"
 
+# --- Case 3b: sources/ itself a symlink out of the dossier (R-F1, A-F4) ---
+echo '--- sources/ is a symlink to a folder outside the dossier ---'
+e=$(scratch_repo)
+build_dossier "$e"
+outside=$(mktemp -d)
+cp -R "$e/sources/." "$outside/"
+rm -rf "$e/sources"
+ln -s "$outside" "$e/sources"
+expect_deny 'Edit existing file through a sources/ symlink' \
+  "$(hook_json PreToolUse "$e" Edit file_path "$e/$TRANSCRIPT_REL")" "$TRANSCRIPT_REL"
+expect_deny 'Write new file through a sources/ symlink' \
+  "$(hook_json PreToolUse "$e" Write file_path "$e/sources/received/new.txt")" 'sources/received/new.txt'
+expect_deny 'Edit relative path through a sources/ symlink' \
+  "$(hook_json PreToolUse "$e" Edit file_path "$TRANSCRIPT_REL")" "$TRANSCRIPT_REL"
+expect_silent 'Edit dossier/HISTORY.md next to a sources/ symlink' \
+  "$(hook_json PreToolUse "$e" Edit file_path "$e/dossier/HISTORY.md")"
+
+# --- Case 3c: a dossier.yaml under sources/ is not a new root (A-F1) ---
+echo '--- dossier.yaml planted under sources/ ---'
+mkdir -p "$d/sources/received/old-export/dossier"
+cp "$d/dossier.yaml" "$d/sources/received/old-export/dossier.yaml"
+expect_deny 'Edit a file under a root planted inside sources/' \
+  "$(hook_json PreToolUse "$d" Edit file_path "$d/sources/received/old-export/dossier/HISTORY.md")" \
+  'sources/received/old-export/dossier/HISTORY.md'
+expect_deny 'Write into the planted root own sources/' \
+  "$(hook_json PreToolUse "$d" Write file_path "$d/sources/received/old-export/sources/x.txt")" \
+  'sources/x.txt'
+expect_silent 'a legitimate nested dossier outside sources/ is still silent' \
+  "$(hook_json PreToolUse "$d" Edit file_path "$d/clients/acme/knowledge/CONTEXT.md")"
+
 # --- Case 4: fail open ---
 echo '--- Fail open ---'
 expect_silent 'stdin is not JSON' 'not json'
@@ -221,6 +251,6 @@ bash_ok 'rm -rf sources outside any dossier' 'rm -rf sources' "$plain"
 
 rm -rf "$b"
 
-rm -rf "$d" "$plain"
+rm -rf "$d" "$plain" "$e" "$outside"
 
 finish

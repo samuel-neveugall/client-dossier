@@ -54,24 +54,41 @@ def find_root(start):
     return None
 
 
+def under_any_sources(candidate):
+    """The path of `candidate` relative to an ancestor dossier root when it
+    lies under that root's sources/ folder, else None.
+
+    EVERY ancestor holding a dossier.yaml is tried, not only the nearest: a
+    dossier.yaml planted or received under sources/ would otherwise turn that
+    subtree into a root and let its files through (A-F1). Nesting stays
+    legitimate outside sources/, since the inner root's own sources/ is under
+    the outer root's non-sources folder and is still denied by the inner root.
+    The first component is compared casefolded because a case-insensitive
+    filesystem keeps the spelling that was typed.
+    """
+    here = os.path.dirname(candidate)
+    for ancestor in (here,) + tuple(Path(here).parents):
+        ancestor = str(ancestor)
+        if not os.path.isfile(os.path.join(ancestor, CONFIG_NAME)):
+            continue
+        parts = os.path.relpath(candidate, ancestor).split(os.sep)
+        if parts[0] not in (".", "..") and parts[0].casefold() == SOURCES_DIR:
+            return "/".join(parts)
+    return None
+
+
 def sources_target(path, cwd):
     """The path of `path` relative to its dossier root when it lies under
     that dossier's sources/ folder, else None.
 
-    The path is joined to `cwd` (an absolute path stays absolute) and
-    resolved through symlinks and `..`; the root is searched from the target
-    so the nearest dossier wins; the first component is compared casefolded
-    because a case-insensitive filesystem keeps the spelling that was typed.
+    The path is joined to `cwd` (an absolute path stays absolute) and judged
+    twice: resolved through symlinks and `..`, and lexically (`normpath`, no
+    link followed). The lexical reading catches a sources/ folder that is
+    itself a symlink to somewhere outside the dossier (R-F1, A-F4), where the
+    resolved path has left the dossier. Either reading under a sources/ denies.
     """
-    target = os.path.realpath(os.path.join(cwd, path))
-    root = find_root(os.path.dirname(target))
-    if root is None:
-        return None
-    rel = os.path.relpath(target, root)
-    parts = rel.split(os.sep)
-    if parts[0] in (".", "..") or parts[0].casefold() != SOURCES_DIR:
-        return None
-    return "/".join(parts)
+    lexical = os.path.normpath(os.path.join(cwd, path))
+    return under_any_sources(os.path.realpath(lexical)) or under_any_sources(lexical)
 
 
 # ---------------------------------------------------------------------------
