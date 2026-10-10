@@ -149,9 +149,10 @@ mission, now validated by the phase's own delivery:
 
 ### Pending Todos
 
-- **Phase 3 planning** — mission `v1-phases-3-7` (2026-10-10) drives Phases 3-7 on per-phase
-  branches; Phase 3 plans await Samuel's answers on the scenario pointer (research Q1) and the
-  `dossier-status` sentence of the Stop hook (research Q2).
+- **Phase 3 paused on Samuel (2026-10-10)** — Q6 (unreachable RED baseline: the scaffold's
+  `sources/README.md` already prevents the edit) and Q7 (fail-open paths of the sources guard, fix
+  vs debt) block 03-05/03-06; Phase 4 cadrage questions Q3-Q5 pending. Details:
+  `.planning/missions/2026-10-10-v1-phases-3-7.md`, `03-REVIEW.md`, `03-SECURITY.md`.
 
 ### Blockers/Concerns
 
