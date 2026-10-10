@@ -257,13 +257,16 @@ print("yes" if hit else "no")
 }
 
 # jsonl_skill_invoked FILE WORD — yes when any assistant tool_use named Skill
-# has an input whose JSON text contains WORD. Loose on purpose: the exact
-# input shape is not a documented contract (RESEARCH A5).
+# has an input whose JSON text contains WORD AND its tool_result (matched by
+# tool_use_id) came back with is_error not true (R4-m7: a denied call is not an
+# invocation). Loose on the input on purpose: the exact input shape is not a
+# documented contract (RESEARCH A5).
 jsonl_skill_invoked() {
   python3 -c '
 import json, sys
 path, word = sys.argv[1], sys.argv[2]
-hit = False
+uses = set()
+results = {}
 try:
     fh = open(path, encoding="utf-8", errors="replace")
 except OSError:
@@ -278,21 +281,28 @@ with fh:
             ev = json.loads(line)
         except ValueError:
             continue
-        if not isinstance(ev, dict) or ev.get("type") != "assistant":
+        if not isinstance(ev, dict) or ev.get("type") not in ("assistant", "user"):
             continue
         msg = ev.get("message")
         content = msg.get("content") if isinstance(msg, dict) else None
         if not isinstance(content, list):
             continue
         for block in content:
-            if (
-                isinstance(block, dict)
-                and block.get("type") == "tool_use"
-                and block.get("name") == "Skill"
-                and word in json.dumps(block.get("input", {}))
-            ):
-                hit = True
-print("yes" if hit else "no")
+            if not isinstance(block, dict):
+                continue
+            if ev.get("type") == "assistant" and block.get("type") == "tool_use":
+                if (
+                    block.get("name") == "Skill"
+                    and word in json.dumps(block.get("input", {}))
+                ):
+                    if isinstance(block.get("id"), str):
+                        uses.add(block["id"])
+            elif ev.get("type") == "user" and block.get("type") == "tool_result":
+                if isinstance(block.get("tool_use_id"), str):
+                    results[block["tool_use_id"]] = block.get("is_error") is True
+# R4-m7: a call counts only when its tool_result came back and is not an error
+# (a permission denial is a tool_result with is_error true).
+print("yes" if any(i in results and not results[i] for i in uses) else "no")
 ' "$1" "$2"
 }
 
@@ -353,12 +363,14 @@ print("yes" if hit else "no")
 # named Agent or Task has an input subagent_type ending in SUFFIX. Both names
 # are matched: in Claude Code 2.1.x the init tools list says Task while the
 # tool_use is named Agent (RESEARCH "State of the Art"). A Skill tool_use that
-# merely mentions the suffix does not count.
+# merely mentions the suffix does not count. As for skills (R4-m7), the call
+# counts only when its tool_result came back with is_error not true.
 jsonl_agent_dispatched() {
   python3 -c '
 import json, sys
-path, suffix = sys.argv[1], sys.argv[2]
-hit = False
+path, word = sys.argv[1], sys.argv[2]
+uses = set()
+results = {}
 try:
     fh = open(path, encoding="utf-8", errors="replace")
 except OSError:
@@ -373,22 +385,29 @@ with fh:
             ev = json.loads(line)
         except ValueError:
             continue
-        if not isinstance(ev, dict) or ev.get("type") != "assistant":
+        if not isinstance(ev, dict) or ev.get("type") not in ("assistant", "user"):
             continue
         msg = ev.get("message")
         content = msg.get("content") if isinstance(msg, dict) else None
         if not isinstance(content, list):
             continue
         for block in content:
-            if (
-                isinstance(block, dict)
-                and block.get("type") == "tool_use"
-                and block.get("name") in ("Agent", "Task")
-                and isinstance(block.get("input"), dict)
-                and str(block["input"].get("subagent_type", "")).endswith(suffix)
-            ):
-                hit = True
-print("yes" if hit else "no")
+            if not isinstance(block, dict):
+                continue
+            if ev.get("type") == "assistant" and block.get("type") == "tool_use":
+                if (
+                    block.get("name") in ("Agent", "Task")
+                    and isinstance(block.get("input"), dict)
+                    and str(block["input"].get("subagent_type", "")).endswith(word)
+                ):
+                    if isinstance(block.get("id"), str):
+                        uses.add(block["id"])
+            elif ev.get("type") == "user" and block.get("type") == "tool_result":
+                if isinstance(block.get("tool_use_id"), str):
+                    results[block["tool_use_id"]] = block.get("is_error") is True
+# R4-m7: a call counts only when its tool_result came back and is not an error
+# (a permission denial is a tool_result with is_error true).
+print("yes" if any(i in results and not results[i] for i in uses) else "no")
 ' "$1" "$2"
 }
 

@@ -49,15 +49,30 @@ assert_eq yes "$(call jsonl_has_agent_prefix "$INIT_OBJ" client-dossier:)" 'json
 assert_eq no "$(call jsonl_has_agent_prefix "$INIT_NONE" client-dossier:)" 'jsonl_has_agent_prefix: no agents key'
 assert_eq no "$(call jsonl_has_agent_prefix "$INIT_STR" other:)" 'jsonl_has_agent_prefix: prefix miss'
 
+# R4-m7: a call counts only with its tool_result, matched by tool_use_id, not in error.
+OKR='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok","is_error":false}]}}'
+NOERRKEY='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}'
+ERRR='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"denied","is_error":true}]}}'
+OTHERR='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","content":"ok","is_error":false}]}}'
+SKU='{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Skill","input":{"skill":"client-dossier:dossier-ingest"}}]}}'
+AGU='{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"subagent_type":"client-dossier:fact-extractor"}}]}}'
+for pair in "ok:$OKR:yes" "noerrkey:$NOERRKEY:yes" "error:$ERRR:no" "other-id:$OTHERR:no" "none::no"; do
+  label="${pair%%:*}"; rest="${pair#*:}"; res="${rest%:*}"; want="${rest##*:}"
+  printf '%s\n' "$SKU" ${res:+"$res"} >"$WORK/pair-skill.jsonl"
+  printf '%s\n' "$AGU" ${res:+"$res"} >"$WORK/pair-agent.jsonl"
+  assert_eq "$want" "$(call jsonl_skill_invoked "$WORK/pair-skill.jsonl" dossier-ingest)" "jsonl_skill_invoked: result $label"
+  assert_eq "$want" "$(call jsonl_agent_dispatched "$WORK/pair-agent.jsonl" fact-extractor)" "jsonl_agent_dispatched: result $label"
+done
+
 DISP_AGENT="$WORK/dispatch-agent.jsonl"
 DISP_TASK="$WORK/dispatch-task.jsonl"
 DISP_GENERAL="$WORK/dispatch-general.jsonl"
 DISP_SKILL="$WORK/dispatch-skill.jsonl"
 printf '%s\n' 'noise' \
-  '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Agent","input":{"subagent_type":"client-dossier:fact-extractor"}}]}}' >"$DISP_AGENT"
-printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Task","input":{"subagent_type":"client-dossier:fact-extractor"}}]}}' >"$DISP_TASK"
-printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Agent","input":{"subagent_type":"general-purpose"}}]}}' >"$DISP_GENERAL"
-printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"client-dossier:fact-extractor"}}]}}' >"$DISP_SKILL"
+  '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"subagent_type":"client-dossier:fact-extractor"}}]}}' "$OKR" >"$DISP_AGENT"
+printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Task","input":{"subagent_type":"client-dossier:fact-extractor"}}]}}' "$OKR" >"$DISP_TASK"
+printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Agent","input":{"subagent_type":"general-purpose"}}]}}' "$OKR" >"$DISP_GENERAL"
+printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Skill","input":{"skill":"client-dossier:fact-extractor"}}]}}' "$OKR" >"$DISP_SKILL"
 
 assert_eq yes "$(call jsonl_agent_dispatched "$DISP_AGENT" fact-extractor)" 'jsonl_agent_dispatched: Agent tool_use'
 assert_eq yes "$(call jsonl_agent_dispatched "$DISP_TASK" fact-extractor)" 'jsonl_agent_dispatched: Task tool_use'
@@ -213,10 +228,20 @@ fi
 printf '%s\n' '{"type":"system","subtype":"init","model":"fake-model","claude_code_version":"0.0.0-fake","skills":'"$skills"',"agents":'"$agents"'}'
 if [ "$has_plugin" = yes ]; then
   if [ -z "${FAKE_NOINVOKE:-}" ]; then
-    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"client-dossier:dossier-ingest"}}]}}'
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_skill","name":"Skill","input":{"skill":"client-dossier:dossier-ingest"}}]}}'
+    if [ -n "${FAKE_DENY_SKILL:-}" ]; then
+      printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_skill","content":"Permission denied","is_error":true}]}}'
+    elif [ -z "${FAKE_NORESULT:-}" ]; then
+      printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_skill","content":"Launching skill"}]}}'
+    fi
   fi
   if [ -z "${FAKE_NODISPATCH:-}" ]; then
-    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Agent","input":{"subagent_type":"client-dossier:fact-extractor"}}]}}'
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_agent","name":"Agent","input":{"subagent_type":"client-dossier:fact-extractor"}}]}}'
+    if [ -n "${FAKE_DISPATCH_ERROR:-}" ]; then
+      printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_agent","content":"Agent type not found","is_error":true}]}}'
+    elif [ -z "${FAKE_NORESULT:-}" ]; then
+      printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_agent","content":"Read: 7 lines","is_error":false}]}}'
+    fi
   fi
 fi
 if [ "$mode" = error ]; then iserr=true; else iserr=false; fi
@@ -360,11 +385,24 @@ assert_eq GREEN "$(col 3)" 'plugin + correct: verdict GREEN'
 assert_eq yes "$(col 13)" 'plugin + correct: corrected yes'
 assert_eq 0 "$(col 9)" 'plugin + correct: lint_exit 0'
 
-# --- Case 4: the dispatch never gates ---
+# --- Case 4: 04 D-12 amended, the fact-extractor dispatch gates GREEN ---
 run_case plugin FAKE_MODE=ingest FAKE_NODISPATCH=1
-assert_eq 0 "$CASE_STATUS" 'plugin + ingest + NODISPATCH: exit 0 (dispatch never gates)'
-assert_eq GREEN "$(col 3)" 'plugin + ingest + NODISPATCH: verdict GREEN'
+assert_eq 1 "$CASE_STATUS" 'plugin + ingest + NODISPATCH: exit 1 (the dispatch gates)'
+assert_eq INCOMPLETE "$(col 3)" 'plugin + ingest + NODISPATCH: verdict INCOMPLETE'
 assert_eq no "$(col 12)" 'plugin + ingest + NODISPATCH: extractor_dispatched no'
+run_case plugin FAKE_MODE=ingest FAKE_DISPATCH_ERROR=1
+assert_eq 1 "$CASE_STATUS" 'plugin + ingest + dispatch tool_result in error: exit 1 (R4-m7)'
+assert_eq INCOMPLETE "$(col 3)" 'plugin + ingest + dispatch in error: verdict INCOMPLETE'
+assert_eq no "$(col 12)" 'plugin + ingest + dispatch in error: extractor_dispatched no'
+run_case plugin FAKE_MODE=ingest FAKE_DENY_SKILL=1
+assert_eq 1 "$CASE_STATUS" 'plugin + ingest + Skill call denied: exit 1 (R4-m7)'
+assert_eq INCOMPLETE "$(col 3)" 'plugin + ingest + Skill call denied: verdict INCOMPLETE'
+assert_eq no "$(col 11)" 'plugin + ingest + Skill call denied: ingest_skill no'
+run_case plugin FAKE_MODE=ingest FAKE_NORESULT=1
+assert_eq INCOMPLETE "$(col 3)" 'plugin + ingest + no tool_result at all: verdict INCOMPLETE (R4-m7)'
+# Both paid harnesses carry the amended gate (grep, since the PDF one has no fake).
+assert_grep '"\$R_INGEST" = yes \] && \[ "\$R_DISPATCH" = yes' "$HARNESS"
+assert_grep '"\$R_INGEST" = yes \] && \[ "\$R_DISPATCH" = yes' "$SCEN_DIR/ingest-pdf.sh"
 
 # --- Case 5: D-12, GREEN needs the dossier-ingest Skill invocation ---
 run_case plugin FAKE_MODE=ingest FAKE_NOINVOKE=1

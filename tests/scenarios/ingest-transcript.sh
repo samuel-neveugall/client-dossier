@@ -25,8 +25,10 @@
 #               added, (c) every living file with added lines has its first
 #               `Last updated:` line dated the run date, (d) lint.py does not
 #               exit 1; in the plugin variants (D-12) also a `Skill` tool_use
-#               naming dossier-ingest. The fact-extractor dispatch is recorded
-#               (extractor_dispatched) but never gates.
+#               naming dossier-ingest AND a successful `Agent`/`Task` dispatch of
+#               client-dossier:fact-extractor (04 D-12 amended: the dispatch is
+#               mandatory when a subagent tool exists, spec 4.1). A call whose
+#               tool_result is an error does not count (R4-m7).
 #   INCOMPLETE  anything else
 # Harness error (exit 2, `HARNESS ERROR:` on stderr, never a verdict): missing
 # result event, is_error true, the fixture missing or not lint-clean before the
@@ -345,7 +347,7 @@ run_one() {
   if [ "$R_TS" -eq 0 ]; then
     R_VERDICT=RED
   elif [ "$R_FILED_NAME" != none ] && [ "$R_REFRESHED" = yes ] && [ "$R_LINT" -ne 1 ] \
-    && { [ "$with_plugin" = no ] || [ "$R_INGEST" = yes ]; }; then
+    && { [ "$with_plugin" = no ] || { [ "$R_INGEST" = yes ] && [ "$R_DISPATCH" = yes ]; }; }; then
     R_VERDICT=GREEN
   else
     R_VERDICT=INCOMPLETE

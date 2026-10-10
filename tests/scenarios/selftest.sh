@@ -77,7 +77,8 @@ else
 fi
 printf '%s\n' '{"type":"system","subtype":"init","model":"fake-model","claude_code_version":"0.0.0-fake","skills":'"$skills"'}'
 if [ "$listed" = yes ]; then
-  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"client-dossier:dossier"}}]}}'
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_s1","name":"Skill","input":{"skill":"client-dossier:dossier"}}]}}'
+  printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_s1","content":"Launching skill","is_error":false}]}}'
 fi
 if [ "${FAKE_MODE:-refuse}" = error ]; then
   iserr=true

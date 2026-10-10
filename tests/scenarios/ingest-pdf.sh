@@ -23,9 +23,10 @@
 #               line added to dossier/ACTORS.md names the page-2 contact; every
 #               living file with added lines has its first `Last updated:` line
 #               dated the run date; lint.py does not exit 1; and a `Skill`
-#               tool_use names dossier-ingest. The fact-extractor dispatch is
-#               recorded (extractor_dispatched), never a gate (D-12), and so is
-#               filed_date_is_content (D-01).
+#               tool_use names dossier-ingest and a successful dispatch of
+#               client-dossier:fact-extractor is in the stream (04 D-12 amended:
+#               mandatory, spec 4.1; an errored call does not count, R4-m7).
+#               filed_date_is_content (D-01) is recorded, never a gate.
 #   INCOMPLETE  anything else
 # Harness error (exit 2, `HARNESS ERROR:` on stderr, never a verdict): missing
 # result event, is_error true, pdftotext or make-pdf.py missing, the prepared
@@ -285,7 +286,7 @@ run_one() {
 
   if [ "$R_FILED_NAME" != none ] && [ "$R_TEXT" = yes ] && [ "$R_PAGE_LINES" -ge 1 ] \
     && [ "$R_RIGHT" = yes ] && [ "$R_REFRESHED" = yes ] && [ "$R_LINT" -ne 1 ] \
-    && [ "$R_INGEST" = yes ]; then
+    && [ "$R_INGEST" = yes ] && [ "$R_DISPATCH" = yes ]; then
     R_VERDICT=GREEN
   else
     R_VERDICT=INCOMPLETE
