@@ -61,31 +61,31 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Protocol skill `dossier` + hooks
 
-- [ ] **PROTO-01**: The `dossier` skill triggers on any task in a repository containing
+- [x] **PROTO-01**: The `dossier` skill triggers on any task in a repository containing
       `dossier.yaml`, or any mention of a client/counterpart/prospect/partner/call/message
       to someone outside the team, and is always loaded first
 - [ ] **PROTO-02**: The `dossier` skill's content covers the four-folder layout, the
       read-before-act/update-before-handoff table, the fact-line format, the status-header
       format, the "what the agent never does" list, the "Name (Organisation)" rule on first
       mention of a person in a file, and one-sentence pointers to the other five skills
-- [ ] **PROTO-03**: The `dossier` skill sets the rule that the agent writes dossier content
+- [x] **PROTO-03**: The `dossier` skill sets the rule that the agent writes dossier content
       in the language configured in `dossier.yaml`
-- [ ] **PROTO-04**: A SessionStart hook injects the protocol reminder ("this repository is a
+- [x] **PROTO-04**: A SessionStart hook injects the protocol reminder ("this repository is a
       client dossier, load the `dossier` skill") whenever `dossier.yaml` is found from the
       working directory upward, and stays silent otherwise
-- [ ] **PROTO-05**: A PreToolUse hook on Write/Edit/MultiEdit/NotebookEdit denies any write
+- [x] **PROTO-05**: A PreToolUse hook on Write/Edit/MultiEdit/NotebookEdit denies any write
       whose target path resolves under the sources folder of the nearest dossier, new files
       included, with the message that sources are immutable; a second, heuristic PreToolUse
       guard on Bash denies commands that visibly modify an existing file under sources
       (in-place edits, rm, mv out, cp, tee or redirection onto it, truncate, git rm) and
       allows copying a new file in (Phase 3 D-03, D-04)
-- [ ] **PROTO-06**: A Stop hook blocks the stop once when `git status` shows uncommitted
+- [x] **PROTO-06**: A Stop hook blocks the stop once when `git status` shows uncommitted
       changes under outbound or sources but none under the dossier folder, returning a
       reason to the agent (update the living files the work touched, or say why none needed
       it; `dossier-status` named once that skill exists); the second stop of the same turn
       (`stop_hook_active`) passes, so it never loops (settled with Samuel 2026-10-10,
       Phase 3 D-01)
-- [ ] **PROTO-07**: The "fix the typo in the transcript" baseline pressure scenario is
+- [x] **PROTO-07**: The "fix the typo in the transcript" baseline pressure scenario is
       recorded RED (agent edits the source) before the protocol skill/hooks exist, and
       re-run GREEN (the transcript stays byte-identical and the agent files the correction
       as a dated, sourced line in the living file concerned; Phase 3 D-09) after
@@ -218,14 +218,14 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | LINT-01 | Phase 2 | Complete |
 | LINT-02 | Phase 2 | Complete |
 | LINT-03 | Phase 2 | Complete |
-| PROTO-01 | Phase 3 | Pending |
-| PROTO-02 | Phase 3 (pointers completed incrementally as each task skill lands in Phases 4-6, verified in full at Phase 6; D-07) | Pending |
-| PROTO-03 | Phase 3 | Pending |
-| PROTO-04 | Phase 3 | Pending |
-| PROTO-05 | Phase 3 | Pending |
-| PROTO-06 | Phase 3 | Pending |
-| PROTO-07 | Phase 3 | Pending |
-| PROTO-08 | Phase 3 (rule and hooks; the task-skill stop completed incrementally in Phases 4-6, verified in full at Phase 6) | Pending |
+| PROTO-01 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-02 | Phase 3 (pointers completed incrementally as each task skill lands in Phases 4-6, verified in full at Phase 6; D-07) | Partial — Phase 3 part done 2026-10-10 (only `dossier-init` pointer exists) |
+| PROTO-03 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-04 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-05 | Phase 3 | Complete (closed 2026-10-10) — Bash guard class D-04 accepted as documented v1 debt (D-17) |
+| PROTO-06 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-07 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-08 | Phase 3 (rule and hooks; the task-skill stop completed incrementally in Phases 4-6, verified in full at Phase 6) | Partial — Phase 3 part done 2026-10-10 (rule, hooks, entry skill) |
 | INGEST-01 | Phase 4 | Pending |
 | INGEST-02 | Phase 4 | Pending |
 | INGEST-03 | Phase 4 | Pending |

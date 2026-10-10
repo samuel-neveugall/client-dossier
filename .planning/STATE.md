@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 03
-current_phase_name: Protocol Skill & Hooks
-status: executing
+current_phase: 04
+current_phase_name: Ingest & Fact Extraction
+status: ready_to_plan
 stopped_at: Completed 03-04-PLAN.md (03-02 still blocked at baseline gate, RED 0/3)
 last_updated: "2026-10-10T13:13:58.245Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 03 execution started
+last_activity_desc: Phase 03 verified and UAT complete
 state_head: d037cf0473fbbf25cf82e46cc85081e4895a4b93
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 21
   completed_plans: 21
-  percent: 43
+  percent: 57
 ---
 
 # Project State
@@ -25,22 +25,18 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 03 — Protocol Skill & Hooks
+**Current focus:** Phase 04 — Ingest & Fact Extraction (ready to plan)
 
 ## Current Position
 
-Phase: 03 (Protocol Skill & Hooks) — EXECUTING
-Plan: 6 of 6
-Status: Phase 3 plans complete, awaiting verification
-Phase 2 closed 2026-10-10: recette delegated by Samuel to the agent and run green (`02-UAT.md`
-complete, items 2 and 4 re-tested, 7 gaps resolved by 02-07..02-09); WR-01 (default-ignorable
-characters outside Cf hid a confidential name) fixed by `ce42a6a` on Samuel's call before
-sign-off; `02-VERIFICATION.md` passed 14/14 on `ce42a6a`; `tests/test-lint.sh` 1551 assertions,
-`bash tests/run.sh` 6 files, 0 failed. Branch `feat/phase-02-gap-closure` is NOT merged into
-`main` yet — merge awaits Samuel's go.
-Last activity: 2026-10-10 — Phase 03 execution started
+Phase: 04 (Ingest & Fact Extraction) — ready to plan
+Status: Phase 3 closed 2026-10-10: `03-VERIFICATION.md` passed 6/6 (1 override, the D-04 class, D-17);
+`03-UAT.md` complete (agent-run: GREEN 3/3 replay twice, plugin+AGENTS.md 3/3, real `claude -p`
+sessions for the 3 hooks, run.sh 11/0, plugin validate exit 0). Branch
+`feat/phase-03-protocol-skill-hooks` merges into `main` (--no-ff) and is pushed by the manager.
+Last activity: 2026-10-10 — Phase 3 verification + recette
 
-Progress: [████░░░░░░] 43%
+Progress: [██████░░░░] 57%
 
 ## Performance Metrics
 
@@ -78,5 +74,5 @@ Progress: [████░░░░░░] 43%
 ## Session Continuity
 
 Last session: 2026-10-10T13:13:58.213Z
-Stopped at: Completed 03-06-PLAN.md (RED 3/3 baseline, GREEN 3/3 plugin)
-Resume file: .planning/phases/03-protocol-skill-hooks/03-06-SUMMARY.md
+Stopped at: Phase 3 closed (verification passed, UAT complete)
+Resume file: .planning/phases/03-protocol-skill-hooks/03-UAT.md
