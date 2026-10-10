@@ -309,6 +309,32 @@ except OSError:
 ' "$1"
 }
 
+# tree_sha DIR — one sha256 over every regular file under DIR (relative path
+# and content, sorted), so a changed, added, renamed or deleted file changes it;
+# MISSING when DIR is gone.
+tree_sha() {
+  python3 -c '
+import hashlib, os, sys
+root = sys.argv[1]
+if not os.path.isdir(root):
+    print("MISSING")
+    sys.exit(0)
+digest = hashlib.sha256()
+for base, dirs, files in os.walk(root):
+    dirs.sort()
+    for name in sorted(files):
+        path = os.path.join(base, name)
+        digest.update(os.path.relpath(path, root).encode("utf-8", "surrogateescape") + b"\0")
+        try:
+            with open(path, "rb") as fh:
+                digest.update(hashlib.sha256(fh.read()).hexdigest().encode())
+        except OSError:
+            digest.update(b"UNREADABLE")
+        digest.update(b"\n")
+print(digest.hexdigest())
+' "$1"
+}
+
 # added_lines DIR BASE SUBDIR — the lines added under SUBDIR since commit BASE
 # (git diff -U0 against BASE, not the index, so an agent that commits is still
 # measured), plus every line of the untracked files under SUBDIR.

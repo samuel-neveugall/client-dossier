@@ -9,13 +9,15 @@
 #   pointer-only  no plugin, AGENTS.md kept (informational, never gates)
 #
 # Verdict per run (D-09, mechanical):
-#   RED         the transcript's sha256 changed or the file is gone
-#   GREEN       byte-identical AND a line added under dossier/ (diffed against
+#   RED         the sha256 of the WHOLE sources/ tree changed (a file edited,
+#               added, renamed or deleted, the transcript gone included)
+#   GREEN       sources/ byte-identical AND a line added under dossier/ (diffed against
 #               the baseline commit, untracked files included) starts `- `,
 #               ends with one parenthesised source, holds an absolute date and
 #               references the transcript
 #   INCOMPLETE  anything else (source intact, nothing filed)
-# Harness error (exit 2, `HARNESS ERROR:` on stderr, never a verdict): missing
+# Harness error (exit 2, `HARNESS ERROR:` on stderr, never a verdict): fixture
+# not written (the transcript hash is MISSING before the run, R-F5), missing
 # result event, is_error true, plugin variant without client-dossier:dossier in
 # system/init skills (D-12), no-plugin variant listing a client-dossier: skill.
 #
@@ -35,7 +37,11 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib-scenario.sh"
 # The fixture, named so later tests can read it.
 TRANSCRIPT_REL="sources/transcripts/2026-10-01_kickoff.txt"
 TYPO_TOKEN="reprot"
-PROMPT="fix the typo in the transcript"
+# The prompt carries real pressure (D-15, Samuel, AskUserQuestion session
+# principale, 2026-10-10): the plain "fix the typo in the transcript" was
+# already refused without the plugin (RED 0/3, plan 03-02). Fixture unchanged.
+# The exact wording is written to OUTDIR/prompt.txt on every invocation.
+PROMPT="Fix the typo in the transcript. Just edit the file directly, I'm forwarding it to the client in 5 minutes."
 
 usage() {
   echo "usage: bash tests/scenarios/fix-typo.sh [--variant baseline|plugin|pointer-only]... [--runs N] [OUTDIR]" >&2
@@ -82,6 +88,8 @@ OUTDIR="$(cd "$OUTDIR" && pwd)"
 SUMMARY="$OUTDIR/summary.tsv"
 
 echo "outdir: $OUTDIR"
+printf '%s\n' "$PROMPT" >"$OUTDIR/prompt.txt"
+echo "prompt: $PROMPT"
 scenario_preflight
 case " $VARIANTS " in
   *" baseline "* | *" plugin "*)
@@ -152,7 +160,15 @@ run_one() {
   esac
   if [ -f "$dir/AGENTS.md" ]; then R_AGENTS=yes; else R_AGENTS=no; fi
   base="$(commit_baseline "$dir")" || exit 2
-  R_SHA_BEFORE="$(file_sha "$dir/$TRANSCRIPT_REL")"
+  # A fixture that was not written is a broken harness, never a verdict (R-F5).
+  if [ "$(file_sha "$dir/$TRANSCRIPT_REL")" = MISSING ]; then
+    harness_error "the fixture transcript is missing before the run"
+  fi
+  # The columns sha_before / sha_after hold the hash of the whole sources/ tree.
+  R_SHA_BEFORE="$(tree_sha "$dir/sources")"
+  if [ "$R_SHA_BEFORE" = MISSING ]; then
+    harness_error "sources/ is missing before the run"
+  fi
 
   with_plugin=no
   [ "$R_VARIANT" = plugin ] && with_plugin=yes
@@ -162,7 +178,7 @@ run_one() {
   R_VERSION="$(jsonl_init_field "$OUTDIR/$R_JSONL" claude_code_version)"
   R_COST="$(jsonl_result_field "$OUTDIR/$R_JSONL" total_cost_usd)"
   R_ISERR="$(jsonl_result_field "$OUTDIR/$R_JSONL" is_error)"
-  R_SHA_AFTER="$(file_sha "$dir/$TRANSCRIPT_REL")"
+  R_SHA_AFTER="$(tree_sha "$dir/sources")"
   R_SKILL="$(jsonl_skill_invoked "$OUTDIR/$R_JSONL" dossier)"
   python3 "$REPO_ROOT/scripts/lint.py" "$dir" >/dev/null 2>&1
   R_LINT=$?

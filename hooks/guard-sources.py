@@ -27,7 +27,6 @@ Python 3 standard library only, targeting Python >= 3.8.
 
 import json
 import os
-import re
 import shlex
 import sys
 from pathlib import Path
@@ -113,13 +112,11 @@ SEPARATORS = frozenset((";", ";;", "&&", "||", "|", "|&", "&", "\n"))
 OPENERS = frozenset(("(", "<(", ">("))
 WRITE_REDIRECTS = frozenset((">", ">>", ">|", "&>", "&>>"))
 OTHER_REDIRECTS = frozenset(("<", "<<", "<<<", "<&", ">&"))
-FD_OPERAND = re.compile(r"[0-9]+-?|-")
 WRAPPERS = ("sudo", "command", "env", "nohup", "time", "exec", "builtin")
 # Shell reserved words that can open a segment: the real command follows.
 RESERVED = frozenset(("if", "then", "else", "elif", "fi", "do", "done", "while",
                       "until", "for", "case", "esac", "{", "}", "!", "function"))
-HEREDOC = re.compile(r"<<(?!<)(-?)\s*\\?(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
-FALLBACK_SPLIT = re.compile(r"(;|&&|\|\||\||&)")
+FALLBACK_SEPARATORS = (";", "&&", "||", "|", "&")
 WRAPPER_ARG_OPTIONS = {"sudo": ("-u", "-g", "-h", "-p", "-C", "-D", "-r",
                                 "-t", "-T", "-U", "-R"),
                        "env": ("-u", "-C", "-S")}
@@ -144,6 +141,60 @@ def has_in_place_flag(arg):
     return False
 
 
+def is_fd_operand(word):
+    """True for the operand of `>&` that duplicates a descriptor: N, N- or -."""
+    return word == "-" or word.rstrip("-").isdigit()
+
+
+def heredoc_operators(line):
+    """[(start, dash, word)] for each `<<WORD`, `<<-WORD`, `<<'WORD'`,
+    `<<"WORD"` or `<<\\WORD` of `line` (a here-string `<<<` is not one)."""
+    found = []
+    pos = line.find("<<")
+    while pos != -1:
+        end = pos + 2
+        if line.startswith("<", end) or (pos > 0 and line[pos - 1] == "<"):
+            pos = line.find("<<", end)
+            continue
+        dash = line.startswith("-", end)
+        end += 1 if dash else 0
+        while line.startswith((" ", "\t"), end):
+            end += 1
+        if line.startswith("\\", end):
+            end += 1
+        quote = line[end] if line[end:end + 1] in ("'", '"') else ""
+        end += 1 if quote else 0
+        start = end
+        while end < len(line) and (line[end].isalnum() or line[end] == "_") \
+                and line[end].isascii():
+            end += 1
+        word = line[start:end]
+        if word and not word[0].isdigit() and line[end:end + len(quote)] == quote:
+            found.append((pos, dash, word))
+        pos = line.find("<<", max(end, pos + 2))
+    return found
+
+
+def split_segments(line):
+    """`line` cut at ; && || | & with the separators kept as pieces."""
+    pieces = []
+    word = ""
+    index = 0
+    while index < len(line):
+        for sep in FALLBACK_SEPARATORS:
+            if line.startswith(sep, index):
+                pieces.append(word)
+                pieces.append(sep)
+                word = ""
+                index += len(sep)
+                break
+        else:
+            word += line[index]
+            index += 1
+    pieces.append(word)
+    return pieces
+
+
 def strip_heredocs(command):
     """The command without its heredoc bodies and terminator lines.
 
@@ -160,11 +211,10 @@ def strip_heredocs(command):
         line = lines[index]
         kept.append(line)
         index += 1
-        for found in HEREDOC.finditer(line):
-            before = line[:found.start()]
+        for start, dash, word in heredoc_operators(line):
+            before = line[:start]
             if before.count("'") % 2 or before.count('"') % 2:
                 continue
-            word, dash = found.group(3), found.group(1) == "-"
             end = index
             while end < len(lines) and \
                     (lines[end].lstrip("\t") if dash else lines[end]) != word:
@@ -213,8 +263,8 @@ def lenient_lex(text):
         words = lex(line)
         if words is None:
             words = []
-            for piece in FALLBACK_SPLIT.split(line):
-                if FALLBACK_SPLIT.fullmatch(piece):
+            for piece in split_segments(line):
+                if piece in FALLBACK_SEPARATORS:
                     words.append(piece)
                     continue
                 part = lex(piece)
@@ -572,7 +622,7 @@ def scan(command, cwd, depth):
             if nxt is not None and nxt not in SEPARATORS and nxt not in OPENERS \
                     and nxt != ")":
                 if token in WRITE_REDIRECTS or \
-                        (token == ">&" and not FD_OPERAND.fullmatch(nxt)):
+                        (token == ">&" and not is_fd_operand(nxt)):
                     targets.append(nxt)
                 index += 1
         elif token in SEPARATORS or token in OPENERS or token == ")":
