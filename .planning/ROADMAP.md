@@ -13,8 +13,9 @@ earlier one.
 
 **Decisions settled 2026-09-16 (spec §11):** the plugin is `client-dossier`, the folders are
 `dossier/` and `outbound/`, protocol keywords (`Last updated:`, status-header fields and
-values) stay English and are never translated. The one remaining open point, whether the Stop
-hook ships in v1, is decided during Phase 3 planning with Samuel; the spec ships it by default.
+values) stay English and are never translated. The Stop
+hook question (spec section 11 #3) was settled at Phase 3 planning with Samuel on 2026-10-10:
+it ships in v1 and blocks once.
 
 **Development loop:** the plugin is loaded from the working copy with `claude --plugin-dir .`
 from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
@@ -186,8 +187,8 @@ break them, on any harness.
 and from `dossier-status` later)
 **Requirements**: PROTO-01, PROTO-02, PROTO-03, PROTO-04, PROTO-05, PROTO-06, PROTO-07,
 PROTO-08
-**Decision to take at planning**: whether the Stop hook (PROTO-06, criterion 4) ships in v1
-(spec §11 #3, with Samuel).
+**Decision settled at planning (2026-10-10, D-01)**: the Stop hook (PROTO-06, criterion 4)
+ships in v1 and blocks once.
 **Success Criteria** (what must be TRUE):
 
   1. Loading the `dossier` skill in a repo with `dossier.yaml` surfaces the layout, the
@@ -199,12 +200,18 @@ PROTO-08
   3. An attempt to Write/Edit/MultiEdit a file under the sources folder is denied with the
      immutability message.
   4. Changing files under outbound or sources without touching the dossier folder, then
-     stopping, triggers a non-blocking Stop-hook warning pointing at `dossier-status`.
-  5. The "fix the typo in the transcript" pressure scenario, run without the skill/hooks,
-     edits the source (RED); run with them, the agent refuses and points to filing a
-     correction instead (GREEN).
+     stopping, makes the Stop hook block the stop once with a reason addressed to the agent
+     (update the living files the work touched, or say why none needed it; `dossier-status`
+     named once that skill exists); the second stop of the turn passes (`stop_hook_active`),
+     so it never loops.
+  5. The "fix the typo in the transcript" pressure scenario, run without the plugin, edits
+     the source (RED, at least once in three runs); run with it, the transcript stays
+     byte-identical and the agent files the correction as a dated, sourced line in the
+     living file concerned (GREEN, three runs out of three).
   6. Invoked from a subfolder of a dossier, a skill finds the nearest `dossier.yaml` upward;
-     invoked outside any dossier, every skill except `dossier-init` stops with a message.
+     invoked outside any dossier, the `dossier` entry skill says so in one line and
+     steps aside, and every task skill stops with a message (verified with each task skill
+     as it lands in Phases 4-6).
 **Plans**: 1/6 plans executed
 
 Plans:

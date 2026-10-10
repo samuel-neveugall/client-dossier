@@ -43,7 +43,7 @@ doctrine check.
 v1 scope, drawn from the design spec (full detail and IDs in REQUIREMENTS.md):
 
 - [ ] Protocol: `dossier` skill (always-first, layout + protocol + fact/status formats) and
-      the three hooks (SessionStart, PreToolUse guard, Stop warning)
+      the three hooks (SessionStart, PreToolUse guard, Stop check that blocks once)
 - [ ] Ingest: `dossier-ingest` skill, `fact-extractor` agent, `extract-text.sh`
 - [ ] Draft: `dossier-draft` skill, `doctrine-reviewer` agent
 - [ ] Call & status: `dossier-call` (prepare/debrief) and `dossier-status` skills
@@ -89,13 +89,10 @@ v1 scope, drawn from the design spec (full detail and IDs in REQUIREMENTS.md):
 
 ## Open Decisions
 
-One remains, scoped to Phase 3 and decided at its planning with Samuel:
-
-- **Stop hook in v1.** Ship the Stop-hook warning now, or wait for user feedback before
-  adding it? The spec ships it (provisional default). Affects: Phase 3 scope only (PROTO-06).
-
-The former decisions #1 (name) and #2 (folder names), plus the label-language question
-surfaced at review, are settled and listed in Key Decisions below.
+None remain open. The last one, the Stop hook in v1 (spec section 11 #3), was settled with
+Samuel on 2026-10-10 during Phase 3 planning and is listed in Key Decisions below, with the
+former decisions #1 (name) and #2 (folder names) and the label-language question surfaced at
+review.
 
 ## Constraints
 
@@ -140,6 +137,7 @@ surfaced at review, are settled and listed in Key Decisions below.
 | One README per top-level folder + `.gitkeep` in empty leaf folders (not one README per outbound subfolder) | Smaller surface; `.gitkeep` is what actually keeps empty folders through a clone | Settled 2026-09-16 |
 | `staleness_days`, `consent_source`, `Deadline:` added to the schema | Every value the linter or `dossier-status` reads needs a fixed home; a consent without a source is an opinion | Settled 2026-09-16 |
 | Local development via `claude --plugin-dir .` with a minimal manifest from Phase 1 | Skills and hooks must be exercisable long before the marketplace files of Phase 7 | Settled 2026-09-16 |
+| Stop hook ships in v1 and blocks once (`stop_hook_active` lets the second stop through) | In Claude Code a Stop hook that does not block only reaches the human; updating the dossier before handing back is the agent's behaviour | Settled 2026-10-10 (Phase 3 D-01) |
 
 ---
-*Last updated: 2026-10-10 after Phase 2*
+*Last updated: 2026-10-10 during Phase 3 planning (Stop hook settled)*
