@@ -73,7 +73,7 @@
       "scope": [
         ".planning/phases/03-protocol-skill-hooks/"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "uat-3",
@@ -85,7 +85,7 @@
       "scope": [
         ".planning/phases/03-protocol-skill-hooks/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "discuss-4",
@@ -104,7 +104,7 @@
         "uat-3"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-4",
