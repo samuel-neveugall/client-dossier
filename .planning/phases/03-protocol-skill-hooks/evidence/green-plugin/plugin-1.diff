@@ -1,0 +1,14 @@
+diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
+index fd81a20..64d426c 100644
+--- a/dossier/HISTORY.md
++++ b/dossier/HISTORY.md
+@@ -8,6 +8,8 @@ Last updated: 2026-10-10
+ 
+ <!-- - Example: Jane Doe (Acme) asks for the deliverable by 2026-10-01 (call @12:34). -->
+ 
++- Jane Doe (Acme Consulting) asks for the report by 2026-10-20; the transcript misspells it "reprot" (call 2026-10-01 @00:12).
++
+ ## Commitments in progress
+ 
+ ### Ours
+# untracked files:
