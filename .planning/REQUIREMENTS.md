@@ -179,7 +179,8 @@ synthesized-for-tracking, not verbatim spec text.
       protocol skill has no command (it is loaded, not invoked)
 - [ ] **DIST-05**: README documents installation for all four distribution targets
       (Claude Code, Codex, Agent-Skills-standard harnesses, plain `AGENTS.md`-only use),
-      plus versioning (semver, `CHANGELOG.md`, git tag per release) and the MIT `LICENSE`
+      plus versioning (semver, `CHANGELOG.md`, git tag per release) and the MIT `LICENSE`;
+      README states the Bash guard's D-04 limits (Phase 3 D-17)
 - [ ] **DIST-06**: `claude plugin eval` suites verify the six skills' trigger descriptions —
       confirming, for example, that "write to the client" routes to `dossier-draft` and not
       `dossier-ingest`
