@@ -84,6 +84,38 @@ skills, the agents, the Codex manifests and the slash commands belong to Phases 
 - **D-10:** 3 runs per variant. Without the plugin, RED must appear at least once (the
   baseline is recorded even if not every run fails); with the plugin, GREEN 3/3.
 
+### Manager decisions (vf-dev-manager, 2026-10-10, open questions 3 and 4 of the research)
+- **D-11:** The scenario harness writes into an output directory passed as an argument
+  (default `mktemp -d`). The phase copies the summary and the `.jsonl` runs it cites into
+  `.planning/phases/03-protocol-skill-hooks/evidence/` (transcripts hold only scratch paths and
+  fixture text).
+- **D-12:** In the plugin variant the harness asserts that `system/init.skills` contains
+  `client-dossier:dossier` and fails loudly (harness error, never RED/GREEN) otherwise. This
+  guards against a future `claude -p` defaulting to bare mode.
+
+### Pending decisions (Samuel)
+Asked to Samuel on 2026-10-10 during planning; the plan is built on the provisional option and
+isolates each in dedicated tasks so a different answer is a targeted edit, not a replan.
+- **P-01 (research Open Question 1) — scratch dossier and `AGENTS.md`.**
+  Provisional: the scenario harness builds the scratch dossier with the real `init.py`, then
+  **deletes `AGENTS.md` in BOTH variants** (the plugin is the only variable); an optional,
+  informational third column "pointer only" (AGENTS.md kept, no plugin) is recorded but never
+  gates the verdict. Rationale: with the pointer present the no-plugin baseline refused without
+  filing anything (neither RED nor GREEN), so D-10's "RED at least once" could not be met.
+  Alternative: keep `AGENTS.md`. Reversion path: the removal is one clearly marked function
+  (`strip_agents_pointer`) in `tests/scenarios/lib-scenario.sh`, called by `fix-typo.sh`; keeping
+  `AGENTS.md` means dropping that call (and the harness note), then rerunning the scenario and
+  re-recording the evidence. No other file depends on it.
+- **P-02 (research Open Question 2) — naming `dossier-status` in the Stop reason before it
+  exists.**
+  Provisional: the Stop hook appends the sentence naming `dossier-status` only when
+  `${CLAUDE_PLUGIN_ROOT}/skills/dossier-status/SKILL.md` exists; both states are tested
+  (temporary `CLAUDE_PLUGIN_ROOT`). Self-completing when Phase 6 lands. Alternatives: always
+  name it, or never name it. Reversion path: one conditional in `hooks/stop-check.py`
+  (`status_sentence()`) plus the two assertions in `tests/test-hook-stop.sh` that cover the
+  with/without states; nothing else references it.
+Once Samuel answers, the manager relays it and this section is rewritten as D-13/D-14 (settled).
+
 ### Claude's Discretion
 - Hook implementation language: Python 3.8+ standard library, like the other scripts,
   instead of the `.sh` names of spec §4.3 (one language, testable from the bash runner,
