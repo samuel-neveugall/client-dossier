@@ -6,13 +6,14 @@
 # scripts/lint.py.
 #
 # REQUIRED_EVENTS lists the events hooks.json must declare. Plan 03-01 ships
-# PreToolUse; plan 03-04 adds SessionStart and Stop by extending this line.
+# PreToolUse; plan 03-04 adds SessionStart and Stop by extending this line,
+# and one end-to-end `sh -c` block per event at the bottom of this file.
 set -u
 
 # shellcheck source=./lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-REQUIRED_EVENTS='PreToolUse'
+REQUIRED_EVENTS='PreToolUse SessionStart'
 PRETOOLUSE_MATCHER='Write|Edit|MultiEdit|NotebookEdit|Bash'
 HOOKS_JSON="$REPO_ROOT/hooks/hooks.json"
 
@@ -167,16 +168,22 @@ PY
   assert_eq "$LINT_BLOCK" "$HOOK_BLOCK" "$name find_root is byte-identical to scripts/lint.py's"
 done
 
-# --- the declared PreToolUse command, run through sh -c as Claude Code runs it ---
-PRE_COMMAND="$(printf '%s' "$DECLARED" | awk -F'\t' '$1 == "PreToolUse" { print $4; exit }')"
+# --- each declared command, run through sh -c as Claude Code runs it ---
+# declared_command EVENT — the first declared command of EVENT.
+declared_command() {
+  printf '%s' "$DECLARED" | awk -F'\t' -v ev="$1" '$1 == ev { print $4; exit }'
+}
 
-# run_declared PLUGIN_ROOT JSON — run PRE_COMMAND through `sh -c` with
+PRE_COMMAND="$(declared_command PreToolUse)"
+START_COMMAND="$(declared_command SessionStart)"
+
+# run_declared COMMAND PLUGIN_ROOT JSON — run COMMAND through `sh -c` with
 # CLAUDE_PLUGIN_ROOT exported, storing the result like run_hook does.
 run_declared() {
-  local root="$1" json="$2" err_file
+  local command="$1" root="$2" json="$3" err_file
   err_file="$(mktemp)"
   HOOK_STATUS=0
-  HOOK_OUT="$(printf '%s' "$json" | CLAUDE_PLUGIN_ROOT="$root" sh -c "$PRE_COMMAND" 2>"$err_file")" || HOOK_STATUS=$?
+  HOOK_OUT="$(printf '%s' "$json" | CLAUDE_PLUGIN_ROOT="$root" sh -c "$command" 2>"$err_file")" || HOOK_STATUS=$?
   HOOK_ERR="$(cat "$err_file")"
   rm -f "$err_file"
 }
@@ -190,21 +197,56 @@ if [ -n "$PRE_COMMAND" ]; then
     >"$d/sources/transcripts/2026-10-01_kickoff.txt"
   EDIT_JSON="$(hook_json PreToolUse "$d" Edit file_path "$d/sources/transcripts/2026-10-01_kickoff.txt")"
 
-  run_declared "$REPO_ROOT" "$EDIT_JSON"
+  run_declared "$PRE_COMMAND" "$REPO_ROOT" "$EDIT_JSON"
   assert_eq 0 "$HOOK_STATUS" 'sh -c: exit status 0'
   assert_eq deny "$(hook_field hookSpecificOutput.permissionDecision)" 'sh -c: an Edit under sources/ is denied'
 
   spaced="$(mktemp -d)/plugin root with space"
   mkdir -p "$(dirname "$spaced")"
   ln -s "$REPO_ROOT" "$spaced"
-  run_declared "$spaced" "$EDIT_JSON"
+  run_declared "$PRE_COMMAND" "$spaced" "$EDIT_JSON"
   assert_eq 0 "$HOOK_STATUS" 'sh -c, plugin root with a space: exit status 0'
   assert_eq deny "$(hook_field hookSpecificOutput.permissionDecision)" 'sh -c, plugin root with a space: an Edit under sources/ is denied'
   rm -rf "$(dirname "$spaced")"
 
-  run_declared "$REPO_ROOT" 'not json'
+  run_declared "$PRE_COMMAND" "$REPO_ROOT" 'not json'
   assert_eq 0 "$HOOK_STATUS" 'sh -c with malformed stdin: exit status 0'
   assert_eq '' "$HOOK_OUT" 'sh -c with malformed stdin: empty stdout'
+
+  # SessionStart (PROTO-04): from inside the scratch dossier the reminder
+  # names the namespaced skill; the command runs from a plugin root with a
+  # space too, and stays silent on malformed stdin.
+  if [ -n "$START_COMMAND" ]; then
+    START_JSON="$(hook_json SessionStart "$d" '' '' '')"
+    run_declared "$START_COMMAND" "$REPO_ROOT" "$START_JSON"
+    assert_eq 0 "$HOOK_STATUS" 'sh -c SessionStart: exit status 0'
+    case "$(hook_field hookSpecificOutput.additionalContext)" in
+      *client-dossier:dossier*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+      *)
+        echo 'FAIL: sh -c SessionStart: additionalContext does not name client-dossier:dossier' >&2
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        ;;
+    esac
+    spaced="$(mktemp -d)/plugin root with space"
+    mkdir -p "$(dirname "$spaced")"
+    ln -s "$REPO_ROOT" "$spaced"
+    run_declared "$START_COMMAND" "$spaced" "$START_JSON"
+    assert_eq 0 "$HOOK_STATUS" 'sh -c SessionStart, plugin root with a space: exit status 0'
+    case "$(hook_field hookSpecificOutput.additionalContext)" in
+      *client-dossier:dossier*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+      *)
+        echo 'FAIL: sh -c SessionStart, plugin root with a space: no reminder' >&2
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+        ;;
+    esac
+    rm -rf "$(dirname "$spaced")"
+    run_declared "$START_COMMAND" "$REPO_ROOT" 'not json'
+    assert_eq 0 "$HOOK_STATUS" 'sh -c SessionStart with malformed stdin: exit status 0'
+    assert_eq '' "$HOOK_OUT" 'sh -c SessionStart with malformed stdin: empty stdout'
+  else
+    echo 'FAIL: no SessionStart command to run through sh -c' >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  fi
   rm -rf "$d"
 else
   echo 'FAIL: no PreToolUse command to run through sh -c' >&2

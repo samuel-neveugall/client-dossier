@@ -1,6 +1,16 @@
 {
-  "description": "client-dossier: protocol reminder, sources guard, update-before-handoff check",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.py\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit|NotebookEdit|Bash",
@@ -13,5 +23,6 @@
         ]
       }
     ]
-  }
+  },
+  "description": "client-dossier: protocol reminder, sources guard, update-before-handoff check"
 }
