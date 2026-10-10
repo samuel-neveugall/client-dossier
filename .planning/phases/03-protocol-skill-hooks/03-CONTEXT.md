@@ -93,28 +93,16 @@ skills, the agents, the Codex manifests and the slash commands belong to Phases 
   `client-dossier:dossier` and fails loudly (harness error, never RED/GREEN) otherwise. This
   guards against a future `claude -p` defaulting to bare mode.
 
-### Pending decisions (Samuel)
-Asked to Samuel on 2026-10-10 during planning; the plan is built on the provisional option and
-isolates each in dedicated tasks so a different answer is a targeted edit, not a replan.
-- **P-01 (research Open Question 1) — scratch dossier and `AGENTS.md`.**
-  Provisional: the scenario harness builds the scratch dossier with the real `init.py`, then
-  **deletes `AGENTS.md` in BOTH variants** (the plugin is the only variable); an optional,
-  informational third column "pointer only" (AGENTS.md kept, no plugin) is recorded but never
-  gates the verdict. Rationale: with the pointer present the no-plugin baseline refused without
-  filing anything (neither RED nor GREEN), so D-10's "RED at least once" could not be met.
-  Alternative: keep `AGENTS.md`. Reversion path: the removal is one clearly marked function
-  (`strip_agents_pointer`) in `tests/scenarios/lib-scenario.sh`, called by `fix-typo.sh`; keeping
-  `AGENTS.md` means dropping that call (and the harness note), then rerunning the scenario and
-  re-recording the evidence. No other file depends on it.
-- **P-02 (research Open Question 2) — naming `dossier-status` in the Stop reason before it
-  exists.**
-  Provisional: the Stop hook appends the sentence naming `dossier-status` only when
-  `${CLAUDE_PLUGIN_ROOT}/skills/dossier-status/SKILL.md` exists; both states are tested
-  (temporary `CLAUDE_PLUGIN_ROOT`). Self-completing when Phase 6 lands. Alternatives: always
-  name it, or never name it. Reversion path: one conditional in `hooks/stop-check.py`
-  (`status_sentence()`) plus the two assertions in `tests/test-hook-stop.sh` that cover the
-  with/without states; nothing else references it.
-Once Samuel answers, the manager relays it and this section is rewritten as D-13/D-14 (settled).
+### Settled by Samuel after planning (formerly P-01, P-02)
+- **D-13 (was P-01) — scratch dossier without `AGENTS.md`.** The scenario harness builds the
+  scratch dossier with the real `init.py`, then deletes `AGENTS.md` in BOTH variants (baseline
+  and plugin), so the plugin is the only variable; the informational third column "pointer
+  only" is kept. Implemented in `strip_agents_pointer` (`tests/scenarios/lib-scenario.sh`).
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+- **D-14 (was P-02) — `dossier-status` named only once it exists.** The Stop hook appends the
+  sentence naming `dossier-status` only when `${CLAUDE_PLUGIN_ROOT}/skills/dossier-status/SKILL.md`
+  exists; both states are tested. Implemented in `status_sentence()` (`hooks/stop-check.py`).
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
 
 ### Claude's Discretion
 - Hook implementation language: Python 3.8+ standard library, like the other scripts,

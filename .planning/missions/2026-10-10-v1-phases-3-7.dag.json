@@ -6,7 +6,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plan-3",
@@ -33,7 +33,7 @@
         "CLAUDE.md",
         ".planning/"
       ],
-      "status": "ready"
+      "status": "failed"
     },
     {
       "id": "revue-3",
@@ -328,13 +328,34 @@
     },
     {
       "id": "docs",
-      "step": "hygi\u00e8ne documentaire",
+      "step": "hygiène documentaire",
       "stage": "",
       "deps": [
         "uat-7"
       ],
       "scope": [],
       "status": "blocked"
+    },
+    {
+      "id": "revue-3a",
+      "step": "interim code review: hooks, guard, harness (03-01/02/04)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit-3a",
+      "step": "interim security audit: sources guard fail-open paths",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/"
+      ],
+      "status": "done"
     }
   ]
 }
