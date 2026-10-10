@@ -47,7 +47,7 @@
         "hooks/",
         "tests/"
       ],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -60,7 +60,7 @@
       "scope": [
         "hooks/"
       ],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "verify-3",
@@ -73,7 +73,7 @@
       "scope": [
         ".planning/phases/03-protocol-skill-hooks/"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "uat-3",
@@ -93,7 +93,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "plan-4",
@@ -430,6 +430,19 @@
         "hooks/",
         "skills/dossier/",
         "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-3d",
+      "step": "last bounded guard round (D-17)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "skills/dossier/",
+        "tests/",
+        "docs/"
       ],
       "status": "done"
     }
