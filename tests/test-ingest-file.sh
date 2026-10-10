@@ -379,6 +379,99 @@ expect_error 'TMPDIR inside the dossier' staging_inside_dossier
 assert_eq 0 "$(count_sources "$d")" 'containment: nothing filed when staging would sit in the dossier'
 assert_eq 0 "$(ls -A "$d/tmp" | wc -l | tr -d ' ')" 'containment: the staging directory was removed'
 
+# R4-m8 / A4-F3: a link that stays inside the dossier writes there as surely
+# as one that leaves it; the kind folder is checked, not only sources/.
+d="$(build_dossier)"
+rm -rf "$d/sources"
+outbound_before="$(find "$d/outbound" -type f | wc -l | tr -d ' ')"
+ln -s outbound "$d/sources"
+run_fs "$d" --kind received --date 2026-10-01 --slug x "incoming/Call transcript.txt"
+expect_error 'sources/ is a symlink to outbound/ (inside the dossier)' sources_redirected
+assert_eq "$outbound_before" "$(find "$d/outbound" -type f | wc -l | tr -d ' ')" 'containment: outbound/ received nothing'
+
+d="$(build_dossier)"
+outside="$(mktemp -d)"
+rm -rf "$d/sources/received"
+ln -s "$outside" "$d/sources/received"
+run_fs "$d" --kind received --date 2026-10-01 --slug x "incoming/Call transcript.txt"
+expect_error 'sources/received is a symlink out of sources/' sources_outside_dossier
+assert_eq 0 "$(ls -A "$outside" | wc -l | tr -d ' ')" 'containment: the outside directory behind sources/received stays empty'
+rm -rf "$outside"
+
+d="$(build_dossier)"
+rm -rf "$d/sources/received"
+ln -s transcripts "$d/sources/received"
+run_fs "$d" --kind received --date 2026-10-01 --slug x "incoming/Call transcript.txt"
+expect_error 'sources/received is a symlink to a sibling folder' sources_redirected
+assert_eq 0 "$(count_sources "$d")" 'containment: nothing filed through a sibling link'
+
+d="$(build_dossier)"
+mkdir -p "$d/sources/transcripts/raw"
+rm -rf "$d/sources/transcripts/raw"
+ln -s ../received "$d/sources/transcripts/raw"
+printf '%s\n' 'WEBVTT' >"$d/incoming/export.vtt"
+run_fs "$d" --kind raw --date 2026-10-10 --slug x "incoming/export.vtt"
+expect_error 'sources/transcripts/raw is a symlink to a sibling folder' sources_redirected
+
+d="$(build_dossier)"
+rm -rf "$d/sources/received"
+printf 'not a folder\n' >"$d/sources/received"
+run_fs "$d" --kind received --date 2026-10-01 --slug x "incoming/Call transcript.txt"
+expect_error 'sources/received is a file (R4-m6): a refusal, not an internal error' not_a_directory
+assert_eq 'not a folder' "$(cat "$d/sources/received")" 'containment: the file at sources/received is untouched'
+
+# A staging folder whose path merely starts with the dossier's path is outside
+# the dossier (a prefix without a separator is not containment).
+d="$(build_dossier)"
+mkdir -p "${d}-tmp"
+TMPDIR="${d}-tmp" run_fs "$d" --kind received --date 2026-10-01 --slug x "incoming/Call transcript.txt"
+expect_ok 'TMPDIR in a sibling folder sharing the dossier path prefix' filed
+rm -rf "${d}-tmp"
+
+# R4-m5: the JSON carries the root and the absolute path; a source filed from
+# a subfolder can be read back from there.
+d="$(build_dossier)"
+mkdir -p "$d/dossier/deep"
+run_fs "$d/dossier/deep" --kind received --date 2026-10-01 --slug x "$d/incoming/Call transcript.txt"
+expect_ok 'filed from a subfolder' filed
+real_d="$(cd "$d" && pwd -P)"
+assert_eq "$real_d" "$(fs_field root)" 'JSON: root is the real dossier root'
+assert_eq "$real_d/sources/received/2026-10-01_x.txt" "$(fs_field abs_path)" 'JSON: abs_path joins root and path'
+assert_file "$(fs_field abs_path)"
+run_fs "$d/dossier/deep" --kind received --date 2026-10-02 --slug y "$d/incoming/Call transcript.txt"
+expect_ok 'again from a subfolder' already_filed
+assert_eq "$real_d/sources/received/2026-10-01_x.txt" "$(fs_field abs_path)" 'JSON: abs_path on already_filed'
+
+# R4-m8 / A4-F9 / R4-m10: a hostile extension never reaches the name, and a
+# file coming from a fetch staging folder carries the purge message.
+d="$(build_dossier)"
+printf 'one\n' >"$d/incoming/report.ex%e$(printf '\177')"
+run_fs "$d" --kind received --date 2026-10-10 --slug report "incoming/report.ex%e$(printf '\177')"
+expect_ok 'hostile extension (punctuation, DEL)' filed
+assert_eq 'sources/received/2026-10-10_report' "$(fs_field path)" 'extension: none kept when it is not a-z0-9'
+printf 'two\n' >"$d/incoming/report.abcdefghijk"
+run_fs "$d" --kind received --date 2026-10-10 --slug longext "incoming/report.abcdefghijk"
+expect_ok 'extension longer than 10 characters' filed
+assert_eq 'sources/received/2026-10-10_longext' "$(fs_field path)" 'extension: none kept when longer than 10'
+printf 'three\n' >"$d/incoming/report.PDF"
+run_fs "$d" --kind received --date 2026-10-10 --slug upper "incoming/report.PDF"
+assert_eq 'sources/received/2026-10-10_upper.pdf' "$(fs_field path)" 'extension: lowercased'
+
+d="$(build_dossier)"
+stage_parent="$(mktemp -d)"
+mkdir -p "$stage_parent/client-dossier-fetch-abc123"
+printf 'staged\n' >"$stage_parent/client-dossier-fetch-abc123/page.txt"
+run_fs "$d" --kind received --date 2026-10-10 --slug page "$stage_parent/client-dossier-fetch-abc123/page.txt"
+expect_ok 'a file from a fetch staging folder' filed
+case "$(fs_field warnings)" in
+  *'rm -r '*client-dossier-fetch-abc123*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *)
+    echo "FAIL: no purge message for the staging folder ('$(fs_field warnings)')" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    ;;
+esac
+rm -rf "$stage_parent"
+
 # ---------------------------------------------------------------------------
 echo '--- Raw exports and large files: warnings ---'
 
@@ -449,8 +542,9 @@ STATUS=0
 python3 - "$script" <<'PY' 2>/dev/null || STATUS=$?
 import ast, sys
 tree = ast.parse(open(sys.argv[1]).read())
-allowed = {"argparse", "datetime", "errno", "hashlib", "ipaddress", "json", "os",
-           "shutil", "socket", "stat", "sys", "tempfile", "time", "unicodedata",
+allowed = {"argparse", "datetime", "errno", "hashlib", "http.client", "ipaddress",
+           "json", "os", "shutil", "signal", "socket", "stat", "sys", "tempfile",
+           "time", "unicodedata",
            "urllib.error", "urllib.parse", "urllib.request"}
 bad = []
 for node in ast.walk(tree):

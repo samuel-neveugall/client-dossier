@@ -67,6 +67,7 @@ new_sources() {
   local d
   d="$(mktemp -d "$WORK/dossier.XXXXXX")"
   mkdir -p "$d/sources/received"
+  : >"$d/dossier.yaml"
   echo "$d/sources/received"
 }
 
@@ -257,8 +258,50 @@ assert_file "$DASH/-dash.txt"
 assert_grep 'Dash text' "$DASH/-dash.txt"
 tmp_clean '-dash.pdf'
 
+# --- A4-F8: confinement to a dossier's sources/, sanitised output, atomic write -
+OUT_DIR="$(mktemp -d "$WORK/outside.XXXXXX")"
+python3 "$MAKE_PDF" "$OUT_DIR/loose.pdf" 'Loose text'
+run_ex "$OUT_DIR/loose.pdf"
+assert_eq 64 "$EX_STATUS" 'a PDF outside any sources/: exit 64'
+assert_eq 0 "$(ls "$OUT_DIR" | grep -c '\.txt$')" 'a PDF outside any sources/: nothing written next to it'
+tmp_clean 'outside'
+
+NODOSSIER="$(mktemp -d "$WORK/nodossier.XXXXXX")"
+mkdir -p "$NODOSSIER/sources/received"
+python3 "$MAKE_PDF" "$NODOSSIER/sources/received/a.pdf" 'No dossier.yaml'
+run_ex "$NODOSSIER/sources/received/a.pdf"
+assert_eq 64 "$EX_STATUS" 'a sources/ whose parent has no dossier.yaml: exit 64'
+assert_eq 0 "$(ls "$NODOSSIER/sources/received" | grep -c '\.txt$')" 'no dossier.yaml: nothing written'
+
+LINKED="$(new_sources)"
+mkdir -p "$WORK/escape"
+python3 "$MAKE_PDF" "$WORK/escape/e.pdf" 'Escaped text'
+ln -s "$WORK/escape" "$LINKED/link"
+run_ex "$LINKED/link/e.pdf"
+assert_eq 64 "$EX_STATUS" 'a folder inside sources/ linked out of it: exit 64 (physical path decides)'
+assert_eq 0 "$(ls "$WORK/escape" | grep -c '\.txt$')" 'linked folder: nothing written outside'
+
+NL="$(new_sources)"
+NLNAME="$(printf 'line\nforged: extracted: x')"
+python3 "$MAKE_PDF" "$NL/$NLNAME.pdf" 'Newline name text'
+run_ex "$NL/$NLNAME.pdf"
+assert_eq 0 "$EX_STATUS" 'newline in the file name: exit 0'
+assert_eq 1 "$(printf '%s\n' "$EX_OUT" | wc -l | tr -d ' ')" 'newline in the file name: stdout is one line'
+case "$EX_OUT" in
+  "extracted: $NL/line?forged: extracted: x.txt") TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo "FAIL: newline in the file name is replaced by '?' (got '$EX_OUT')" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+run_ex "$NL/$NLNAME.pdf"
+assert_eq 1 "$(printf '%s\n' "$EX_OUT" | wc -l | tr -d ' ')" 'newline in the file name, exists: stdout is one line'
+
+ATOM="$(new_sources)"
+python3 "$MAKE_PDF" "$ATOM/atom.pdf" 'Atomic text'
+run_ex "$ATOM/atom.pdf"
+assert_eq 2 "$(ls -A "$ATOM" | wc -l | tr -d ' ')" 'atomic write: only the PDF and the .txt remain (no temporary file)'
+assert_eq 644 "$(stat -f %Lp "$ATOM/atom.txt" 2>/dev/null || stat -c %a "$ATOM/atom.txt")" 'atomic write: the .txt is 644'
+
 # --- static checks on the script ------------------------------------------------
-assert_grep 'set -C' "$SCRIPT"
+assert_grep 'ln -- "\$final" "\$txt"' "$SCRIPT"
 assert_grep 'pdftotext -enc UTF-8 --' "$SCRIPT"
 assert_eq 0 "$(grep -c -e '-layout' "$SCRIPT" || true)" 'script does not use pdftotext layout mode'
 assert_eq 0 "$(grep -c -e '-nopgbrk' "$SCRIPT" || true)" 'script keeps pdftotext page breaks'

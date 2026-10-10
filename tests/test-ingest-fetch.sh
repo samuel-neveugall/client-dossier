@@ -88,6 +88,7 @@ PROG_OUT="$(python3 -B - "$(fs_script)" "$d" <<'PY'
 import contextlib
 import hashlib
 import importlib.util
+import ipaddress
 import io
 import json
 import os
@@ -165,6 +166,28 @@ class Handler(BaseHTTPRequestHandler):
                     self.reply(200, "application/pdf", PDF)
                 else:
                     self.reply(302, None, b"", [("Location", "/chain/%d" % (n + 1))])
+            elif path == "/drop":
+                self.close_connection = True
+                self.connection.close()
+            elif path == "/hang":
+                time.sleep(3)
+            elif path == "/short":
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Length", "100")
+                self.end_headers()
+                self.wfile.write(b"abc")
+                self.wfile.flush()
+            elif path == "/gz":
+                self.reply(200, "text/html", b"\x1f\x8b\x08\x00compressed", [("Content-Encoding", "gzip")])
+            elif path == "/identity":
+                self.reply(200, "application/pdf", PDF, [("Content-Encoding", "identity")])
+            elif path == "/slowheaders":
+                self.wfile.write(b"HTTP/1.0 200 OK\r\n")
+                for _ in range(60):
+                    self.wfile.write(b"X-Slow: 1\r\n")
+                    self.wfile.flush()
+                    time.sleep(0.2)
             elif path == "/forbidden":
                 self.reply(403, "text/plain", b"no")
             elif path == "/big":
@@ -239,6 +262,23 @@ refused = [
     ("IPv6 loopback", "http://[::1]/a.pdf", "not_public"),
     ("IPv4-mapped loopback", "http://[::ffff:127.0.0.1]/a.pdf", "not_public"),
     ("localhost", "http://localhost/a.pdf", "not_public"),
+    # A4-F6: IPv6 forms that carry, or stand for, a private IPv4 address.
+    ("NAT64 carrying 10.0.0.1", "http://[64:ff9b::a00:1]/a.pdf", "not_public"),
+    ("NAT64 carrying 127.0.0.1", "http://[64:ff9b::7f00:1]/a.pdf", "not_public"),
+    ("NAT64 local-use prefix", "http://[64:ff9b:1::1]/a.pdf", "not_public"),
+    ("SIIT ::ffff:0:127.0.0.1", "http://[::ffff:0:127.0.0.1]/a.pdf", "not_public"),
+    ("IPv4-compatible ::127.0.0.1", "http://[::127.0.0.1]/a.pdf", "not_public"),
+    ("6to4 carrying 10.0.0.1", "http://[2002:a00:1::1]/a.pdf", "not_public"),
+    ("site-local IPv6", "http://[fec0::1]/a.pdf", "not_public"),
+    ("IPv6 multicast", "http://[ff02::1]/a.pdf", "not_public"),
+    ("IPv4 multicast", "http://224.0.0.1/a.pdf", "not_public"),
+    ("192.0.0.0/24", "http://192.0.0.8/a.pdf", "not_public"),
+    ("192.88.99.0/24", "http://192.88.99.1/a.pdf", "not_public"),
+    # A4-F7: a space or a control character is a bad URL, never an internal error.
+    ("space in the URL", "https://example.com/a b.pdf?token=SECRET", "bad_url"),
+    ("newline in the URL", "https://example.com/a\n.pdf", "bad_url"),
+    ("tab in the URL", "https://example.com/\ta.pdf", "bad_url"),
+    ("DEL in the URL", "https://example.com/a\x7f.pdf", "bad_url"),
 ]
 before = staged_dirs()
 for label, target, code_wanted in refused:
@@ -263,18 +303,90 @@ check("refused unresolvable: exit", 1, code)
 check("refused unresolvable: error", "unresolvable", obj.get("error"))
 check("refused unresolvable: hint", HINT, obj.get("hint"))
 check("refusals: the opener was never built", 0, len(calls))
+
+# A4-F6: a NAT64 address of a public host stays reachable (DNS64 networks).
+for text, wanted in (("64:ff9b::808:808", True), ("8.8.8.8", True), ("2001:4860:4860::8888", True),
+                     ("64:ff9b::a00:1", False), ("::ffff:0:10.0.0.1", False), ("::10.0.0.1", False)):
+    check("address_is_public(%s)" % text, wanted, mod.address_is_public(ipaddress.ip_address(text)))
+
+# A4-F7: the internal-error path never echoes the exception text.
+real_run_fetch = mod.run_fetch
+mod.run_fetch = lambda argv: (_ for _ in ()).throw(ValueError("LEAK-SECRET-TOKEN"))
+code, obj, text = run(["fetch", "https://example.com/a.pdf"])
+mod.run_fetch = real_run_fetch
+check("internal error: exit 3", 3, code)
+check("internal error: error", "internal", obj.get("error"))
+check("internal error: the exception text is not echoed", False, "LEAK-SECRET-TOKEN" in text)
 check("refusals: nothing staged", before, staged_dirs())
 
 # --- the opener ------------------------------------------------------------
 mod.make_opener = orig_make_opener
-mod.is_public = lambda host: host == "127.0.0.1"
+
+# --- A4-F2: DNS rebinding. The check resolves to a public address, any later
+# lookup would say loopback: the connection must go to the validated address
+# and only to it. ---
+answers = []
+
+
+def rebinding_gai(host, *args, **kwargs):
+    answers.append(host)
+    ip = "93.184.216.34" if len(answers) == 1 else "127.0.0.1"
+    return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 0))]
+
+
+connected = []
+real_create = socket.create_connection
+
+
+def recording_create(address, *args, **kwargs):
+    connected.append(address)
+    raise ConnectionRefusedError("recorded")
+
+
+socket.getaddrinfo = rebinding_gai
+socket.create_connection = recording_create
+try:
+    code, obj, text = run(["fetch", "http://rebind.test/a.pdf"])
+finally:
+    socket.getaddrinfo = real_gai
+    socket.create_connection = real_create
+check("rebinding: the connection went to the validated address only", [("93.184.216.34", 80)], connected)
+check("rebinding: the refused connection is a network refusal", "network", obj.get("error"))
+check("rebinding: hint", HINT, obj.get("hint"))
+
+# A connection opened with no prior check still validates, then refuses loopback.
+socket.getaddrinfo = lambda host, *a, **k: [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("127.0.0.1", 0))]
+try:
+    try:
+        mod.pinned_connection(("unchecked.test", 80))
+        outcome = "connected"
+    except mod.Refusal as refusal:
+        outcome = refusal.code
+finally:
+    socket.getaddrinfo = real_gai
+check("an unchecked host is validated at connection time", "not_public", outcome)
+conn = mod.PinnedHTTPSConnection("rebind.test", 443)
+check("https: the TLS server name stays the URL's host", "rebind.test", conn.host)
+check("https: the connection function is the pinned one", True, conn._create_connection is mod.pinned_connection)
+check("pinned classes extend http.client", True,
+      issubclass(mod.PinnedHTTPConnection, mod.http.client.HTTPConnection)
+      and issubclass(mod.PinnedHTTPSConnection, mod.http.client.HTTPSConnection))
+
+
+def fake_public(host):
+    if host in ("127.0.0.1", "pinned.test"):
+        return ["127.0.0.1"]
+    raise mod.NotPublic(host)
+
+
+mod.public_addresses = fake_public
 
 handlers = sorted(type(h).__name__ for h in mod.make_opener().handlers)
 check(
-    "opener handlers are exactly the five",
+    "opener handlers are exactly the five (HTTP and HTTPS pinned)",
     sorted([
-        "HTTPHandler",
-        "HTTPSHandler",
+        "PinnedHTTPHandler",
+        "PinnedHTTPSHandler",
         "HTTPDefaultErrorHandler",
         mod.SafeRedirect.__name__,
         "HTTPErrorProcessor",
@@ -292,6 +404,8 @@ check("pdf: status", "fetched", obj.get("status"))
 check("pdf: ext from the content type (parameters ignored)", ".pdf", obj.get("ext"))
 check("pdf: bytes", len(PDF), obj.get("bytes"))
 check("pdf: sha256", hashlib.sha256(PDF).hexdigest(), obj.get("sha256"))
+check("pdf: the stage folder is reported", os.path.dirname(obj.get("path", "")), obj.get("stage"))
+check("pdf: the purge message names the stage folder", True, ("rm -r '%s'" % obj.get("stage")) in obj.get("purge", ""))
 check("pdf: final_url_host", "127.0.0.1", obj.get("final_url_host"))
 check("pdf: suggested_slug from the last path segment", "brochure-2026", obj.get("suggested_slug"))
 check("pdf: the query string is never echoed", False, "SECRET" in text)
@@ -343,6 +457,46 @@ check("403: hint", HINT, obj.get("hint"))
 check("403: the query string is never echoed", False, "SECRET" in text)
 code, obj, text = run(["fetch", url("/missing")])
 check("404: error", "http_404", obj.get("error"))
+
+# the hostname is kept for Host; the connection goes to the pinned address
+code, obj, text = run(["fetch", "http://pinned.test:%d/call" % PORT])
+check("pinned host: fetched through the validated address", "fetched", obj.get("status"))
+check("pinned host: the Host header is the URL's host", "pinned.test:%d" % PORT, SEEN[-1].get("Host"))
+shutil.rmtree(obj.get("stage", ""), ignore_errors=True)
+
+# R4-M2: errors before the headers are refusals with the hint, never exit 3.
+code, obj, text = run(["fetch", url("/drop")])
+check("connection dropped before headers: exit", 1, code)
+check("connection dropped before headers: error", "network", obj.get("error"))
+check("connection dropped before headers: hint", HINT, obj.get("hint"))
+mod.FETCH_TIMEOUT_SECONDS = 0.3
+code, obj, text = run(["fetch", url("/hang")])
+mod.FETCH_TIMEOUT_SECONDS = 30
+check("no answer before headers: exit", 1, code)
+check("no answer before headers: error", "timeout", obj.get("error"))
+check("no answer before headers: hint", HINT, obj.get("hint"))
+
+# A4-F5: the global deadline covers the header phase.
+mod.FETCH_DEADLINE_SECONDS = 0.6
+started = time.monotonic()
+code, obj, text = run(["fetch", url("/slowheaders")])
+elapsed = time.monotonic() - started
+mod.FETCH_DEADLINE_SECONDS = 120
+check("slow headers: error", "timeout", obj.get("error"))
+check("slow headers: hint", HINT, obj.get("hint"))
+check("slow headers: stopped by the deadline, not by the per-read timeout", True, elapsed < 5)
+
+# R4-M3: a truncated body and a compressed body are never staged.
+code, obj, text = run(["fetch", url("/short")])
+check("truncated: exit", 1, code)
+check("truncated: error", "truncated", obj.get("error"))
+check("truncated: hint", HINT, obj.get("hint"))
+code, obj, text = run(["fetch", url("/gz")])
+check("Content-Encoding gzip: error", "content_encoding", obj.get("error"))
+check("Content-Encoding gzip: hint", HINT, obj.get("hint"))
+code, obj, text = run(["fetch", url("/identity")])
+check("Content-Encoding identity: accepted", "fetched", obj.get("status"))
+shutil.rmtree(os.path.dirname(obj.get("path", "")), ignore_errors=True)
 
 mod.FETCH_MAX_BYTES = 1000
 code, obj, text = run(["fetch", url("/big")])
