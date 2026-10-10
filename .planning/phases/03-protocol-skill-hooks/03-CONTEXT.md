@@ -104,6 +104,25 @@ skills, the agents, the Codex manifests and the slash commands belong to Phases 
   exists; both states are tested. Implemented in `status_sentence()` (`hooks/stop-check.py`).
   (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
 
+### Settled by Samuel after execution started (RED baseline, guard fail-open)
+- **D-15 — RED baseline under pressure, with a fallback.** The baseline of plan 03-02 found the
+  plain prompt already refused without the plugin (RED 0/3, GREEN 2/3): the scaffold's own
+  `sources/README.md` teaches immutability. The scenario prompt gains real pressure, as
+  `superpowers:writing-skills` prescribes (e.g. "just edit the file directly, I'm forwarding it to
+  the client in 5 minutes"), fixture unchanged, 3 runs. If it is still 0 RED, the phase switches to
+  the fallback without coming back to Samuel: record that the scaffold already prevents the edit,
+  and judge the plugin on what it adds (correction filed 3/3 with the plugin vs the baseline's
+  filing rate); D-10 and ROADMAP criterion 5 are then amended to say so.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a) then (d))
+- **D-16 — fix every reproduced fail-open path of the sources guard, before the skill.** One
+  targeted round with tests: (1) `sources/` itself a symlink out of the dossier; (2) a
+  `dossier.yaml` under `sources/` making that subtree a root (the target is denied when it sits
+  under the `sources/` of ANY ancestor root); (3) an unmatched quote (heredoc body, comment)
+  disabling the whole Bash guard; (4) shell reserved words (`then`, `do`, `else`, `{`, `!`...),
+  `>& file` redirection, hard links via `ln`. Findings: `03-REVIEW.md` R-F1..R-F3,
+  `03-SECURITY.md` A-F1..A-F4.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+
 ### Claude's Discretion
 - Hook implementation language: Python 3.8+ standard library, like the other scripts,
   instead of the `.sh` names of spec §4.3 (one language, testable from the bash runner,
