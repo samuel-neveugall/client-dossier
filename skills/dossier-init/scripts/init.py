@@ -185,23 +185,41 @@ class MarkerSectionError(Exception):
 _SCALAR_BREAKS_RE = re.compile("[\x00-\x1f\x7f-\x9f\u2028\u2029]")
 
 
+# Every Default_Ignorable_Code_Point (Unicode DerivedCoreProperties) -- the
+# characters a renderer draws as nothing; most are category Cf, the rest (CGJ,
+# the variation selectors, the Hangul fillers) hide a name just as well
+# (WR-01 of the Phase 2 re-verification, 2026-10-10). The same set as
+# scripts/lint.py's _DEFAULT_IGNORABLE_RE, kept in step by hand: each script
+# stands alone.
+_DEFAULT_IGNORABLE_RE = re.compile(
+    "[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f"
+    "\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff0-\ufff8"
+    "\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0000-\U000e0fff]")
+
+
+def _is_invisible(ch):
+    """True for a format character (category Cf) or any other default-ignorable code point."""
+    return unicodedata.category(ch) == "Cf" or _DEFAULT_IGNORABLE_RE.match(ch) is not None
+
+
 def _fold_format_chars(value, delete=False):
-    """Map (default) or delete every Unicode format character (category Cf).
+    """Map (default) or delete every invisible character (_is_invisible()).
 
     Shared by yaml_quote() (always maps to space) and
     _confidential_yaml_entries() (needs both readings) -- CR-03 of the
     iteration-4 review.
     """
     if delete:
-        return "".join(ch for ch in value if unicodedata.category(ch) != "Cf")
-    return "".join(" " if unicodedata.category(ch) == "Cf" else ch for ch in value)
+        return "".join(ch for ch in value if not _is_invisible(ch))
+    return "".join(" " if _is_invisible(ch) else ch for ch in value)
 
 
 def yaml_quote(value):
     """Return a double-quoted YAML scalar, safe for any user-supplied string.
 
-    Every Unicode format character (category Cf: ZWSP, BOM, a soft hyphen,
-    ZWNJ, the word joiner) is mapped to a space first, then each break or
+    Every invisible character (category Cf: ZWSP, BOM, a soft hyphen,
+    ZWNJ, the word joiner; or any other default-ignorable code point, such
+    as a variation selector or CGJ) is mapped to a space first, then each break or
     control character (_SCALAR_BREAKS_RE) becomes a space too -- never
     deleted: between two words it is a separator, and deleting it fuses
     `Acme<U+2028>Corp` or `Acme<ZWSP>Corp` into `AcmeCorp`, a confidential

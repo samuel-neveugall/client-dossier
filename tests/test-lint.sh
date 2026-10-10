@@ -590,6 +590,32 @@ done
 assert_out_line '^outbound/mails/archive/2026-09-17_ac.*me\.md:0: ERROR \[E5\] ' \
   "format-body: the name surviving only in a path below E4's scope is still found"
 assert_last_line '9 error(s), 0 warning(s)' 'format-body: eight body lines plus one path, one finding each'
+# --- A Default_Ignorable_Code_Point outside category Cf (a variation selector, CGJ, a Hangul
+# filler) hides no name either, in the body, hand-written in the config, or through init.py
+# (WR-01 of the re-verification, 2026-10-10) ---
+ib="$FIXTURES/ignorable-body/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/ignorable-body" 1 'ignorable-body: a default-ignorable character inside a name hides nothing'
+assert_only E5 'ignorable-body: only [E5] fires'
+for marker in L1 L2 L3 L4 L5 L6 L7 L8; do
+  assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ib" "$marker:"): ERROR \\[E5\\] " \
+    "ignorable-body: $marker's default-ignorable character hides nothing"
+done
+assert_last_line '8 error(s), 0 warning(s)' 'ignorable-body: one finding per line'
+assert_lint "$FIXTURES/ignorable-name-yaml" 1 'ignorable-name-yaml: a default-ignorable character in a configured name hides nothing'
+assert_only E5 'ignorable-name-yaml: only [E5] fires'
+assert_last_line '2 error(s), 0 warning(s)' 'ignorable-name-yaml: one finding per name'
+ini="$FIXTURES/ignorable-name-init/dossier.yaml"
+for ch in '\315\217' '\357\270\217'; do
+  assert_eq 0 "$(grep -c -F -- "$(printf "$ch")" "$ini")" \
+    "ignorable-name-init: init.py writes no raw default-ignorable character into dossier.yaml ($ch)"
+done
+assert_grep '"Globex"' "$ini"
+assert_grep '"AT&T"' "$ini"
+assert_lint "$FIXTURES/ignorable-name-init" 1 'ignorable-name-init: init.py -> lint.py round trip, every leak exits 1'
+assert_only E5 'ignorable-name-init: only [E5] fires'
+iir="$FIXTURES/ignorable-name-init/outbound/mails/2026-09-17_relance.md"
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$iir" "We met Globex"): ERROR \\[E5\\] .*'AT&T'" \
+  'ignorable-name-init: AT&T (the deletion reading) is found'
 # --- E5 on multi-word names: slugs and whitespace variants (CR-03) ---
 assert_lint "$FIXTURES/e5-slug" 1 'e5-slug: big-telco in a conforming filename exits 1'
 assert_only E5 'e5-slug: only [E5] fires'

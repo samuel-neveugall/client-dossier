@@ -947,6 +947,42 @@ L7: Contact${ZWSP}Acme today.
 L8: Ac&shy;me in a pasted snippet.
 "
 write_file "$parent/format-body/outbound/mails/archive/2026-09-17_ac${SHY}me.md" "$GOOD_MAIL"
+
+# --- ignorable-body / ignorable-name-yaml / ignorable-name-init: a Default_Ignorable_Code_Point
+# that is NOT category Cf hides no name either (WR-01 of the re-verification, closed before the
+# Phase 2 sign-off, 2026-10-10). Built from bytes: CGJ U+034F (Mn), HANGUL CHOSEONG FILLER
+# U+115F (Lo), KHMER VOWEL INHERENT AQ U+17B4 (Mn), MONGOLIAN FVS1 U+180B (Mn), HANGUL FILLER
+# U+3164 (Lo), VS16 U+FE0F (Mn), HALFWIDTH HANGUL FILLER U+FFA0 (Lo), VS17 U+E0100 (Mn).
+CGJ="$(printf '\315\217')"
+HCF="$(printf '\341\205\237')"
+KIV="$(printf '\341\236\264')"
+FVS="$(printf '\341\240\213')"
+HF="$(printf '\343\205\244')"
+VS16="$(printf '\357\270\217')"
+HHF="$(printf '\357\276\240')"
+VS17="$(printf '\363\240\204\200')"
+make_named_case ignorable-body --confidential-name Acme
+write_file "$parent/ignorable-body/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+L1: Ac${CGJ}me signed.
+L2: Ac${HCF}me signed.
+L3: Ac${KIV}me signed.
+L4: Ac${FVS}me signed.
+L5: Ac${HF}me signed.
+L6: Ac${VS16}me signed.
+L7: Ac${HHF}me signed.
+L8: Ac${VS17}me signed.
+"
+make_case ignorable-name-yaml
+replace_line "$parent/ignorable-name-yaml/dossier.yaml" 'confidential_names: []' \
+  "confidential_names: [ \"Acme${VS16}Corp\", \"Glo${CGJ}bex\" ]"
+write_file "$parent/ignorable-name-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Acme Corp today.
+Finally Globex agreed.
+"
+make_named_case ignorable-name-init --confidential-name "Glo${CGJ}bex" --confidential-name "AT${VS16}&T"
+write_file "$parent/ignorable-name-init/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Globex and AT&T.
+"
 # --- Multi-word names: filename slugs and whitespace variants (CR-03) ---
 # E4 only accepts a lowercase ASCII slug joined by hyphens, so the only
 # conforming spelling of a multi-word name in a filename is `big-telco`;

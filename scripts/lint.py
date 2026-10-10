@@ -1627,25 +1627,44 @@ def _decode_html_entities(text):
                       for line in text.split("\n"))
 
 
-def format_readings(text):
-    """The one or two Cf-blind readings of TEXT (D-GAP-6, CR-02 of the iteration-3 review).
+# Every Default_Ignorable_Code_Point (Unicode DerivedCoreProperties) -- the
+# characters a renderer draws as nothing. Most are category Cf; the ones that
+# are not (CGJ, the variation selectors, the Hangul fillers, the Mongolian
+# free variation selectors, two Khmer inherent vowels) hid a name from E5 all
+# the same (WR-01 of the Phase 2 re-verification, 2026-10-10). Hard-coded: the
+# standard library exposes the category, not this property.
+_DEFAULT_IGNORABLE_RE = re.compile(
+    "[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f"
+    "\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff0-\ufff8"
+    "\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0000-\U000e0fff]")
 
-    TEXT itself when it holds no character of Unicode category Cf (a format
-    character: ZWSP, BOM, a soft hyphen, ZWNJ, the word joiner, among
-    others). Otherwise two strings, in this order: the deletion reading
-    (every Cf character removed -- what a format character sitting inside a
-    single word needs, `Ac<SHY>me` -> `Acme`) and the space reading (every
-    Cf character replaced by one space -- what one sitting between two
-    words needs, `Big<ZWSP>Telco` -> `Big Telco`). Either reading alone
-    misses a real case, so both are always returned together, without
-    duplicates. Category Cf never contains `\\n`, so neither reading adds
-    or removes one -- callers that need the line contract e5_haystacks()
-    promises may rely on that.
+
+def is_invisible(ch):
+    """True for a format character (category Cf) or any other default-ignorable code point."""
+    return unicodedata.category(ch) == "Cf" or _DEFAULT_IGNORABLE_RE.match(ch) is not None
+
+
+def format_readings(text):
+    """The one or two invisible-blind readings of TEXT (D-GAP-6, CR-02 of the iteration-3 review).
+
+    TEXT itself when it holds no invisible character (is_invisible(): a
+    format character of category Cf -- ZWSP, BOM, a soft hyphen, ZWNJ, the
+    word joiner, among others -- or any other default-ignorable code point,
+    such as a variation selector or CGJ, WR-01 of the re-verification).
+    Otherwise two strings, in this order: the deletion reading (every
+    invisible character removed -- what one sitting inside a single word
+    needs, `Ac<SHY>me` -> `Acme`) and the space reading (every invisible
+    character replaced by one space -- what one sitting between two words
+    needs, `Big<ZWSP>Telco` -> `Big Telco`). Either reading alone misses a
+    real case, so both are always returned together, without duplicates.
+    No invisible character is `\\n`, so neither reading adds or removes
+    one -- callers that need the line contract e5_haystacks() promises may
+    rely on that.
     """
-    if not any(unicodedata.category(ch) == "Cf" for ch in text):
+    if not any(is_invisible(ch) for ch in text):
         return [text]
-    deleted = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
-    spaced = "".join(" " if unicodedata.category(ch) == "Cf" else ch for ch in text)
+    deleted = "".join(ch for ch in text if not is_invisible(ch))
+    spaced = "".join(" " if is_invisible(ch) else ch for ch in text)
     return [deleted, spaced] if deleted != spaced else [deleted]
 
 
@@ -1696,7 +1715,7 @@ def _build_needle(name):
 
     `display` is the last of format_readings() applied to the normalised
     name, whitespace collapsed: the deletion reading when the name holds no
-    Cf character, otherwise the space reading -- what every E5 message and
+    invisible character, otherwise the space reading -- what every E5 message and
     the (line, name) de-duplication name the leak as. `exact_patterns` is
     boundary_pattern() of every reading, distinct patterns only and
     _NEVER_RE dropped, so the exact pass catches a format character read
