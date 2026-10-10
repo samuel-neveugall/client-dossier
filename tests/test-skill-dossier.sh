@@ -30,6 +30,28 @@ has_not() {
   fi
 }
 
+# has_flat FIXED_STRING LABEL — the body contains the string once its line breaks
+# are folded into single spaces (a sentence the Markdown wraps over two lines).
+has_flat() {
+  if tr '\n' ' ' <"$SKILL_MD" 2>/dev/null | tr -s ' ' | grep -qF -- "$1"; then
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+  else
+    echo "FAIL: SKILL.md lacks (line breaks folded): $2 ($1)" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  fi
+}
+# cell_has ROW FIELD TOKEN LABEL — the row of the read/update table that starts
+# with ROW holds TOKEN in its FIELD-th column (3 = read first, 4 = update).
+cell_has() {
+  if awk -F'|' -v row="$1" -v field="$2" -v tok="$3" \
+    '$0 ~ "^\\| *" row { found = 1; if (index($field, tok)) ok = 1 } END { exit !(found && ok) }' "$SKILL_MD"; then
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+  else
+    echo "FAIL: SKILL.md table row '$1' column $2 lacks: $4 ($3)" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  fi
+}
+
 assert_file "$SKILL_MD"
 
 # --- Frontmatter (PROTO-01) and the one-file rule (D-06) ---
@@ -98,6 +120,7 @@ has 'the nearest `dossier.yaml`' 'nearest dossier.yaml'
 has 'the nearest one wins' 'several dossiers rule'
 has 'say so in one line' 'step-aside: one line'
 has "then continue with the user's task" 'step-aside: never blocks'
+has_flat 'The task skills stop when no dossier is found; this one only steps aside.' 'step-aside: the task skills stop, this one only steps aside'
 has 'task skills stop' 'task skills stop without a dossier'
 has 'Protocol keywords stay in English' 'language rule: keywords'
 has '`language`' 'language key'
@@ -138,13 +161,37 @@ assert_eq '6' "$ROWS_N" 'the table has its six rows'
 has 'before its final message' 'handing back means before the final message'
 has 'knowledge/CONTEXT.md' 'context one-pager is read first'
 has 'why none needed it' 'update-or-say-why rule (D-01)'
+has_flat 'In Claude Code a stop check blocks the first stop of a turn when `outbound/` or `sources/` changed and `dossier/` did not;' 'the stop check sentence'
+has_flat 'the rule is the same without that check, and you apply it yourself.' 'the rule holds without the stop check'
+# What each row makes the agent read and update, not only that the cells are filled.
+for tok in 'knowledge/CONTEXT.md' 'dossier/HISTORY.md'; do cell_has 'Any session' 3 "$tok" "read first: $tok"; done
+cell_has 'Any session' 4 'nothing, unless something was learned' 'update: only if something was learned'
+for tok in 'dossier/TONE.md' 'dossier/LEARNINGS.md' 'knowledge/DOCTRINE.md' 'knowledge/decisions/'; do
+  cell_has 'Write a message' 3 "$tok" "read first: $tok"
+done
+for tok in 'dossier/HISTORY.md' 'dossier/TONE.md'; do cell_has 'Write a message' 4 "$tok" "update: $tok"; done
+for tok in 'dossier/OPEN-QUESTIONS.md' 'previous files in `outbound/calls/`'; do
+  cell_has 'Prepare a call' 3 "$tok" "read first: $tok"
+done
+for tok in 'a call file in `outbound/calls/`' 'objectives' 'agenda' 'what we do not do'; do
+  cell_has 'Prepare a call' 4 "$tok" "update: $tok"
+done
+cell_has 'Debrief a call' 3 'the transcript in `sources/transcripts/`' 'read first: the transcript'
+for tok in 'HISTORY.md' 'OPEN-QUESTIONS.md' 'LEARNINGS.md' 'ACTORS.md' 'CHANNELS.md' 'RELATIONSHIP.md'; do
+  cell_has 'Debrief a call' 4 "$tok" "update: $tok"
+done
+cell_has 'Check a fact' 3 '`sources/`' 'read first: sources/'
+cell_has 'Check a fact' 4 'the line that was wrong' 'update: the wrong line'
+cell_has 'Ingest a source' 3 'nothing' 'read first: nothing'
+cell_has 'Ingest a source' 4 'every living file the source touches' 'update: every living file the source touches'
 
 # --- Fact line ---
 has '- <fact, one sentence, absolute dates> (<source>, <locator>).' 'fact-line format'
 has 'call @12:34' 'source example: call'
 has 'mail 2026-09-16 from Jane' 'source example: mail'
 has 'brochure p. 4' 'source example: brochure'
-has 'reconstructed' 'reconstructed marker'
+has_flat 'A line whose source is a reconstruction (their view as we reconstruct it) says "reconstructed".' 'reconstructed marker rule'
+has_flat 'A line without a source is an opinion and says so.' 'unsourced line is an opinion'
 has '(corrects a line dated' 'correction trace'
 has 'Name (Organisation)' 'Name (Organisation) rule'
 has '`Last updated:` line current' 'Last updated rule'
@@ -156,6 +203,8 @@ has 'ends with one parenthesised source' 'fact line shape'
 assert_grep_e '^- .*transcript reads .*\(call [0-9]{4}-[0-9]{2}-[0-9]{2} @[0-9]{2}:[0-9]{2}\)\.$' "$SKILL_MD"
 has 'every route' 'the rule covers every route'
 has 'heuristic' 'the Bash guard is a heuristic'
+has_flat 'It does not see `eval`, interpreters (`python3 -c` and the like), command substitutions, variables or loops' 'the guard limits (D-04, D-17)'
+has_flat 'this file stays the boundary: never modify a source by any route' 'the rule is the boundary (D-04)'
 # Drift guard: the scenario fixture constants this check is copied from.
 FIXTURE="$REPO_ROOT/tests/scenarios/fix-typo.sh"
 TYPO_TOKEN="$(sed -n 's/^TYPO_TOKEN="\(.*\)"$/\1/p' "$FIXTURE" | head -1)"

@@ -80,6 +80,8 @@ and even when the user asks for it. The rule covers every route: Write, Edit, `s
 script, `mv`, `rm`, `cp` over a file, a redirection, retyping a file. New sources are copied in
 unchanged, never written or retyped. In Claude Code a guard denies the obvious shortcuts, but it
 is a heuristic that reads the command text; a command it fails to recognise is still forbidden.
+It does not see `eval`, interpreters (`python3 -c` and the like), command substitutions, variables or
+loops, so this file stays the boundary: never modify a source by any route, seen or not by the guard.
 
 Common rationalizations, all answered the same way: "the user asked me to fix it" (observed at
 the baseline), "it is one character", "they are forwarding it in five minutes", "I will tell them
