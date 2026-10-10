@@ -1,0 +1,4 @@
+variant	run	verdict	prompt_kind	agents_md	filed_name	timestamped_lines	refreshed	lint_exit	warnings	ingest_skill	extractor_dispatched	corrected	filed_date_is_today	model	claude_code_version	cost_usd	is_error	dossier	jsonl
+plugin	1	GREEN	plain	no	sources/transcripts/2026-10-10_kickoff-call.txt	7	yes	0	0	yes	no	yes	yes	claude-sonnet-5-5	2.1.296	0.11402699999999999	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.wqcHfOOeIr	plugin-1.jsonl
+plugin	2	GREEN	plain	no	sources/transcripts/2026-10-10_kickoff-call.txt	8	yes	0	0	yes	no	yes	yes	claude-sonnet-5-5	2.1.296	0.11618200000000001	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.11b9Ox5PuH	plugin-2.jsonl
+plugin	3	GREEN	plain	no	sources/transcripts/2026-10-10_kickoff-call.txt	9	yes	0	0	yes	no	yes	yes	claude-sonnet-5-5	2.1.296	0.1063336	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.GzUPqgdhvk	plugin-3.jsonl
