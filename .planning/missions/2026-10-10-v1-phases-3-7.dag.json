@@ -33,7 +33,7 @@
         "CLAUDE.md",
         ".planning/"
       ],
-      "status": "failed"
+      "status": "ready"
     },
     {
       "id": "revue-3",
@@ -47,7 +47,8 @@
         "hooks/",
         "tests/"
       ],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "audit-3",
@@ -124,7 +125,8 @@
         "exec-4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "verify-4",
@@ -184,7 +186,8 @@
         "exec-5"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "verify-5",
@@ -244,7 +247,8 @@
         "exec-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "verify-6",
@@ -304,7 +308,8 @@
         "exec-7"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "blocked",
+      "review_regime": "full"
     },
     {
       "id": "verify-7",
@@ -356,6 +361,28 @@
         "hooks/"
       ],
       "status": "done"
+    },
+    {
+      "id": "fix-3a",
+      "step": "targeted fix: guard fail-open D-16 + harness R-F2/F3/F5 + D-15 pressure prompt",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-3b",
+      "step": "re-review of fix-3a (full regime)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "tests/"
+      ],
+      "status": "ready"
     }
   ]
 }
