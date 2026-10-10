@@ -6,19 +6,17 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "plan-3",
       "step": "plan phase 3 (validation, patterns, planner, checker)",
       "stage": "",
-      "deps": [
-        "decide-3"
-      ],
+      "deps": [],
       "scope": [
         ".planning/phases/03-protocol-skill-hooks/"
       ],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "exec-3",
@@ -35,7 +33,7 @@
         "CLAUDE.md",
         ".planning/"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-3",
@@ -94,7 +92,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "plan-4",
@@ -330,7 +328,7 @@
     },
     {
       "id": "docs",
-      "step": "hygiène documentaire",
+      "step": "hygi\u00e8ne documentaire",
       "stage": "",
       "deps": [
         "uat-7"
