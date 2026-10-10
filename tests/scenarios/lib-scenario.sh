@@ -328,18 +328,18 @@ added_lines() {
 # prefix (sk-ant-) or this repository's git user email. Run before evidence is
 # copied into the repository (T-03-11).
 scrub_check() {
-  local email f status=0
+  local email f rc=0
   email="$(git -C "$REPO_ROOT" config user.email 2>/dev/null || true)"
   for f in "$@"; do
     [ -f "$f" ] || continue
     if grep -q -- 'sk-ant-' "$f"; then
       echo "scrub_check: $f contains 'sk-ant-'" >&2
-      status=1
+      rc=1
     fi
     if [ -n "$email" ] && grep -qF -- "$email" "$f"; then
       echo "scrub_check: $f contains the git user email" >&2
-      status=1
+      rc=1
     fi
   done
-  return "$status"
+  return "$rc"
 }
