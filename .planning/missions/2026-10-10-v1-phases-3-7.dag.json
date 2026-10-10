@@ -115,7 +115,7 @@
         "uat-3"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "revue-4",
@@ -125,7 +125,7 @@
         "exec-4"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "running",
       "review_regime": "full"
     },
     {
@@ -454,7 +454,7 @@
         "exec-4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "running"
     }
   ]
 }
