@@ -7,9 +7,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The single source of truth is `docs/superpowers/specs/2026-09-16-client-dossier-design.md`
 (status: approved for implementation, 2026-09-16). Phases 1-2 are delivered: the `dossier-init`
 skill with its bundled script and templates, a minimal `.claude-plugin/plugin.json`, `scripts/lint.py`,
-and a bash test suite under `tests/`. Phase 3 (protocol skill and hooks) is built and in review
-fixes: the `dossier` entry skill (`skills/dossier/SKILL.md`), the hooks under `hooks/`
-(SessionStart, PreToolUse guard, Stop check) and the pressure scenarios under `tests/scenarios/`. Read the spec before any work; when this file and the spec
+and a bash test suite under `tests/`. Phase 3 (protocol skill and hooks) is delivered: the
+`dossier` entry skill (`skills/dossier/SKILL.md`), the hooks under `hooks/` (SessionStart,
+PreToolUse guard, Stop check) and the pressure scenarios under `tests/scenarios/`. Phase 4
+(ingest and fact extraction) adds the `dossier-ingest` skill (`skills/dossier-ingest/`) with its
+two private scripts, `file_source.py` and `extract-text.sh`, and the read-only `fact-extractor`
+agent (`agents/fact-extractor.md`). Read the spec before any work; when this file and the spec
 disagree, the spec wins and this file must be updated. Planning lives in `.planning/` (GSD):
 ROADMAP, REQUIREMENTS, STATE.
 
@@ -52,11 +55,12 @@ Division of responsibility, which decides where any new behaviour goes:
   skill prose. `lint.py` is Python 3 standard library only (tiny YAML-subset parser, JSON
   fallback); exit 1 on errors, 0 on warnings only. A skill's own *private* mechanics and
   resources are bundled inside its own folder instead: `skills/dossier-init/scripts/init.py`
-  and `skills/dossier-init/templates/{en,fr}/`, referenced from `SKILL.md` as
-  `${CLAUDE_SKILL_DIR}/…`, never by a relative path. A script shared by several skills stays at
+  and `skills/dossier-init/templates/{en,fr}/`, then `skills/dossier-ingest/scripts/{file_source.py,extract-text.sh}`
+  (Phase 4 D-05, the second example; the shell script targets bash 3.2), referenced from
+  `SKILL.md` as `${CLAUDE_SKILL_DIR}/…`, never by a relative path. A script shared by several skills stays at
   the repository-root `scripts/`, which is the rule that keeps `lint.py` where it is — see D-05
   and D-06 of `.planning/phases/01-scaffold-templates/01-CONTEXT.md`; spec §4's tree was amended
-  in Phase 1 to match. Scripts target **Python 3.8 or newer**, standard library only.
+  in Phase 1, and again in Phase 4, to match. Scripts target **Python 3.8 or newer**, standard library only.
 - **Hooks carry reminders** (`hooks/hooks.json`): SessionStart injects a pointer when a
   `dossier.yaml` is found upward, PreToolUse denies writes under `sources/`, Stop blocks once (the second stop of a
   turn passes) when outbound/sources changed without the dossier. The hook scripts are Python
@@ -124,10 +128,23 @@ status → manifests and distribution.
 - `bash tests/test-hook-session-start.sh` — the SessionStart reminder.
 - `bash tests/test-hook-stop.sh` — the block-once Stop check.
 - `bash tests/test-skill-dossier.sh` — frontmatter and content checklist of the `dossier` skill.
+- `bash tests/test-ingest-file.sh` — `file_source.py`: naming, dedup, no overwrite, refusals.
+- `bash tests/test-ingest-fetch.sh` — the URL download and its guard-rails, against a local server.
+- `bash tests/test-ingest-extract.sh` — the `extract-text.sh` exit contract.
+- `bash tests/test-ingest-guard.sh` — the ingest skill's own commands through the real sources guard and scripts.
+- `bash tests/test-agent-fact-extractor.sh` — agent frontmatter, rules, parity with the skill.
+- `bash tests/test-skill-ingest.sh` — the `dossier-ingest` skill checklist.
 - `bash tests/scenarios/selftest.sh` — free self-test of the scenario harness against a fake `claude`.
+- `bash tests/scenarios/selftest-ingest.sh` — free self-test of the ingest scenario harness.
 - `bash tests/scenarios/fix-typo.sh [--variant baseline|plugin|pointer-only]... [--runs N] [OUTDIR]`
   — the PROTO-07 pressure scenario: paid headless `claude -p` runs, run by the agent, never part
   of `tests/run.sh`. Exit 0 pass, 1 gate not met, 2 harness error.
+- `bash tests/scenarios/ingest-transcript.sh [--variant baseline|plugin|plugin-pointer]... [--runs N] [--prompt plain|pressured] [OUTDIR]`
+  — the INGEST-05 pressure scenario: paid headless `claude -p` runs, run by the agent, never part
+  of `tests/run.sh`. Exit 0 pass, 1 gate not met, 2 harness error.
+- `bash tests/scenarios/ingest-pdf.sh [--runs N] [OUTDIR]` — the end-to-end PDF ingest of
+  ROADMAP criterion 1: a paid headless run with the plugin, run by the agent, never part of
+  `tests/run.sh`. Same exit codes.
 - `claude --plugin-dir .` — load the plugin from the working copy during development.
 
 Add more here as they are created.

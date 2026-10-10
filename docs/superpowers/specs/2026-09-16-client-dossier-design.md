@@ -214,7 +214,11 @@ client-dossier/
                                        stubs, three folder READMEs) plus AGENTS-pointer.md, the
                                        protocol-pointer body upserted into AGENTS.md/CLAUDE.md
         fr/                           the same thirteen files, French headings, English protocol keywords
-    dossier-ingest/SKILL.md           file a source, extract facts into the living files
+    dossier-ingest/                   file a source, extract facts into the living files
+      SKILL.md                        judgement: kind, content date, slug, dispatch, apply, report
+      scripts/
+        file_source.py                mechanics: name, sha256 dedup, no overwrite, URL download into a staging folder
+        extract-text.sh               pdftotext wrapper, writes .txt next to the PDF
     dossier-draft/SKILL.md            write an outbound message or document
     dossier-call/SKILL.md             prepare a call, debrief a call
     dossier-status/SKILL.md           where we are, what is due, what is stale
@@ -228,7 +232,6 @@ client-dossier/
     session-start.py  guard-sources.py  stop-check.py     Python 3.8+, standard library
   scripts/
     lint.py                           mechanical checks (python3, no dependencies)
-    extract-text.sh                   pdftotext wrapper, writes .txt next to the PDF
     release.sh                        bumps the version in both manifests, tags
   tests/                              fixture dossiers, the bash runner for lint.py and the hooks; scenarios/ holds the paid pressure-scenario harness
   docs/                               this spec, the protocol reference, the fact-line reference
@@ -242,7 +245,7 @@ complete it at distribution time.
 
 A skill's own directory may bundle its own `scripts/` and other resources under the Agent
 Skills standard, and that is where a skill's *private* mechanics and assets live — `dossier-init`
-above is the only skill that needs any today. A script shared by several skills, such as
+and `dossier-ingest` above are the skills that need any today. A script shared by several skills, such as
 `lint.py`, stays at the repository-root `scripts/` instead. A bundled resource is referenced
 from `SKILL.md` as `${CLAUDE_SKILL_DIR}/…`, never by a relative path, because a skill's working
 directory at invocation is the user's dossier repository, not the plugin. `dossier.yaml` is
@@ -286,9 +289,11 @@ written for triggering: they name the situations, not the features.
   proposes the `git mv` renames to the fixed English names, then writes only what is missing.
 
 **`dossier-ingest <path or URL>`**
-- Files the source under `sources/` with the `YYYY-MM-DD_slug` name, runs the text extraction
-  for PDFs (`extract-text.sh`, which needs `pdftotext` from poppler; when it is missing the
-  script exits with an install hint, the PDF is still filed and the skill reports that
+- Files the source under `sources/` with the `YYYY-MM-DD_slug` name through the skill's private
+  `file_source.py` (a copy, or a URL downloaded into a staging folder first and read before
+  filing), never through the Write tool, which the `sources/` guard denies. It runs the text
+  extraction for PDFs (`extract-text.sh`, which needs `pdftotext` from poppler; when it is
+  missing the script exits with an install hint, the PDF is still filed and the skill reports that
   extraction was skipped), keeps raw exports next to transcripts.
 - Dispatches `fact-extractor` on the source (one agent per source, so the long text stays
   out of the main context). Receives a proposal: lines grouped by target file, each with its
