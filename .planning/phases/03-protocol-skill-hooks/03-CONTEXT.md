@@ -123,6 +123,20 @@ skills, the agents, the Codex manifests and the slash commands belong to Phases 
   `03-SECURITY.md` A-F1..A-F4.
   (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
 
+- **D-17 — closing the Bash guard: one last bounded round, then documented debt.** After the
+  review budget (3 rounds) ran out with minors only: fix the round-2 regression (`a\ #b`, `$'…'`,
+  multi-line strings holding `<<EOF`), `cd -`/`popd`, size bounds against hook timeouts, globs on
+  the `sources` path component, `rm -rf .`/`*`, the listed verbs (`gsed -i`, `patch`,
+  `awk -i inplace`, `ed`, `vim -es`, `sponge`) and wrappers (`timeout`, `nice`, `ionice`, `stdbuf`,
+  `caffeinate`), and the spec's "nearest dossier" wording; then explicitly accept the D-04 class
+  (eval, interpreters, substitutions, variables, loops) as documented v1 debt in the skill and the
+  README (README lands in Phase 7). One non-regression verification, no new hunting round.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+- **Git policy (Q10, mission-wide).** After each phase passes verification and its UAT is complete,
+  the phase branch is merged into `main` with `--no-ff` and `main` plus the branch are pushed to
+  `origin` (private GitHub); the next phase starts from `main`. No tags, no publication.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+
 ### Claude's Discretion
 - Hook implementation language: Python 3.8+ standard library, like the other scripts,
   instead of the `.sh` names of spec §4.3 (one language, testable from the bash runner,
