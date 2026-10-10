@@ -1,3 +1,5 @@
+> Note (2026-10-10): snapshot of the 2026-09-16 ingestion; superseded by 03-CONTEXT D-01/D-03/D-04 and the amended spec §4.3. The body below is kept as ingested.
+
 # Context
 
 No DOC-classified documents were present in this ingest batch. The topics below are carried

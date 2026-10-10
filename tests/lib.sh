@@ -30,6 +30,13 @@ skip() {
 LINT_OUT=""
 LINT_ERR=""
 
+# The last hook run's stdout, stderr and exit status, set by run_hook().
+# Initialised here for the same reason as LINT_OUT: set -u aborts on a read
+# before the first run_hook.
+HOOK_OUT=""
+HOOK_ERR=""
+HOOK_STATUS=0
+
 # init_py — the absolute path to the script under test. Tests call
 # `python3 "$(init_py)" ...` because the bash harness has no
 # `${CLAUDE_SKILL_DIR}` expansion (that is a Claude Code harness-side
@@ -43,6 +50,64 @@ init_py() {
 # path breaks the moment the repository is checked out elsewhere.
 lint_py() {
   echo "$REPO_ROOT/scripts/lint.py"
+}
+
+# hooks_dir — the absolute path to the hook scripts under test. Mirrors
+# lint_py(): the bash harness has no ${CLAUDE_PLUGIN_ROOT} expansion.
+hooks_dir() {
+  echo "$REPO_ROOT/hooks"
+}
+
+# hook_json EVENT CWD TOOL_NAME INPUT_KEY INPUT_VALUE — one JSON object, the
+# stdin a Claude Code hook receives. Built by python3 from argv, never by
+# printf, so a path holding a space, a quote or a backslash stays valid JSON.
+# `cwd` is present only when CWD is non-empty; `tool_name` and `tool_input`
+# ({INPUT_KEY: INPUT_VALUE}) only when TOOL_NAME is non-empty.
+hook_json() {
+  python3 -c 'import json, sys
+a = sys.argv[1:] + [""] * 5
+event, cwd, tool, key, value = a[:5]
+d = {"hook_event_name": event, "session_id": "test", "transcript_path": "/dev/null"}
+if cwd:
+    d["cwd"] = cwd
+if tool:
+    d["tool_name"] = tool
+    d["tool_input"] = {key: value}
+print(json.dumps(d))' "$@"
+}
+
+# run_hook NAME JSON — pipes JSON into `python3 hooks/NAME`, stores stdout in
+# HOOK_OUT, stderr in HOOK_ERR and the exit status in HOOK_STATUS for the
+# assertions that follow. stderr goes through a mktemp file, never a file
+# beside the dossier, so the tree under test is left untouched.
+run_hook() {
+  local name="$1" json="$2" err_file
+  err_file="$(mktemp)"
+  HOOK_STATUS=0
+  HOOK_OUT="$(printf '%s' "$json" | python3 "$(hooks_dir)/$name" 2>"$err_file")" || HOOK_STATUS=$?
+  HOOK_ERR="$(cat "$err_file")"
+  rm -f "$err_file"
+}
+
+# hook_field DOTTED.PATH — the value at that path in HOOK_OUT. Prints `none`
+# when HOOK_OUT is empty or only whitespace (the hook stayed silent), and
+# `invalid` when HOOK_OUT is not a single JSON object.
+hook_field() {
+  printf '%s' "$HOOK_OUT" | python3 -c 'import json, sys
+text = sys.stdin.read()
+if not text.strip():
+    print("none")
+    sys.exit(0)
+try:
+    value = json.loads(text)
+    if not isinstance(value, dict):
+        raise ValueError("not an object")
+    for part in sys.argv[1].split("."):
+        value = value[part]
+except Exception:
+    print("invalid")
+    sys.exit(0)
+print(value)' "$1"
 }
 
 # scratch_repo — a fresh throwaway git repository. Echoes its path.

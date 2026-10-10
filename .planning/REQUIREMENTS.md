@@ -61,29 +61,39 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Protocol skill `dossier` + hooks
 
-- [ ] **PROTO-01**: The `dossier` skill triggers on any task in a repository containing
+- [x] **PROTO-01**: The `dossier` skill triggers on any task in a repository containing
       `dossier.yaml`, or any mention of a client/counterpart/prospect/partner/call/message
       to someone outside the team, and is always loaded first
 - [ ] **PROTO-02**: The `dossier` skill's content covers the four-folder layout, the
       read-before-act/update-before-handoff table, the fact-line format, the status-header
       format, the "what the agent never does" list, the "Name (Organisation)" rule on first
       mention of a person in a file, and one-sentence pointers to the other five skills
-- [ ] **PROTO-03**: The `dossier` skill sets the rule that the agent writes dossier content
+- [x] **PROTO-03**: The `dossier` skill sets the rule that the agent writes dossier content
       in the language configured in `dossier.yaml`
-- [ ] **PROTO-04**: A SessionStart hook injects the protocol reminder ("this repository is a
+- [x] **PROTO-04**: A SessionStart hook injects the protocol reminder ("this repository is a
       client dossier, load the `dossier` skill") whenever `dossier.yaml` is found from the
       working directory upward, and stays silent otherwise
-- [ ] **PROTO-05**: A PreToolUse hook on Write/Edit/MultiEdit denies any write whose target
-      path is under the sources folder, with the message that sources are immutable
-- [ ] **PROTO-06**: A Stop hook warns (non-blocking) when `git status` shows changes under
-      outbound or sources but none under the dossier folder, pointing at `dossier-status`
-      (provisional default: ships in v1 — see PROJECT.md Open Decisions #3)
-- [ ] **PROTO-07**: The "fix the typo in the transcript" baseline pressure scenario is
+- [x] **PROTO-05**: A PreToolUse hook on Write/Edit/MultiEdit/NotebookEdit denies any write
+      whose target path resolves under the sources folder of the nearest dossier, new files
+      included, with the message that sources are immutable; a second, heuristic PreToolUse
+      guard on Bash denies commands that visibly modify an existing file under sources
+      (in-place edits, rm, mv out, cp, tee or redirection onto it, truncate, git rm) and
+      allows copying a new file in (Phase 3 D-03, D-04)
+- [x] **PROTO-06**: A Stop hook blocks the stop once when `git status` shows uncommitted
+      changes under outbound or sources but none under the dossier folder, returning a
+      reason to the agent (update the living files the work touched, or say why none needed
+      it; `dossier-status` named once that skill exists); the second stop of the same turn
+      (`stop_hook_active`) passes, so it never loops (settled with Samuel 2026-10-10,
+      Phase 3 D-01)
+- [x] **PROTO-07**: The "fix the typo in the transcript" baseline pressure scenario is
       recorded RED (agent edits the source) before the protocol skill/hooks exist, and
-      re-run GREEN (agent refuses and points to filing a dossier correction) after
-- [ ] **PROTO-08**: Every skill except `dossier-init` locates the nearest `dossier.yaml`
-      (working directory, then parents) and stops with a message when none is found; in a
-      repository holding several dossiers, the nearest one wins
+      re-run GREEN (the transcript stays byte-identical and the agent files the correction
+      as a dated, sourced line in the living file concerned; Phase 3 D-09) after
+- [ ] **PROTO-08**: Every skill locates the nearest `dossier.yaml` (working directory, then
+      parents); every task skill (all except `dossier-init` and the `dossier` entry skill)
+      stops with a message when none is found; the `dossier` entry skill says so in one line,
+      suggests `dossier-init` when relevant, and steps aside (03-CONTEXT D-05); in a repository
+      holding several dossiers, the nearest one wins
 
 ### Ingest (dossier-ingest, fact-extractor agent, extract-text.sh)
 
@@ -169,7 +179,8 @@ synthesized-for-tracking, not verbatim spec text.
       protocol skill has no command (it is loaded, not invoked)
 - [ ] **DIST-05**: README documents installation for all four distribution targets
       (Claude Code, Codex, Agent-Skills-standard harnesses, plain `AGENTS.md`-only use),
-      plus versioning (semver, `CHANGELOG.md`, git tag per release) and the MIT `LICENSE`
+      plus versioning (semver, `CHANGELOG.md`, git tag per release) and the MIT `LICENSE`;
+      README states the Bash guard's D-04 limits (Phase 3 D-17)
 - [ ] **DIST-06**: `claude plugin eval` suites verify the six skills' trigger descriptions —
       confirming, for example, that "write to the client" routes to `dossier-draft` and not
       `dossier-ingest`
@@ -207,14 +218,14 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | LINT-01 | Phase 2 | Complete |
 | LINT-02 | Phase 2 | Complete |
 | LINT-03 | Phase 2 | Complete |
-| PROTO-01 | Phase 3 | Pending |
-| PROTO-02 | Phase 3 | Pending |
-| PROTO-03 | Phase 3 | Pending |
-| PROTO-04 | Phase 3 | Pending |
-| PROTO-05 | Phase 3 | Pending |
-| PROTO-06 | Phase 3 | Pending |
-| PROTO-07 | Phase 3 | Pending |
-| PROTO-08 | Phase 3 | Pending |
+| PROTO-01 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-02 | Phase 3 (pointers completed incrementally as each task skill lands in Phases 4-6, verified in full at Phase 6; D-07) | Partial — Phase 3 part done 2026-10-10 (only `dossier-init` pointer exists) |
+| PROTO-03 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-04 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-05 | Phase 3 | Complete (closed 2026-10-10) — Bash guard class D-04 accepted as documented v1 debt (D-17) |
+| PROTO-06 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-07 | Phase 3 | Complete (closed 2026-10-10) |
+| PROTO-08 | Phase 3 (rule and hooks; the task-skill stop completed incrementally in Phases 4-6, verified in full at Phase 6) | Partial — Phase 3 part done 2026-10-10 (rule, hooks, entry skill) |
 | INGEST-01 | Phase 4 | Pending |
 | INGEST-02 | Phase 4 | Pending |
 | INGEST-03 | Phase 4 | Pending |
@@ -249,4 +260,5 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 *Requirements defined: 2026-09-16*
 *Last updated: 2026-09-16 after the spec review (decisions §11 settled; SCAF-08, PROTO-08,
 INGEST-06, DRAFT-05, DIST-07 added; SCAF-01/02/04/07, LINT-01/02, PROTO-02, INGEST-01,
-DRAFT-02, CALL-03, DIST-03/04 amended)*
+DRAFT-02, CALL-03, DIST-03/04 amended); 2026-10-10 Phase 3 planning: PROTO-05/06/07 amended
+(D-01, D-03, D-04, D-09), PROTO-02/08 completed incrementally (D-07)*

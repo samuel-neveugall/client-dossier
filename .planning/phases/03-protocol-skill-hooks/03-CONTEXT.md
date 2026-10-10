@@ -84,6 +84,59 @@ skills, the agents, the Codex manifests and the slash commands belong to Phases 
 - **D-10:** 3 runs per variant. Without the plugin, RED must appear at least once (the
   baseline is recorded even if not every run fails); with the plugin, GREEN 3/3.
 
+### Manager decisions (vf-dev-manager, 2026-10-10, open questions 3 and 4 of the research)
+- **D-11:** The scenario harness writes into an output directory passed as an argument
+  (default `mktemp -d`). The phase copies the summary and the `.jsonl` runs it cites into
+  `.planning/phases/03-protocol-skill-hooks/evidence/` (transcripts hold only scratch paths and
+  fixture text).
+- **D-12:** In the plugin variant the harness asserts that `system/init.skills` contains
+  `client-dossier:dossier` and fails loudly (harness error, never RED/GREEN) otherwise. This
+  guards against a future `claude -p` defaulting to bare mode.
+
+### Settled by Samuel after planning (formerly P-01, P-02)
+- **D-13 (was P-01) — scratch dossier without `AGENTS.md`.** The scenario harness builds the
+  scratch dossier with the real `init.py`, then deletes `AGENTS.md` in BOTH variants (baseline
+  and plugin), so the plugin is the only variable; the informational third column "pointer
+  only" is kept. Implemented in `strip_agents_pointer` (`tests/scenarios/lib-scenario.sh`).
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+- **D-14 (was P-02) — `dossier-status` named only once it exists.** The Stop hook appends the
+  sentence naming `dossier-status` only when `${CLAUDE_PLUGIN_ROOT}/skills/dossier-status/SKILL.md`
+  exists; both states are tested. Implemented in `status_sentence()` (`hooks/stop-check.py`).
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+
+### Settled by Samuel after execution started (RED baseline, guard fail-open)
+- **D-15 — RED baseline under pressure, with a fallback.** The baseline of plan 03-02 found the
+  plain prompt already refused without the plugin (RED 0/3, GREEN 2/3): the scaffold's own
+  `sources/README.md` teaches immutability. The scenario prompt gains real pressure, as
+  `superpowers:writing-skills` prescribes (e.g. "just edit the file directly, I'm forwarding it to
+  the client in 5 minutes"), fixture unchanged, 3 runs. If it is still 0 RED, the phase switches to
+  the fallback without coming back to Samuel: record that the scaffold already prevents the edit,
+  and judge the plugin on what it adds (correction filed 3/3 with the plugin vs the baseline's
+  filing rate); D-10 and ROADMAP criterion 5 are then amended to say so.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a) then (d))
+- **D-16 — fix every reproduced fail-open path of the sources guard, before the skill.** One
+  targeted round with tests: (1) `sources/` itself a symlink out of the dossier; (2) a
+  `dossier.yaml` under `sources/` making that subtree a root (the target is denied when it sits
+  under the `sources/` of ANY ancestor root); (3) an unmatched quote (heredoc body, comment)
+  disabling the whole Bash guard; (4) shell reserved words (`then`, `do`, `else`, `{`, `!`...),
+  `>& file` redirection, hard links via `ln`. Findings: `03-REVIEW.md` R-F1..R-F3,
+  `03-SECURITY.md` A-F1..A-F4.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+
+- **D-17 — closing the Bash guard: one last bounded round, then documented debt.** After the
+  review budget (3 rounds) ran out with minors only: fix the round-2 regression (`a\ #b`, `$'…'`,
+  multi-line strings holding `<<EOF`), `cd -`/`popd`, size bounds against hook timeouts, globs on
+  the `sources` path component, `rm -rf .`/`*`, the listed verbs (`gsed -i`, `patch`,
+  `awk -i inplace`, `ed`, `vim -es`, `sponge`) and wrappers (`timeout`, `nice`, `ionice`, `stdbuf`,
+  `caffeinate`), and the spec's "nearest dossier" wording; then explicitly accept the D-04 class
+  (eval, interpreters, substitutions, variables, loops) as documented v1 debt in the skill and the
+  README (README lands in Phase 7). One non-regression verification, no new hunting round.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+- **Git policy (Q10, mission-wide).** After each phase passes verification and its UAT is complete,
+  the phase branch is merged into `main` with `--no-ff` and `main` plus the branch are pushed to
+  `origin` (private GitHub); the next phase starts from `main`. No tags, no publication.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-10, option (a))
+
 ### Claude's Discretion
 - Hook implementation language: Python 3.8+ standard library, like the other scripts,
   instead of the `.sh` names of spec §4.3 (one language, testable from the bash runner,

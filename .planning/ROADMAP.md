@@ -13,8 +13,9 @@ earlier one.
 
 **Decisions settled 2026-09-16 (spec §11):** the plugin is `client-dossier`, the folders are
 `dossier/` and `outbound/`, protocol keywords (`Last updated:`, status-header fields and
-values) stay English and are never translated. The one remaining open point, whether the Stop
-hook ships in v1, is decided during Phase 3 planning with Samuel; the spec ships it by default.
+values) stay English and are never translated. The Stop
+hook question (spec section 11 #3) was settled at Phase 3 planning with Samuel on 2026-10-10:
+it ships in v1 and blocks once.
 
 **Development loop:** the plugin is loaded from the working copy with `claude --plugin-dir .`
 from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
@@ -28,7 +29,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 
 - [x] **Phase 1: Scaffold & Templates** - `dossier-init` scaffolds a full dossier repo from `dossier.yaml` and templates
 - [x] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures (completed 2026-10-10)
-- [ ] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
+- [x] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
 - [ ] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts
 - [ ] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
 - [ ] **Phase 6: Calls & Status** - `dossier-call` and `dossier-status` close the loop on preparation, debrief, and "where are we"
@@ -186,8 +187,8 @@ break them, on any harness.
 and from `dossier-status` later)
 **Requirements**: PROTO-01, PROTO-02, PROTO-03, PROTO-04, PROTO-05, PROTO-06, PROTO-07,
 PROTO-08
-**Decision to take at planning**: whether the Stop hook (PROTO-06, criterion 4) ships in v1
-(spec §11 #3, with Samuel).
+**Decision settled at planning (2026-10-10, D-01)**: the Stop hook (PROTO-06, criterion 4)
+ships in v1 and blocks once.
 **Success Criteria** (what must be TRUE):
 
   1. Loading the `dossier` skill in a repo with `dossier.yaml` surfaces the layout, the
@@ -196,16 +197,46 @@ PROTO-08
      triggers on dossier-shaped tasks even before `dossier.yaml` is read.
   2. A SessionStart hook injects the protocol reminder whenever `dossier.yaml` is found
      upward from the working directory, and says nothing otherwise.
-  3. An attempt to Write/Edit/MultiEdit a file under the sources folder is denied with the
-     immutability message.
+  3. An attempt to Write/Edit/MultiEdit/NotebookEdit a file under the sources folder is denied
+     with the immutability message, and a heuristic Bash guard denies the obvious shell routes
+     (D-03/D-04).
   4. Changing files under outbound or sources without touching the dossier folder, then
-     stopping, triggers a non-blocking Stop-hook warning pointing at `dossier-status`.
-  5. The "fix the typo in the transcript" pressure scenario, run without the skill/hooks,
-     edits the source (RED); run with them, the agent refuses and points to filing a
-     correction instead (GREEN).
+     stopping, makes the Stop hook block the stop once with a reason addressed to the agent
+     (update the living files the work touched, or say why none needed it; `dossier-status`
+     named once that skill exists); the second stop of the turn passes (`stop_hook_active`),
+     so it never loops.
+  5. The "fix the typo in the transcript" pressure scenario, run without the plugin, edits
+     the source (RED, at least once in three runs); run with it, the transcript stays
+     byte-identical and the agent files the correction as a dated, sourced line in the
+     living file concerned (GREEN, three runs out of three).
   6. Invoked from a subfolder of a dossier, a skill finds the nearest `dossier.yaml` upward;
-     invoked outside any dossier, every skill except `dossier-init` stops with a message.
-**Plans**: TBD
+     invoked outside any dossier, the `dossier` entry skill says so in one line and
+     steps aside, and every task skill stops with a message (verified with each task skill
+     as it lands in Phases 4-6).
+**Plans**: 6/6 plans executed
+
+Plans:
+**Wave 1**
+
+- [x] 03-01-PLAN.md — tracer: the sources guard end to end (hooks.json → guard-sources.py →
+  deny), Write family (D-03) then the heuristic Bash guard (D-04), with the hook test helpers and
+  the config test
+- [x] 03-02-PLAN.md — the headless scenario harness proven against a fake claude, the provisional
+  AGENTS.md removal (P-01), and the RED baseline recorded without the plugin, before the skill
+- [x] 03-03-PLAN.md — spec, PROJECT, ROADMAP and REQUIREMENTS amendments for D-01, D-03, D-04,
+  D-07, D-09; `.gsd/` ignored
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 03-04-PLAN.md — the SessionStart reminder, the block-once Stop check (D-01, D-02) and the
+  provisional dossier-status sentence (P-02)
+- [x] 03-05-PLAN.md — the `dossier` entry skill (triggering, nearest dossier, protocol body,
+  language rule, pointers to existing skills only)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 03-06-PLAN.md — CLAUDE.md and STATE.md amendments with the validate command observed, the
+  GREEN run with the plugin (3/3), full verification and the finalized validation contract
 
 ### Phase 4: Ingest & Fact Extraction
 
@@ -309,7 +340,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
 | 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
-| 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
+| 3. Protocol Skill & Hooks | 6/6 | Complete — verified + recette agent-run | 2026-10-10 |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
 | 6. Calls & Status | 0/TBD | Not started | - |

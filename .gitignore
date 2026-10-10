@@ -11,3 +11,5 @@ __pycache__/
 .planning/DRIVER.lock.gen.*/
 .planning/milestone.lock
 .planning/state.json
+.gsd/
+.planning/DRIVER.lock.children.jsonl

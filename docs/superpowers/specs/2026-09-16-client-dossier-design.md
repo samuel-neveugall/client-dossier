@@ -224,13 +224,13 @@ client-dossier/
   commands/                           thin slash commands that invoke the skills (Claude Code)
     dossier-init.md  dossier-ingest.md  dossier-draft.md  dossier-call.md  dossier-status.md  dossier-lint.md
   hooks/
-    hooks.json                        SessionStart reminder, PreToolUse guard on sources/, Stop warning
-    session-start.sh  guard-sources.sh  stop-check.sh
+    hooks.json                        SessionStart reminder, PreToolUse guard on sources/, Stop check (blocks once)
+    session-start.py  guard-sources.py  stop-check.py     Python 3.8+, standard library
   scripts/
     lint.py                           mechanical checks (python3, no dependencies)
     extract-text.sh                   pdftotext wrapper, writes .txt next to the PDF
     release.sh                        bumps the version in both manifests, tags
-  tests/                              fixture dossiers and the bash runner for lint.py
+  tests/                              fixture dossiers, the bash runner for lint.py and the hooks; scenarios/ holds the paid pressure-scenario harness
   docs/                               this spec, the protocol reference, the fact-line reference
   README.md  LICENSE  CHANGELOG.md
 ```
@@ -268,6 +268,8 @@ written for triggering: they name the situations, not the features.
   update-before-handoff rule, the fact line, the status header, what the agent never does,
   and the one-sentence pointers to the other five skills.
 - Sets the rule that the agent writes in the dossier's language.
+- Without a `dossier.yaml` it does not stop: it says so in one line, suggests `dossier-init`
+  when relevant, and steps aside (03-CONTEXT D-05); the task skills stop (§6).
 
 **`dossier-init`**
 - Asks (or reads from arguments): counterpart names and roles, confidential names, language,
@@ -352,11 +354,20 @@ to perform the same steps inline.
 | Event | Behaviour |
 |---|---|
 | SessionStart | If a `dossier.yaml` is found from the working directory upward, inject two lines: "This repository is a client dossier. Load the `dossier` skill before acting." Nothing otherwise. |
-| PreToolUse on Write, Edit, MultiEdit | If the target path is under the sources folder, deny with the message "sources are immutable; file a correction in the dossier instead". |
-| Stop | If `git status` shows changes under outbound or sources and none under the dossier folder, print a warning: "outbound or sources changed, dossier not updated; run dossier-status". Warning only, never blocks. |
+| PreToolUse on Write, Edit, MultiEdit, NotebookEdit | If the target path resolves under the sources folder of any ancestor dossier (every directory above the target that holds a `dossier.yaml` is tried, not only the nearest, so a `dossier.yaml` planted under sources cannot turn that subtree into a root), deny with the message "sources are immutable; file a correction in the dossier instead". New files are denied too: sources are filed by the ingest skill's script, never by the Write tool. |
+| PreToolUse on Bash | Heuristic, with the same message: deny a command that visibly modifies an existing file under the sources folder (an in-place edit such as `sed -i` or `perl -i`, `rm`, `mv` out of sources, `cp`, `tee` or a redirection onto an existing file, `truncate`, `git rm`), including after a `cd` into sources. Copying a new file in is allowed. It catches the likely shortcut; the skill's rule is the boundary. |
+| Stop | If `git status` shows uncommitted changes under outbound or sources and none under the dossier folder, block the stop once with a reason addressed to the agent: update the living files the work touched, or say in one sentence why none needed it (`dossier-status` is named once that skill exists). The second stop of the same turn (`stop_hook_active`) passes, so the hook never loops. |
 
 Hooks are a convenience. The skills state the same rules so that a harness without hooks
 gets the same behaviour from prose.
+
+The hook scripts are Python 3.8+ standard library, find the dossier with an upward
+`dossier.yaml` search (the linter and the Stop hook use the nearest one; the PreToolUse guard tries every ancestor, so
+it denies under the sources folder of any of them), and fail open: on any internal error they
+exit 0 and print nothing, because a crashing guard would otherwise block every write in every
+repository where the plugin is enabled. The Stop hook blocks instead of warning because in
+Claude Code a Stop hook that does not block only reaches the human, while updating the dossier
+before handing back is the agent's job (section 11 #3).
 
 ### 4.4 The linter (`scripts/lint.py`)
 
@@ -413,7 +424,9 @@ call happens ──► dossier-call debrief ──► ingest transcript ──�
 
 ## 6. Error handling and edge cases
 
-- No `dossier.yaml` found: every skill except `dossier-init` stops and says so.
+- No `dossier.yaml` found: every task skill (all except `dossier-init` and the `dossier` entry
+  skill) stops with a message; the `dossier` entry skill says so in one line, suggests
+  `dossier-init` when relevant, and steps aside (03-CONTEXT D-05).
 - A source already filed (same hash): ingest reports it and does not duplicate.
 - A fact contradicts an existing line: the extractor proposes a correction; the ingest skill
   applies it and appends "(corrects a line dated <date>)" so the change is traceable.
@@ -516,15 +529,19 @@ baseline scenarios recorded for each skill.
 Out: transcript fetchers for recording services, document rendering, a web UI, multi-user
 sync beyond git, automatic sending of anything.
 
-## 11. Decisions (settled 2026-09-16)
+## 11. Decisions (settled 2026-09-16; #3 settled 2026-10-10)
 
 1. **Name: `client-dossier`.** The plugin is `client-dossier`, the entry skill is `dossier`;
    the two names differ and read naturally together (`client-dossier@client-dossier`, skill
    `dossier`). `dossier` alone was rejected as generic on a marketplace search.
 2. **Folder names: `dossier/` and `outbound/`.** `relationship/` and `communication/` were
    rejected; the names are now fixed and hard-coded everywhere.
-3. **Stop hook: decided during Phase 3 planning.** The spec ships it by default; the decision
-   only affects that phase and is deferred to it.
+3. **Stop hook: ships in v1 and blocks once** (settled 2026-10-10 with Samuel during Phase 3
+   planning). It blocks the first stop of a turn when outbound or sources changed without the
+   dossier, with a reason addressed to the agent, and lets the second stop through
+   (`stop_hook_active`), so it never loops. A warning-only hook was rejected because it only
+   reaches the human. Reversible: switching back is a change inside `hooks/` plus the section
+   4.3 row.
 4. **Protocol keywords stay English.** The `Last updated:` label, the status-header field
    names and the status values are never translated (section 3.2). Alternatives rejected: a
    per-language label table in the linter (two places to keep in sync, breaks on an unlisted
@@ -545,7 +562,7 @@ sync beyond git, automatic sending of anything.
   then ingest with the extractor, then draft with the reviewer, then call and status, then
   manifests and distribution.
 - Ambiguity resolved: "update before handing back" means the same session, before its final
-  message; the Stop hook is the reminder, not the mechanism.
+  message; the Stop hook is the reminder, not the mechanism (it blocks once and never loops; section 11 #3).
 - Second pass (2026-09-16): every value the linter reads has a home (`staleness_days`,
   `consent_source`, `Deadline:`) and a fixed English spelling; every external dependency
   (`pdftotext`, `scripts/` in a bare-skills install) has a stated fallback; the plugin can be
