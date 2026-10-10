@@ -61,6 +61,22 @@ status, manifests and slash commands belong to Phases 5-7.
 - **D-11 — `dossier` skill pointer:** the one-sentence pointer to `dossier-ingest` lands in
   this phase (03 D-07), and `tests/test-skill-dossier.sh` picks it up automatically.
 
+### Manager decisions after research (tier 2, reversible)
+- **D-12 — GREEN proves the new skill.** Research found the Phase 3 `dossier` skill alone already
+  files a transcript correctly in one probe. INGEST-05's GREEN therefore also requires a
+  `Skill` invocation naming `dossier-ingest` in the stream; the `fact-extractor` dispatch is
+  recorded in the evidence but does not gate (the inline procedure is valid by spec §6).
+  Reversal: drop the one assertion in the scenario script.
+- **D-13 — The scenario fixture seeds a contradicted line** in a living file, so the
+  "(corrects a line dated <date>)" behaviour (D-09) has evidence; and the harness backdates the
+  scaffold's `Last updated:` lines before its baseline commit so a refresh is observable.
+- **D-14 — Re-ingesting a file already filed** reports `already_filed` with the existing path
+  (INGEST-04) and stops; if that PDF has no `.txt` yet, the skill offers to re-run the extraction
+  only (no second copy).
+- **D-15 — No text extraction available** (`pdftotext` missing, or a scanned PDF giving empty
+  text): the PDF is filed, extraction reported skipped, and the extractor may read the PDF
+  directly with the Read tool when the harness supports it, saying so in the report.
+
 ### Claude's Discretion
 - Exact slug derivation, JSON shape of `file_source.py`'s output, the extractor's proposal
   markup, and test file names.
