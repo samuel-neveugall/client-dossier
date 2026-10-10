@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
 current_phase: 03
-current_phase_name: protocol-skill-hooks
+current_phase_name: Protocol Skill & Hooks
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-10-10T12:36:12.333Z"
+stopped_at: Completed 03-01-PLAN.md
+last_updated: "2026-10-10T12:56:02.961Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 02 complete, transitioned to Phase 3
-state_head: 8bccaea113c9d3458a8598ba65522a77a4808d19
+last_activity_desc: Phase 03 execution started
+state_head: d27a25bec537944a26f42ffb793452f9dfadc9a0
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 21
-  completed_plans: 15
+  completed_plans: 16
   percent: 29
 ---
 
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 3 — Protocol Skill & Hooks
+**Current focus:** Phase 03 — Protocol Skill & Hooks
 
 ## Current Position
 
-Phase: 03 (protocol-skill-hooks) — READY TO EXECUTE
-Plan: Not started
+Phase: 03 (Protocol Skill & Hooks) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
 Phase 2 closed 2026-10-10: recette delegated by Samuel to the agent and run green (`02-UAT.md`
 complete, items 2 and 4 re-tested, 7 gaps resolved by 02-07..02-09); WR-01 (default-ignorable
@@ -38,7 +38,7 @@ characters outside Cf hid a confidential name) fixed by `ce42a6a` on Samuel's ca
 sign-off; `02-VERIFICATION.md` passed 14/14 on `ce42a6a`; `tests/test-lint.sh` 1551 assertions,
 `bash tests/run.sh` 6 files, 0 failed. Branch `feat/phase-02-gap-closure` is NOT merged into
 `main` yet — merge awaits Samuel's go.
-Last activity: 2026-10-10 — Phase 02 complete, transitioned to Phase 3
+Last activity: 2026-10-10 — Phase 03 execution started
 
 Progress: [███░░░░░░░] 29%
 
@@ -74,6 +74,7 @@ Progress: [███░░░░░░░] 29%
 | Phase 02 P04 | 6min | 3 tasks | 3 files |
 | Phase 02 P05 | 6min | 3 tasks | 25 files |
 | Phase 02 P06 | 8min | 3 tasks | 3 files |
+| Phase 03 P01 | 25 min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -140,6 +141,7 @@ mission, now validated by the phase's own delivery:
 - [Phase 02]: gap closure (2026-09-25): CR-02 bis: the rule is OSA <= 1, or OSA <= 2 with the last `_` word within 1 edit of "name"/"names", so `confidential_notes` and `non_confidential_names` stay clean — arbitrage Samuel, relayed by the main session via SendMessage, 2026-09-25, option (2), superseding the first answer's literal "<= 2" wording (confidential_notes is 2 edits away, not 4+); the "name" alternative is a manager precision, strict direction, reversible
 - [Phase 02]: gap closure (2026-09-25): D-FIX-13 (manager arbitration, reversible): `init.py` writes both readings (space, deletion) of a Unicode format character in a confidential name as two list entries when they differ
 - [Phase 02]: gap closure (2026-09-25): the iteration-3 review and the iteration-2 fix report were preserved as `02-REVIEW.iter3.md` / `02-REVIEW-FIX.iter2.md` before being superseded
+- [Phase 03]: 03-01: Bash guard also scans command-substitution bodies visible to shlex; opaque constructs stay allowed (D-04 heuristic)
 
 ### Pending Todos
 
@@ -169,6 +171,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-10-10T11:41:30.701Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-protocol-skill-hooks/03-CONTEXT.md
+Last session: 2026-10-10T12:56:02.927Z
+Stopped at: Completed 03-01-PLAN.md
+Resume file: None

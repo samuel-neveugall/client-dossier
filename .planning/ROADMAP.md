@@ -205,12 +205,12 @@ PROTO-08
      correction instead (GREEN).
   6. Invoked from a subfolder of a dossier, a skill finds the nearest `dossier.yaml` upward;
      invoked outside any dossier, every skill except `dossier-init` stops with a message.
-**Plans**: 6 plans
+**Plans**: 1/6 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — tracer: the sources guard end to end (hooks.json → guard-sources.py →
+- [x] 03-01-PLAN.md — tracer: the sources guard end to end (hooks.json → guard-sources.py →
   deny), Write family (D-03) then the heuristic Bash guard (D-04), with the hook test helpers and
   the config test
 - [ ] 03-02-PLAN.md — the headless scenario harness proven against a fake claude, the provisional
@@ -332,7 +332,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
 | 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
-| 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
+| 3. Protocol Skill & Hooks | 1/6 | In Progress | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
 | 6. Calls & Status | 0/TBD | Not started | - |
