@@ -68,7 +68,16 @@ assert_file "$SKILL_MD"
 # --- Frontmatter and the shape of the folder ---
 assert_grep_e '^name: dossier-ingest$' "$SKILL_MD"
 assert_eq 'dossier-ingest' "$(basename "$SKILL_DIR")" 'the containing folder is named dossier-ingest'
-has_line 'allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/file_source.py *) Bash(${CLAUDE_SKILL_DIR}/scripts/extract-text.sh *)' 'allowed-tools names both scripts'
+# 04-05 round 1: a skill whose frontmatter has `allowed-tools` is not a "safe properties only"
+# skill, so the Skill tool asks for approval before loading it. A headless run (and any session
+# nobody can answer) then denies the call and the skill never loads (observed, evidence round 1).
+# The scripts are called through plain Bash, so the key buys nothing and is not allowed here.
+if grep -qE '^allowed-tools:' "$SKILL_MD"; then
+  echo "FAIL: SKILL.md frontmatter must not carry allowed-tools (the Skill call would need approval)" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
 
 DESC="$(sed -n 's/^description: //p' "$SKILL_MD" | head -1 | tr -d '\n')"
 DESC_LEN=$(printf '%s' "$DESC" | wc -c | tr -d ' ')

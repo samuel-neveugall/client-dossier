@@ -1,7 +1,6 @@
 ---
 name: dossier-ingest
 description: Use when a source arrives for a client dossier, such as a call transcript or its raw export, a mail, a brochure, a PDF, a document or a link. Also use when the user hands over a transcript or a mail and asks what was learned from the call or what changed, or asks to file or ingest something received.
-allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/file_source.py *) Bash(${CLAUDE_SKILL_DIR}/scripts/extract-text.sh *)
 ---
 
 # dossier-ingest
