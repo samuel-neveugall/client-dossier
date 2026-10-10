@@ -27,6 +27,7 @@ Python 3 standard library only, targeting Python >= 3.8.
 
 import json
 import os
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -95,7 +96,9 @@ def sources_target(path, cwd):
 # THE BASH HEURISTIC (D-04)
 # ---------------------------------------------------------------------------
 #
-# The command is tokenized with shlex, never executed or evaluated. It is cut
+# The command is tokenized with shlex (heredoc bodies and comment lines removed
+# first, a lenient per-line fallback on a parse error), never executed or
+# evaluated. It is cut
 # into segments at the shell's separators, the effective working directory is
 # followed through `cd` (and kept inside a subshell), and the verbs that
 # visibly modify an EXISTING file under sources/ are looked for. A new file is
@@ -110,7 +113,13 @@ SEPARATORS = frozenset((";", ";;", "&&", "||", "|", "|&", "&", "\n"))
 OPENERS = frozenset(("(", "<(", ">("))
 WRITE_REDIRECTS = frozenset((">", ">>", ">|", "&>", "&>>"))
 OTHER_REDIRECTS = frozenset(("<", "<<", "<<<", "<&", ">&"))
-WRAPPERS = ("sudo", "command", "env", "nohup", "time", "exec")
+FD_OPERAND = re.compile(r"[0-9]+-?|-")
+WRAPPERS = ("sudo", "command", "env", "nohup", "time", "exec", "builtin")
+# Shell reserved words that can open a segment: the real command follows.
+RESERVED = frozenset(("if", "then", "else", "elif", "fi", "do", "done", "while",
+                      "until", "for", "case", "esac", "{", "}", "!", "function"))
+HEREDOC = re.compile(r"<<(?!<)(-?)\s*\\?(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\2")
+FALLBACK_SPLIT = re.compile(r"(;|&&|\|\||\||&)")
 WRAPPER_ARG_OPTIONS = {"sudo": ("-u", "-g", "-h", "-p", "-C", "-D", "-r",
                                 "-t", "-T", "-U", "-R"),
                        "env": ("-u", "-C", "-S")}
@@ -135,15 +144,45 @@ def has_in_place_flag(arg):
     return False
 
 
-def tokenize(command):
-    """The command as a flat list of words and operators, or None when shlex
-    cannot parse it (an unbalanced quote): the command is then allowed."""
+def strip_heredocs(command):
+    """The command without its heredoc bodies and terminator lines.
+
+    A body is text, not commands: tokenising it gave a false positive (a
+    `rm sources/x` quoted in the body) and a bypass (an apostrophe in the body
+    broke shlex for the whole command). The `<<WORD` line itself stays. An
+    operator inside quotes, or one whose terminator never comes, is not a
+    heredoc and nothing is dropped for it.
+    """
+    lines = command.split("\n")
+    kept = []
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        kept.append(line)
+        index += 1
+        for found in HEREDOC.finditer(line):
+            before = line[:found.start()]
+            if before.count("'") % 2 or before.count('"') % 2:
+                continue
+            word, dash = found.group(3), found.group(1) == "-"
+            end = index
+            while end < len(lines) and \
+                    (lines[end].lstrip("\t") if dash else lines[end]) != word:
+                end += 1
+            if end < len(lines):
+                index = end + 1
+    return "\n".join(kept)
+
+
+def lex(text):
+    """shlex words of `text` split into words and operators, None on a
+    parse error (an unbalanced quote)."""
     try:
-        lex = shlex.shlex(command, posix=True, punctuation_chars=PUNCT)
-        lex.whitespace = " \t\r"
-        lex.whitespace_split = True
-        lex.commenters = ""
-        tokens = list(lex)
+        lexer = shlex.shlex(text, posix=True, punctuation_chars=PUNCT)
+        lexer.whitespace = " \t\r"
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        tokens = list(lexer)
     except ValueError:
         return None
     flat = []
@@ -162,6 +201,39 @@ def tokenize(command):
         else:
             flat.append(token)
     return flat
+
+
+def lenient_lex(text):
+    """The words of `text` when shlex rejects it as a whole: line by line,
+    then segment by segment at the separators, and a segment that still does
+    not parse loses its quote characters. One stray apostrophe thus blinds
+    only its own segment, not the whole command (A-F2)."""
+    flat = []
+    for line in text.split("\n"):
+        words = lex(line)
+        if words is None:
+            words = []
+            for piece in FALLBACK_SPLIT.split(line):
+                if FALLBACK_SPLIT.fullmatch(piece):
+                    words.append(piece)
+                    continue
+                part = lex(piece)
+                if part is None:
+                    part = lex(piece.replace("'", " ").replace('"', " "))
+                words.extend(part or [])
+        flat.extend(words)
+        flat.append("\n")
+    return flat
+
+
+def tokenize(command):
+    """The command as a flat list of words and operators: heredoc bodies and
+    comment lines removed first, then shlex, then the lenient fallback."""
+    text = strip_heredocs(command)
+    text = "\n".join(line for line in text.split("\n")
+                     if not line.lstrip().startswith("#"))
+    flat = lex(text)
+    return flat if flat is not None else lenient_lex(text)
 
 
 def operand_path(operand, cwd):
@@ -335,6 +407,28 @@ def hit_copy(args, cwd, arg_options):
     return destination_hit(dest, sources, cwd)
 
 
+def hit_link(args, cwd):
+    """ln: an operand that is an existing source file. A hard link makes a
+    second name that edits the same bytes; -f replaces the destination. A
+    plain symbolic link is let in: writing through it is caught by the
+    resolved path (A-F4)."""
+    symbolic = forced = False
+    for arg in args:
+        if arg == "--":
+            break
+        if arg in ("--symbolic",):
+            symbolic = True
+        elif arg in ("--force",):
+            forced = True
+        elif arg.startswith("-") and not arg.startswith("--"):
+            symbolic = symbolic or "s" in arg
+            forced = forced or "f" in arg
+    if symbolic and not forced:
+        return None
+    return first_hit(split_args(args, ("-t", "--target-directory", "-S", "--suffix"))[0],
+                     cwd, existing_source_file)
+
+
 def hit_git(args, cwd):
     index = 0
     while index < len(args):
@@ -404,6 +498,8 @@ def hit_verb(verb, args, cwd, depth):
                                     "--files-from", "--rsync-path", "--temp-dir", "-T"))
     if verb == "git":
         return hit_git(args, cwd)
+    if verb == "ln":
+        return hit_link(args, cwd)
     if verb == "tee":
         return first_hit(split_args(args)[0], cwd, existing_source_file)
     if verb == "dd":
@@ -421,7 +517,7 @@ def strip_prefix(words):
     while index < len(words):
         word = words[index]
         base = os.path.basename(word)
-        if is_assignment(word):
+        if is_assignment(word) or word in RESERVED:
             index += 1
         elif base in WRAPPERS:
             index += 1
@@ -475,7 +571,8 @@ def scan(command, cwd, depth):
             nxt = flat[index] if index < len(flat) else None
             if nxt is not None and nxt not in SEPARATORS and nxt not in OPENERS \
                     and nxt != ")":
-                if token in WRITE_REDIRECTS:
+                if token in WRITE_REDIRECTS or \
+                        (token == ">&" and not FD_OPERAND.fullmatch(nxt)):
                     targets.append(nxt)
                 index += 1
         elif token in SEPARATORS or token in OPENERS or token == ")":

@@ -232,6 +232,52 @@ bash_deny 'cp onto an existing source' "cp other.txt sources/transcripts/2026-10
 bash_deny 'git rm' "git rm sources/transcripts/2026-10-01_kickoff.txt"
 bash_deny 'bash -c' "bash -c \"sed -i s/a/b/ sources/transcripts/2026-10-01_kickoff.txt\""
 
+echo '--- Bash: unbalanced quotes, heredocs and comments no longer blind the guard (A-F2, R-F2) ---'
+bash_deny 'rm after a comment holding an apostrophe' \
+  $'# it\'s a note\nrm sources/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'rm after an echo with an apostrophe' \
+  "echo it's done; rm sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'rm on the line after a heredoc whose body has an apostrophe' \
+  $'cat <<EOF > /tmp/x\nit\'s a note\nEOF\nrm sources/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'a heredoc redirected into an existing source' \
+  $'cat > sources/transcripts/2026-10-01_kickoff.txt <<\'EOF\'\nhello\nEOF'
+bash_deny 'a quoted <<X does not hide the next line' \
+  $'echo "<<X"\nrm sources/transcripts/2026-10-01_kickoff.txt\nX'
+bash_ok 'rm sources/x quoted in a heredoc body is text' \
+  $'cat <<EOF > /tmp/note.txt\nrm sources/transcripts/2026-10-01_kickoff.txt\nEOF'
+bash_ok 'indented heredoc terminator (<<-)' \
+  $'cat <<-EOF > /tmp/note.txt\n\tsed -i s/a/b/ sources/transcripts/2026-10-01_kickoff.txt\n\tEOF'
+
+echo '--- Bash: reserved words, functions, cd - and builtin (A-F3) ---'
+bash_deny 'if ...; then rm' \
+  'if true; then rm sources/transcripts/2026-10-01_kickoff.txt; fi'
+bash_deny 'for ...; do rm' \
+  'for f in a; do rm sources/transcripts/2026-10-01_kickoff.txt; done'
+bash_deny 'while ...; do rm' \
+  'while true; do rm sources/transcripts/2026-10-01_kickoff.txt; done'
+bash_deny 'brace group' '{ rm sources/transcripts/2026-10-01_kickoff.txt; }'
+bash_deny 'negation' '! rm sources/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'function definition' 'f(){ rm sources/transcripts/2026-10-01_kickoff.txt; }; f'
+bash_deny 'case arm' 'case x in x) rm sources/transcripts/2026-10-01_kickoff.txt;; esac'
+bash_deny 'builtin cd then sed -i' \
+  'builtin cd sources/transcripts && sed -i s/a/b/ 2026-10-01_kickoff.txt'
+bash_ok 'cd - does not crash and the following relative rm is unknown' 'cd - && rm notes.txt'
+bash_ok 'reserved words around a harmless command' 'if true; then ls; fi'
+
+echo '--- Bash: >& is a write redirection unless the operand is a fd (R-F3) ---'
+bash_deny 'cmd >& existing source' 'echo hi >& sources/transcripts/2026-10-01_kickoff.txt'
+bash_ok 'cmd >& new source file' 'echo hi >& sources/received/2026-10-10_new.txt'
+bash_ok '2>&1' 'ls 2>&1'
+bash_ok '>&2' 'echo err >&2'
+bash_ok '>&-' 'echo err >&-'
+
+echo '--- Bash: ln onto an existing source (A-F4) ---'
+bash_deny 'hard link to an existing source' 'ln sources/transcripts/2026-10-01_kickoff.txt /tmp/h'
+bash_deny 'ln -f over an existing source' 'ln -f other.txt sources/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'ln -sf over an existing source' 'ln -sf other.txt sources/transcripts/2026-10-01_kickoff.txt'
+bash_ok 'plain symbolic link to a source' 'ln -s sources/transcripts/2026-10-01_kickoff.txt /tmp/l'
+bash_ok 'ln between non-source files' 'ln a.txt b.txt'
+
 echo '--- Bash: new files in, reads, and everything the guard cannot judge ---'
 bash_ok 'cp a new file into sources/received' 'cp new.pdf sources/received/2026-10-10_brochure.pdf'
 bash_ok 'cp into the received directory' 'cp new.pdf sources/received/'
