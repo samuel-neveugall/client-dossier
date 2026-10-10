@@ -478,6 +478,17 @@
         "agents/",
         "tests/"
       ],
+      "status": "done"
+    },
+    {
+      "id": "fix-4b",
+      "step": "micro-fix M1-M4 + verification + UAT phase 4",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier-ingest/",
+        "tests/"
+      ],
       "status": "ready"
     }
   ]
