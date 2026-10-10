@@ -178,6 +178,13 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"abc")
                 self.wfile.flush()
+            elif path in ("/cl-unicode", "/cl-huge"):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Length", "\u00b2" if path == "/cl-unicode" else "9" * 5000)
+                self.end_headers()
+                self.wfile.write(b"abc")
+                self.wfile.flush()
             elif path == "/gz":
                 self.reply(200, "text/html", b"\x1f\x8b\x08\x00compressed", [("Content-Encoding", "gzip")])
             elif path == "/identity":
@@ -491,6 +498,12 @@ code, obj, text = run(["fetch", url("/short")])
 check("truncated: exit", 1, code)
 check("truncated: error", "truncated", obj.get("error"))
 check("truncated: hint", HINT, obj.get("hint"))
+# M1: a Content-Length that is not plain ASCII digits (or is absurdly long) is a refusal with the hint, never exit 3.
+for route in ("/cl-unicode", "/cl-huge"):
+    code, obj, text = run(["fetch", url(route)])
+    check("bad Content-Length " + route + ": exit", 1, code)
+    check("bad Content-Length " + route + ": error", "network", obj.get("error"))
+    check("bad Content-Length " + route + ": hint", HINT, obj.get("hint"))
 code, obj, text = run(["fetch", url("/gz")])
 check("Content-Encoding gzip: error", "content_encoding", obj.get("error"))
 check("Content-Encoding gzip: hint", HINT, obj.get("hint"))

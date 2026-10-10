@@ -76,7 +76,7 @@ holds without it.
 File the source:
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/file_source.py --kind <kind> --date <YYYY-MM-DD> --slug '<slug>' '<path>'
+${CLAUDE_SKILL_DIR}/scripts/file_source.py --kind '<kind>' --date '<YYYY-MM-DD>' --slug '<slug>' '<path>'
 ```
 
 It prints one JSON object. Read `status`:
@@ -112,6 +112,7 @@ Report from the exit code:
 - 69: `pdftotext` is missing. The PDF stays filed; say extraction skipped and relay the poppler
   install hint the script printed.
 - 65: the PDF has no text layer (a scan).
+- 64: not a filed copy (or no such file): stop, and file the PDF first.
 - 1: `pdftotext` failed; relay its message.
 
 When there is no text (69 or 65), the extractor may read the PDF directly with the Read tool if

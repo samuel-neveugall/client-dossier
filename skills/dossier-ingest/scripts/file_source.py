@@ -720,7 +720,14 @@ def _download(url, stage):
                 ),
             )
         declared = response.headers.get("Content-Length")
-        declared_size = int(declared) if declared and declared.strip().isdigit() else None
+        declared_size = None
+        if declared is not None:
+            text = declared.strip()
+            # M1: ASCII digits only and fewer than 20 of them; anything else
+            # (unicode digits, a huge number) is a refusal, never an exception.
+            if not (text.isascii() and text.isdigit() and len(text) < 20):
+                raise download_refusal("network", "the server sent an invalid Content-Length")
+            declared_size = int(text)
         if declared_size is not None and declared_size > FETCH_MAX_BYTES:
             raise download_refusal("too_large", "the download exceeds {} bytes".format(FETCH_MAX_BYTES))
         read = getattr(response, "read1", response.read)

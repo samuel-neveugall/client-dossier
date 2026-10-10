@@ -143,7 +143,7 @@ fi
 # --- The command lines of the skill (fixed by the plan; test-ingest-guard.sh runs them) ---
 has_line 'test -x ${CLAUDE_SKILL_DIR}/scripts/file_source.py' 'command line 1: existence check of the filing script'
 has_line "\${CLAUDE_SKILL_DIR}/scripts/file_source.py fetch '<url>'" 'command line 2: fetch, single-quoted'
-has_line "\${CLAUDE_SKILL_DIR}/scripts/file_source.py --kind <kind> --date <YYYY-MM-DD> --slug '<slug>' '<path>'" 'command line 3: file, single-quoted'
+has_line "\${CLAUDE_SKILL_DIR}/scripts/file_source.py --kind '<kind>' --date '<YYYY-MM-DD>' --slug '<slug>' '<path>'" 'command line 3: file, every value single-quoted (M2)'
 has_line 'test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh' 'command line 4: existence check of the extraction script'
 has_line "\${CLAUDE_SKILL_DIR}/scripts/extract-text.sh '<abs_path>'" 'command line 5: extract, on the absolute path'
 has_line "rm -r '<stage>'" 'command line 8: purge of the fetch staging folder (R4-m10)'
@@ -153,8 +153,11 @@ has_line "python3 \${CLAUDE_PLUGIN_ROOT}/scripts/lint.py '<root>'" 'command line
 # A4-F1: no placeholder sits inside double quotes, in any bash block (the no-scripts section included).
 BLOCK_LINES="$(awk '$0 == "```bash" { on = 1; next } $0 == "```" { on = 0; next } on { print }' "$SKILL_MD")"
 assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
-UNQUOTED="$(printf '%s\n' "$BLOCK_LINES" | sed "s/'[^']*'//g" | grep -E '<[A-Za-z][^<>]*>' | grep -vE -- '--(kind|date) <|--kind <kind> --date <YYYY-MM-DD>' || true)"
-assert_eq '' "$UNQUOTED" 'every placeholder in a bash block is inside single quotes (kind and date values excepted)'
+UNQUOTED="$(printf '%s\n' "$BLOCK_LINES" | sed "s/'[^']*'//g" | grep -E '<[A-Za-z][^<>]*>' || true)"
+assert_eq '' "$UNQUOTED" 'every placeholder in a bash block is inside single quotes (M2: kind and date included)'
+
+# M4: exit 64 of extract-text.sh is reported from the exit code.
+has '- 64: not a filed copy' 'exit 64 of extract-text.sh (not a filed copy: stop)'
 
 # The existence check comes before the first line that runs the script (INGEST-06).
 line_of() { grep -nxF -- "$1" "$SKILL_MD" 2>/dev/null | head -1 | cut -d: -f1; }

@@ -371,6 +371,9 @@ import json, sys
 path, word = sys.argv[1], sys.argv[2]
 uses = set()
 results = {}
+async_ids = set()
+task_of = {}
+completed = set()
 try:
     fh = open(path, encoding="utf-8", errors="replace")
 except OSError:
@@ -384,6 +387,16 @@ with fh:
         try:
             ev = json.loads(line)
         except ValueError:
+            continue
+        if (
+            isinstance(ev, dict)
+            and ev.get("type") == "system"
+            and ev.get("subtype") == "task_notification"
+            and ev.get("status") == "completed"
+        ):
+            for key in ("tool_use_id", "task_id"):
+                if isinstance(ev.get(key), str):
+                    completed.add(ev[key])
             continue
         if not isinstance(ev, dict) or ev.get("type") not in ("assistant", "user"):
             continue
@@ -404,10 +417,29 @@ with fh:
                         uses.add(block["id"])
             elif ev.get("type") == "user" and block.get("type") == "tool_result":
                 if isinstance(block.get("tool_use_id"), str):
-                    results[block["tool_use_id"]] = block.get("is_error") is True
+                    tid = block["tool_use_id"]
+                    results[tid] = block.get("is_error") is True
+                    tur = ev.get("tool_use_result")
+                    text = json.dumps(block.get("content"))
+                    if (
+                        isinstance(tur, dict) and tur.get("status") == "async_launched"
+                    ) or "Async agent launched" in text:
+                        # M3: an async dispatch is only "launched" here; the
+                        # task_id is the agentId the launch result carries.
+                        async_ids.add(tid)
+                        if isinstance(tur, dict) and isinstance(tur.get("agentId"), str):
+                            task_of[tid] = tur["agentId"]
 # R4-m7: a call counts only when its tool_result came back and is not an error
 # (a permission denial is a tool_result with is_error true).
-print("yes" if any(i in results and not results[i] for i in uses) else "no")
+# M3: an asynchronous dispatch counts only once a task_notification of status
+# completed exists for it (matched by tool_use_id or by task_id).
+def ok(i):
+    if i not in results or results[i]:
+        return False
+    if i in async_ids:
+        return i in completed or task_of.get(i) in completed
+    return True
+print("yes" if any(ok(i) for i in uses) else "no")
 ' "$1" "$2"
 }
 

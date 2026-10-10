@@ -80,6 +80,19 @@ assert_eq no "$(call jsonl_agent_dispatched "$DISP_GENERAL" fact-extractor)" 'js
 assert_eq no "$(call jsonl_agent_dispatched "$DISP_SKILL" fact-extractor)" 'jsonl_agent_dispatched: a Skill tool_use naming the suffix'
 assert_eq no "$(call jsonl_agent_dispatched "$WORK/absent.jsonl" fact-extractor)" 'jsonl_agent_dispatched: missing file'
 
+# M3: an asynchronous dispatch is only "launched" until a task_notification of
+# status completed exists for its task_id (or tool_use_id).
+ASYNC_R='{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"text","text":"Async agent launched successfully."}]}]},"tool_use_result":{"isAsync":true,"status":"async_launched","agentId":"ag1"}}'
+NOTE_OK='{"type":"system","subtype":"task_notification","task_id":"ag1","tool_use_id":"t1","status":"completed"}'
+NOTE_BYID='{"type":"system","subtype":"task_notification","task_id":"ag1","status":"completed"}'
+NOTE_FAIL='{"type":"system","subtype":"task_notification","task_id":"ag1","tool_use_id":"t1","status":"failed"}'
+NOTE_OTHER='{"type":"system","subtype":"task_notification","task_id":"ag9","tool_use_id":"t9","status":"completed"}'
+for pair in "launched-only::no" "completed:$NOTE_OK:yes" "completed-by-task-id:$NOTE_BYID:yes" "failed:$NOTE_FAIL:no" "other-task:$NOTE_OTHER:no"; do
+  label="${pair%%:*}"; rest="${pair#*:}"; note="${rest%:*}"; want="${rest##*:}"
+  printf '%s\n' "$AGU" "$ASYNC_R" ${note:+"$note"} >"$WORK/async-agent.jsonl"
+  assert_eq "$want" "$(call jsonl_agent_dispatched "$WORK/async-agent.jsonl" fact-extractor)" "jsonl_agent_dispatched: async $label"
+done
+
 # backdate_last_updated on a scaffold built by the real init.py.
 BD="$(mktemp -d "$WORK/bd.XXXXXX")"
 python3 "$(init_py)" --target "$BD" --language en \
