@@ -33,7 +33,7 @@
         "CLAUDE.md",
         ".planning/"
       ],
-      "status": "ready"
+      "status": "running"
     },
     {
       "id": "revue-3",
@@ -382,7 +382,20 @@
         "hooks/",
         "tests/"
       ],
-      "status": "ready"
+      "status": "done"
+    },
+    {
+      "id": "fix-3b",
+      "step": "fix round 2: NF-1..NF-7 (D-16 residuals + fix regressions)",
+      "stage": "",
+      "deps": [
+        "exec-3"
+      ],
+      "scope": [
+        "hooks/",
+        "tests/"
+      ],
+      "status": "blocked"
     }
   ]
 }
