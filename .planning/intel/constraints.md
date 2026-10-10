@@ -1,3 +1,5 @@
+> Note (2026-10-10): snapshot of the 2026-09-16 ingestion; superseded by 03-CONTEXT D-01/D-03/D-04 and the amended spec §4.3. The body below is kept as ingested.
+
 # Constraints
 
 Source document for all entries below: `docs/superpowers/specs/2026-09-16-client-dossier-design.md`

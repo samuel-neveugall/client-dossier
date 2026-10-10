@@ -46,6 +46,33 @@ else
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 case "$DESC" in
+  *': '*) echo "FAIL: description value contains ': ' (invalid plain YAML scalar)" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+  *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+esac
+# Strict mini-parser (python3 stdlib, no yaml): every frontmatter line is `key: value`
+# with no second unquoted ': ' and no '#' comment start inside the value.
+if python3 - "$SKILL_MD" <<'PY'
+import re, sys
+lines = open(sys.argv[1], encoding="utf-8").read().split("\n")
+if not lines or lines[0] != "---":
+    sys.exit("frontmatter does not open with ---")
+try:
+    end = lines.index("---", 1)
+except ValueError:
+    sys.exit("frontmatter is not closed")
+for n, l in enumerate(lines[1:end], 2):
+    m = re.match(r"^([A-Za-z][A-Za-z0-9_-]*): (.+)$", l)
+    if not m:
+        sys.exit("line %d is not 'key: value': %r" % (n, l))
+    v = m.group(2)
+    if v[0] in "\"'":
+        continue
+    if ": " in v or " #" in v or v.endswith(":"):
+        sys.exit("line %d: unquoted value holds ': ', ' #' or a trailing ':'" % n)
+PY
+then TESTS_PASSED=$((TESTS_PASSED + 1))
+else echo "FAIL: SKILL.md frontmatter is not strict key: value YAML" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)); fi
+case "$DESC" in
   "Use when"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
   *) echo "FAIL: description does not start with 'Use when'" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
 esac
@@ -81,17 +108,19 @@ for f in "$REPO_ROOT"/skills/*/SKILL.md; do
   [ "$name" = "dossier" ] && continue
   has "$name" "pointer to the existing skill $name"
 done
-for name in dossier-ingest dossier-draft dossier-call dossier-status; do
-  if [ ! -f "$REPO_ROOT/skills/$name/SKILL.md" ]; then
-    has_not "$name" "pointer to $name, which does not exist yet"
-  fi
+# Every dossier-<word> the body names must exist as skills/<name>/SKILL.md.
+for name in $(grep -oE 'dossier-[a-z]+' "$SKILL_MD" | sort -u); do
+  assert_file "$REPO_ROOT/skills/$name/SKILL.md"
 done
 
 # --- Layout (PROTO-02) ---
-for s in 'sources/' 'received/' 'transcripts/' 'raw/' 'dossier/' 'knowledge/' 'CONTEXT.md' \
-  'DOCTRINE.md' 'decisions/' 'watch/' 'outbound/' 'deliverables/' 'mails/' 'calls/' \
-  'YYYY-MM-DD_slug' 'ACTORS.md' 'HISTORY.md' 'LEARNINGS.md' 'TONE.md' 'CHANNELS.md' \
-  'OPEN-QUESTIONS.md' 'RELATIONSHIP.md'; do
+# Top-level folders and the seven living files are layout bullets, not passing mentions.
+for s in 'dossier.yaml' 'sources/' 'dossier/' 'knowledge/' 'outbound/' 'ACTORS.md' 'HISTORY.md' \
+  'LEARNINGS.md' 'TONE.md' 'CHANNELS.md' 'OPEN-QUESTIONS.md' 'RELATIONSHIP.md'; do
+  assert_grep_e "^ *- \`$s\`" "$SKILL_MD"
+done
+for s in 'received/' 'transcripts/' 'raw/' 'CONTEXT.md' 'DOCTRINE.md' 'decisions/' 'watch/' \
+  'deliverables/' 'mails/' 'calls/' 'YYYY-MM-DD_slug'; do
   has "$s" "layout name $s"
 done
 
@@ -100,6 +129,12 @@ for row in 'Any session' 'Write a message or a document' 'Prepare a call' 'Debri
   'Check a fact' 'Ingest a source'; do
   assert_grep_e "^\\| *$row" "$SKILL_MD"
 done
+# Each table row has a task cell, a non-empty "read first" cell and an update cell.
+ROWS_BAD=$(awk -F'|' '/^\| *(Any session|Write a message|Prepare a call|Debrief a call|Check a fact|Ingest a source)/ {
+  c=$3; gsub(/[ \t]/,"",c); u=$4; gsub(/[ \t]/,"",u); if (c=="" || u=="") bad++ } END {print bad+0}' "$SKILL_MD")
+assert_eq '0' "$ROWS_BAD" 'no read-first/update cell of the table is empty'
+ROWS_N=$(grep -cE '^\| *(Any session|Write a message|Prepare a call|Debrief a call|Check a fact|Ingest a source)' "$SKILL_MD")
+assert_eq '6' "$ROWS_N" 'the table has its six rows'
 has 'before its final message' 'handing back means before the final message'
 has 'knowledge/CONTEXT.md' 'context one-pager is read first'
 has 'why none needed it' 'update-or-say-why rule (D-01)'
@@ -112,6 +147,10 @@ has 'brochure p. 4' 'source example: brochure'
 has 'reconstructed' 'reconstructed marker'
 has '(corrects a line dated' 'correction trace'
 has 'Name (Organisation)' 'Name (Organisation) rule'
+has '`Last updated:` line current' 'Last updated rule'
+has 'after which event' 'Last updated format'
+has 'checked in context before it is reused' 'transcript quote rule'
+has 'ends with one parenthesised source' 'fact line shape'
 
 # --- A wrong source: every route, heuristic, worked example (D-04, D-09) ---
 assert_grep_e '^- .*transcript reads .*\(call [0-9]{4}-[0-9]{2}-[0-9]{2} @[0-9]{2}:[0-9]{2}\)\.$' "$SKILL_MD"
@@ -127,10 +166,13 @@ if [ -n "$TYPO_TOKEN" ]; then has_not "$TYPO_TOKEN" 'the scenario fixture typo t
 if [ -n "$TRANSCRIPT_REL" ]; then has_not "$(basename "$TRANSCRIPT_REL")" 'the scenario fixture transcript name'; fi
 
 # --- Status header and the never-list ---
-for s in 'Status:' 'To:' 'Subject:' 'Deadline:' 'Written by:' 'Rules:' 'draft' 'reviewed by' 'sent'; do
-  has "$s" "status header keyword $s"
+has 'Status: draft | reviewed by <name> | sent <date time> by <name>' 'status line with its three values'
+for s in 'To:' 'Subject:' 'Deadline:' 'Written by:' 'Rules:'; do
+  assert_grep_e "^$s " "$SKILL_MD"
 done
 assert_grep_e '[Nn]ever mark' "$SKILL_MD"
+assert_grep_e '^- Send a message or a document' "$SKILL_MD"
+assert_grep_e '^- Modify anything in `sources/`' "$SKILL_MD"
 assert_grep_e '^## .*[Nn]ever' "$SKILL_MD"
 for s in 'consent_recorded: true' 'consent_source' 'doctrine' '.claude/'; do
   has "$s" "never-list token $s"

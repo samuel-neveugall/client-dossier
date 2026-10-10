@@ -197,8 +197,9 @@ ships in v1 and blocks once.
      triggers on dossier-shaped tasks even before `dossier.yaml` is read.
   2. A SessionStart hook injects the protocol reminder whenever `dossier.yaml` is found
      upward from the working directory, and says nothing otherwise.
-  3. An attempt to Write/Edit/MultiEdit a file under the sources folder is denied with the
-     immutability message.
+  3. An attempt to Write/Edit/MultiEdit/NotebookEdit a file under the sources folder is denied
+     with the immutability message, and a heuristic Bash guard denies the obvious shell routes
+     (D-03/D-04).
   4. Changing files under outbound or sources without touching the dossier folder, then
      stopping, makes the Stop hook block the stop once with a reason addressed to the agent
      (update the living files the work touched, or say why none needed it; `dossier-status`
@@ -212,7 +213,7 @@ ships in v1 and blocks once.
      invoked outside any dossier, the `dossier` entry skill says so in one line and
      steps aside, and every task skill stops with a message (verified with each task skill
      as it lands in Phases 4-6).
-**Plans**: 3/6 plans executed
+**Plans**: 6/6 plans executed
 
 Plans:
 **Wave 1**
@@ -339,7 +340,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
 | 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
-| 3. Protocol Skill & Hooks | 3/6 | In Progress | - |
+| 3. Protocol Skill & Hooks | 6/6 | In Progress | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
 | 6. Calls & Status | 0/TBD | Not started | - |

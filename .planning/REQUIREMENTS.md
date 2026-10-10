@@ -89,9 +89,11 @@ synthesized-for-tracking, not verbatim spec text.
       recorded RED (agent edits the source) before the protocol skill/hooks exist, and
       re-run GREEN (the transcript stays byte-identical and the agent files the correction
       as a dated, sourced line in the living file concerned; Phase 3 D-09) after
-- [ ] **PROTO-08**: Every skill except `dossier-init` locates the nearest `dossier.yaml`
-      (working directory, then parents) and stops with a message when none is found; in a
-      repository holding several dossiers, the nearest one wins
+- [ ] **PROTO-08**: Every skill locates the nearest `dossier.yaml` (working directory, then
+      parents); every task skill (all except `dossier-init` and the `dossier` entry skill)
+      stops with a message when none is found; the `dossier` entry skill says so in one line,
+      suggests `dossier-init` when relevant, and steps aside (03-CONTEXT D-05); in a repository
+      holding several dossiers, the nearest one wins
 
 ### Ingest (dossier-ingest, fact-extractor agent, extract-text.sh)
 

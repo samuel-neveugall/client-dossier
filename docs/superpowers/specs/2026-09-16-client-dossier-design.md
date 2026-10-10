@@ -268,6 +268,8 @@ written for triggering: they name the situations, not the features.
   update-before-handoff rule, the fact line, the status header, what the agent never does,
   and the one-sentence pointers to the other five skills.
 - Sets the rule that the agent writes in the dossier's language.
+- Without a `dossier.yaml` it does not stop: it says so in one line, suggests `dossier-init`
+  when relevant, and steps aside (03-CONTEXT D-05); the task skills stop (§6).
 
 **`dossier-init`**
 - Asks (or reads from arguments): counterpart names and roles, confidential names, language,
@@ -421,7 +423,9 @@ call happens ──► dossier-call debrief ──► ingest transcript ──�
 
 ## 6. Error handling and edge cases
 
-- No `dossier.yaml` found: every skill except `dossier-init` stops and says so.
+- No `dossier.yaml` found: every task skill (all except `dossier-init` and the `dossier` entry
+  skill) stops with a message; the `dossier` entry skill says so in one line, suggests
+  `dossier-init` when relevant, and steps aside (03-CONTEXT D-05).
 - A source already filed (same hash): ingest reports it and does not duplicate.
 - A fact contradicts an existing line: the extractor proposes a correction; the ingest skill
   applies it and appends "(corrects a line dated <date>)" so the change is traceable.

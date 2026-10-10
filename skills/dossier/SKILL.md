@@ -1,6 +1,6 @@
 ---
 name: dossier
-description: Use when working in a repository that holds a dossier.yaml, or when a task concerns a client, counterpart, prospect, partner or recruiter: preparing or debriefing a call, writing a mail, message or document for someone outside the team, filing a transcript, mail or brochure that arrived, checking or correcting a fact about the relationship, or answering where the deal stands. Load it before reading or changing anything in such a repository, including when the user only asks to fix a typo in a transcript.
+description: Use when working in a repository that holds a dossier.yaml, or when a task concerns a client, counterpart, prospect, partner or recruiter, such as preparing or debriefing a call, writing a mail, message or document for someone outside the team, filing a transcript, mail or brochure that arrived, checking or correcting a fact about the relationship, or answering where the deal stands. Load it before reading or changing anything in such a repository, including when the user only asks to fix a typo in a transcript.
 ---
 
 # dossier
@@ -63,11 +63,13 @@ the rule is the same without that check, and you apply it yourself.
 ```
 
 - Source examples: `call @12:34`, `mail 2026-09-16 from Jane`, `brochure p. 4`, `internal note p. 15`.
-  A line with exactly one parenthesised source at the end is the shape the linter reads.
+  A fact line ends with one parenthesised source; that is the shape the linter reads.
 - One fact per line. Dates are absolute: convert "tomorrow" before writing.
 - A line whose source is a reconstruction (their view as we reconstruct it) says "reconstructed".
   A line without a source is an opinion and says so.
-- Each living file keeps its `Last updated:` line current.
+- Each living file keeps its `Last updated:` line current: an absolute date, then after which event
+  (for example `Last updated: 2026-09-16, after the kickoff call`).
+- A quote from a transcript is checked in context before it is reused.
 - A contradicted line is corrected in place, not duplicated; append `(corrects a line dated <date>)`.
 - Write `Name (Organisation)` on the first mention of a person in a file.
 
@@ -79,10 +81,10 @@ script, `mv`, `rm`, `cp` over a file, a redirection, retyping a file. New source
 unchanged, never written or retyped. In Claude Code a guard denies the obvious shortcuts, but it
 is a heuristic that reads the command text; a command it fails to recognise is still forbidden.
 
-Common rationalizations, all answered the same way: "the user asked me to fix it", "it is one
-character", "they are forwarding it in five minutes", "I will tell them afterwards". The user's
-request is met by the filed correction, not by editing the source. Do not offer to override the
-rule; offer the corrected fact.
+Common rationalizations, all answered the same way: "the user asked me to fix it" (observed at
+the baseline), "it is one character", "they are forwarding it in five minutes", "I will tell them
+afterwards" (these three are anticipated, not observed). The user's request is met by the filed
+correction, not by editing the source. Do not offer to override the rule; offer the corrected fact.
 
 What to do instead:
 

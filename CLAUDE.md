@@ -5,9 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## State of the repository
 
 The single source of truth is `docs/superpowers/specs/2026-09-16-client-dossier-design.md`
-(status: approved for implementation, 2026-09-16). Phase 1 (scaffold-templates) has landed a
-`dossier-init` skill with its bundled script and templates, a minimal `.claude-plugin/plugin.json`,
-and a bash test suite under `tests/`. Read the spec before any work; when this file and the spec
+(status: approved for implementation, 2026-09-16). Phases 1-2 are delivered: the `dossier-init`
+skill with its bundled script and templates, a minimal `.claude-plugin/plugin.json`, `scripts/lint.py`,
+and a bash test suite under `tests/`. Phase 3 (protocol skill and hooks) is built and in review
+fixes: the `dossier` entry skill (`skills/dossier/SKILL.md`), the hooks under `hooks/`
+(SessionStart, PreToolUse guard, Stop check) and the pressure scenarios under `tests/scenarios/`. Read the spec before any work; when this file and the spec
 disagree, the spec wins and this file must be updated. Planning lives in `.planning/` (GSD):
 ROADMAP, REQUIREMENTS, STATE.
 
@@ -80,8 +82,10 @@ Division of responsibility, which decides where any new behaviour goes:
   `consent_recorded: true` **and** `consent_source` is filled in (true without a source is a
   lint error).
 - `dossier.yaml` also carries `staleness_days` (default 7) for `dossier-status`.
-- Skills locate the nearest `dossier.yaml` (cwd or parent); all skills except `dossier-init`
-  stop if none is found.
+- Skills locate the nearest `dossier.yaml` (cwd or parent); every task skill (all except
+  `dossier-init` and the `dossier` entry skill) stops with a message if none is found; the
+  `dossier` entry skill says so in one line, suggests `dossier-init` when relevant, and steps
+  aside (03-CONTEXT D-05).
 - External dependencies have a stated fallback: `pdftotext` missing → PDF filed, extraction
   reported as skipped; `scripts/` absent (bare-skills install) → the skill says so and states
   the rule the script would have checked.
