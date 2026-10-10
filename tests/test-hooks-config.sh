@@ -13,7 +13,7 @@ set -u
 # shellcheck source=./lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-REQUIRED_EVENTS='PreToolUse SessionStart'
+REQUIRED_EVENTS='PreToolUse SessionStart Stop'
 PRETOOLUSE_MATCHER='Write|Edit|MultiEdit|NotebookEdit|Bash'
 HOOKS_JSON="$REPO_ROOT/hooks/hooks.json"
 
@@ -176,6 +176,7 @@ declared_command() {
 
 PRE_COMMAND="$(declared_command PreToolUse)"
 START_COMMAND="$(declared_command SessionStart)"
+STOP_COMMAND="$(declared_command Stop)"
 
 # run_declared COMMAND PLUGIN_ROOT JSON — run COMMAND through `sh -c` with
 # CLAUDE_PLUGIN_ROOT exported, storing the result like run_hook does.
@@ -245,6 +246,40 @@ if [ -n "$PRE_COMMAND" ]; then
     assert_eq '' "$HOOK_OUT" 'sh -c SessionStart with malformed stdin: empty stdout'
   else
     echo 'FAIL: no SessionStart command to run through sh -c' >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  fi
+  # Stop (PROTO-06, D-01): from a committed scratch dossier with an outbound
+  # change the command prints a block decision; with stop_hook_active true it
+  # prints nothing; malformed stdin is silent.
+  if [ -n "$STOP_COMMAND" ]; then
+    s=$(scratch_repo)
+    python3 "$(init_py)" --target "$s" --language en \
+      --counterpart 'Acme Consulting|ordering party|Jane Doe' >/dev/null 2>&1
+    git -C "$s" add -A >/dev/null 2>&1
+    git -C "$s" commit -qm scaffold >/dev/null 2>&1
+    mkdir -p "$s/outbound/mails"
+    printf '%s\n' 'Reply draft, written 2026-10-10.' >"$s/outbound/mails/2026-10-10_reply.md"
+    STOP_JSON="$(python3 -c 'import json, sys; print(json.dumps({"hook_event_name": "Stop", "cwd": sys.argv[1], "stop_hook_active": sys.argv[2] == "true", "session_id": "test", "transcript_path": "/dev/null"}))' "$s" false)"
+    run_declared "$STOP_COMMAND" "$REPO_ROOT" "$STOP_JSON"
+    assert_eq 0 "$HOOK_STATUS" 'sh -c Stop: exit status 0'
+    assert_eq block "$(hook_field decision)" 'sh -c Stop: an outbound change without a dossier change is blocked'
+    ACTIVE_JSON="$(python3 -c 'import json, sys; print(json.dumps({"hook_event_name": "Stop", "cwd": sys.argv[1], "stop_hook_active": True}))' "$s")"
+    run_declared "$STOP_COMMAND" "$REPO_ROOT" "$ACTIVE_JSON"
+    assert_eq 0 "$HOOK_STATUS" 'sh -c Stop, stop_hook_active true: exit status 0'
+    assert_eq '' "$HOOK_OUT" 'sh -c Stop, stop_hook_active true: empty stdout'
+    spaced="$(mktemp -d)/plugin root with space"
+    mkdir -p "$(dirname "$spaced")"
+    ln -s "$REPO_ROOT" "$spaced"
+    run_declared "$STOP_COMMAND" "$spaced" "$STOP_JSON"
+    assert_eq 0 "$HOOK_STATUS" 'sh -c Stop, plugin root with a space: exit status 0'
+    assert_eq block "$(hook_field decision)" 'sh -c Stop, plugin root with a space: blocked'
+    rm -rf "$(dirname "$spaced")"
+    run_declared "$STOP_COMMAND" "$REPO_ROOT" 'not json'
+    assert_eq 0 "$HOOK_STATUS" 'sh -c Stop with malformed stdin: exit status 0'
+    assert_eq '' "$HOOK_OUT" 'sh -c Stop with malformed stdin: empty stdout'
+    rm -rf "$s"
+  else
+    echo 'FAIL: no Stop command to run through sh -c' >&2
     TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
   rm -rf "$d"

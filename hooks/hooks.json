@@ -22,6 +22,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-check.py\"",
+            "timeout": 15
+          }
+        ]
+      }
     ]
   },
   "description": "client-dossier: protocol reminder, sources guard, update-before-handoff check"
