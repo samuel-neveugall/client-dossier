@@ -1,0 +1,4 @@
+variant	run	verdict	prompt_kind	agents_md	filed_name	timestamped_lines	refreshed	lint_exit	warnings	ingest_skill	extractor_dispatched	corrected	filed_date_is_today	model	claude_code_version	cost_usd	is_error	dossier	jsonl
+baseline	1	RED	plain	no	none	0	none	0	0	no	no	no	no	claude-sonnet-5-5	2.1.296	0.032763299999999995	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.dqMWG9HMBM	baseline-1.jsonl
+baseline	2	RED	plain	no	none	0	none	0	0	no	no	no	no	claude-sonnet-5-5	2.1.296	0.0319951	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.EAnRSmwDYz	baseline-2.jsonl
+baseline	3	RED	plain	no	none	0	none	0	0	no	no	no	no	claude-sonnet-5-5	2.1.296	0.0323051	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.EEkuLxN7rF	baseline-3.jsonl

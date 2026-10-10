@@ -296,6 +296,138 @@ print("yes" if hit else "no")
 ' "$1" "$2"
 }
 
+# --- Phase 4 additions (plan 04-02) -----------------------------------------
+
+# jsonl_has_agent FILE NAME — D-12. yes when the first system/init event's
+# agents list holds NAME exactly (entries may be strings or objects with a
+# name), else no (also when the key or the file is absent).
+jsonl_has_agent() {
+  _jsonl_agents_match "$1" "$2" exact
+}
+
+# jsonl_has_agent_prefix FILE PREFIX — D-12. yes when any listed agent starts
+# with PREFIX (the contamination check of the no-plugin variants).
+jsonl_has_agent_prefix() {
+  _jsonl_agents_match "$1" "$2" prefix
+}
+
+# _jsonl_agents_match FILE WANTED MODE — the shared body, modelled on
+# _jsonl_skills_match but reading the init event's `agents`.
+_jsonl_agents_match() {
+  python3 -c '
+import json, sys
+path, wanted, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+agents = []
+try:
+    fh = open(path, encoding="utf-8", errors="replace")
+except OSError:
+    print("no")
+    sys.exit(0)
+with fh:
+    for line in fh:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(ev, dict) and ev.get("type") == "system" and ev.get("subtype") == "init":
+            agents = ev.get("agents") or []
+            break
+names = []
+for a in agents:
+    if isinstance(a, str):
+        names.append(a)
+    elif isinstance(a, dict) and isinstance(a.get("name"), str):
+        names.append(a["name"])
+if mode == "exact":
+    hit = wanted in names
+else:
+    hit = any(n.startswith(wanted) for n in names)
+print("yes" if hit else "no")
+' "$1" "$2" "$3"
+}
+
+# jsonl_agent_dispatched FILE SUFFIX — D-12. yes when an assistant tool_use
+# named Agent or Task has an input subagent_type ending in SUFFIX. Both names
+# are matched: in Claude Code 2.1.x the init tools list says Task while the
+# tool_use is named Agent (RESEARCH "State of the Art"). A Skill tool_use that
+# merely mentions the suffix does not count.
+jsonl_agent_dispatched() {
+  python3 -c '
+import json, sys
+path, suffix = sys.argv[1], sys.argv[2]
+hit = False
+try:
+    fh = open(path, encoding="utf-8", errors="replace")
+except OSError:
+    print("no")
+    sys.exit(0)
+with fh:
+    for line in fh:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(ev, dict) or ev.get("type") != "assistant":
+            continue
+        msg = ev.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if (
+                isinstance(block, dict)
+                and block.get("type") == "tool_use"
+                and block.get("name") in ("Agent", "Task")
+                and isinstance(block.get("input"), dict)
+                and str(block["input"].get("subagent_type", "")).endswith(suffix)
+            ):
+                hit = True
+print("yes" if hit else "no")
+' "$1" "$2"
+}
+
+# backdate_last_updated DIR DATE — D-13 (RESEARCH Pitfall 6). init.py renders
+# every living file with today as `Last updated:`, so a same-day scenario could
+# never see a refresh. This rewrites the first `Last updated: YYYY-MM-DD` of
+# each of the seven living files to `Last updated: DATE` and changes no other
+# line. It dies (harness error) when a living file is missing or holds no such
+# line: the scaffold contract changed.
+backdate_last_updated() {
+  local dir="$1" date="$2"
+  python3 -c '
+import re, sys
+root, date = sys.argv[1], sys.argv[2]
+names = ("ACTORS", "HISTORY", "LEARNINGS", "TONE", "CHANNELS", "OPEN-QUESTIONS", "RELATIONSHIP")
+pattern = re.compile(r"^Last updated: [0-9]{4}-[0-9]{2}-[0-9]{2}")
+for name in names:
+    path = "{}/dossier/{}.md".format(root, name)
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            lines = fh.read().split("\n")
+    except OSError as exc:
+        sys.stderr.write("{}: {}\n".format(path, exc))
+        sys.exit(1)
+    for i, line in enumerate(lines):
+        if pattern.match(line):
+            lines[i] = "Last updated: " + date + line[len("Last updated: YYYY-MM-DD"):]
+            break
+    else:
+        sys.stderr.write("{}: no Last updated: line\n".format(path))
+        sys.exit(1)
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write("\n".join(lines))
+' "$dir" "$date" \
+    || scenario_die "backdate_last_updated failed in $dir: a living file has no Last updated: line (D-13)"
+}
+
+# --- end Phase 4 additions ----------------------------------------------------
+
 # file_sha FILE — sha256 (python3 hashlib, portable), MISSING when the file is
 # gone.
 file_sha() {
