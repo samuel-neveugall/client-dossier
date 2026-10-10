@@ -30,7 +30,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - [x] **Phase 1: Scaffold & Templates** - `dossier-init` scaffolds a full dossier repo from `dossier.yaml` and templates
 - [x] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures (completed 2026-10-10)
 - [x] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
-- [ ] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts
+- [x] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts (completed 2026-10-10)
 - [ ] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
 - [ ] **Phase 6: Calls & Status** - `dossier-call` and `dossier-status` close the loop on preparation, debrief, and "where are we"
 - [ ] **Phase 7: Manifests, Docs & Distribution** - both manifests, commands, README/LICENSE/CHANGELOG, and trigger-description eval
@@ -259,7 +259,29 @@ never touches sources, updates before handoff)
   5. With `pdftotext` absent from PATH, the PDF is still filed and the skill reports the
      extraction as skipped with an install hint; the skill text contains the inline
      extraction procedure for a harness without subagents.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [x] 04-01-PLAN.md — tracer: the skill's filing command through the real guard into sources/
+  (file_source.py), then sha256 dedup, no overwrite, refusals, and the URL fetch with its SSRF
+  guard-rails (D-01, D-02, D-04, D-06, D-07, D-14)
+- [x] 04-02-PLAN.md — the ingest-transcript scenario harness proven against a fake claude, and the
+  paid RED baseline without the plugin, before the skill (D-10, D-12, D-13; 03 D-15 branch planned)
+- [x] 04-03-PLAN.md — extract-text.sh in the skill folder: page markers, no overwrite, scan and
+  missing-pdftotext exits with the install hint (D-05, D-15)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 04-04-PLAN.md — the read-only fact-extractor agent, the dossier-ingest skill with its inline
+  procedure and the dossier pointer (one commit, after the baseline), and the skill's own commands
+  through the real guard (D-03, D-08, D-09, D-11)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 04-05-PLAN.md — spec and CLAUDE.md amendments, the paid GREEN run 3/3 with dossier-ingest
+  invoked, full verification and the validation contract
 
 ### Phase 5: Drafting & Doctrine Review
 
@@ -341,7 +363,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
 | 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
 | 3. Protocol Skill & Hooks | 6/6 | Complete — verified + recette agent-run | 2026-10-10 |
-| 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
+| 4. Ingest & Fact Extraction | 5/5 | Complete — verified + recette agent-run | 2026-10-10 |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
 | 6. Calls & Status | 0/TBD | Not started | - |
 | 7. Manifests, Docs & Distribution | 0/TBD | Not started | - |

@@ -1,7 +1,6 @@
 ---
 name: dossier-init
 description: Use when someone wants to start or set up a dossier for a client, partner, prospect or recruiter in this repository, or when a repository already holds calls, mails and deliverables about an external party but has no dossier.yaml yet. Also use to complete a dossier scaffold that already exists in this repository — re-running only adds what is missing, it never overwrites a living file.
-allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/init.py *)
 ---
 
 # dossier-init

@@ -104,7 +104,7 @@
         "uat-3"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-4",
@@ -115,7 +115,7 @@
         "uat-3"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-4",
@@ -125,7 +125,7 @@
         "exec-4"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -136,7 +136,7 @@
         "revue-4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "uat-4",
@@ -146,7 +146,7 @@
         "verify-4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "discuss-5",
@@ -154,7 +154,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-5",
@@ -165,7 +165,7 @@
         "uat-4"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-5",
@@ -215,7 +215,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-6",
@@ -276,7 +276,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-7",
@@ -443,6 +443,51 @@
         "skills/dossier/",
         "tests/",
         "docs/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "audit-4",
+      "step": "security audit phase 4 (URL download, filing)",
+      "stage": "",
+      "deps": [
+        "exec-4"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-4a",
+      "step": "fix round: review R4 + audit A4 + dispatch rewording + paid re-runs",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/",
+        "agents/",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-4b",
+      "step": "re-review round 2 phase 4 (review + audit closures)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/",
+        "agents/",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-4b",
+      "step": "micro-fix M1-M4 + verification + UAT phase 4",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier-ingest/",
+        "tests/"
       ],
       "status": "done"
     }

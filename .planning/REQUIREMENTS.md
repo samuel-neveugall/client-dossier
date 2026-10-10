@@ -97,26 +97,26 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Ingest (dossier-ingest, fact-extractor agent, extract-text.sh)
 
-- [ ] **INGEST-01**: `dossier-ingest <path or URL>` files the source under `sources/` as
+- [x] **INGEST-01**: `dossier-ingest <path or URL>` files the source under `sources/` as
       `YYYY-MM-DD_slug`, runs `extract-text.sh` (pdftotext wrapper) for PDFs, and keeps raw
       exports next to transcripts; when `pdftotext` is missing the script exits with an
       install hint, the PDF is still filed and the skill reports extraction as skipped
-- [ ] **INGEST-02**: `dossier-ingest` dispatches the `fact-extractor` agent and applies its
+- [x] **INGEST-02**: `dossier-ingest` dispatches the `fact-extractor` agent and applies its
       proposal to the living files — appending under the right heading, correcting a
       contradicted line instead of adding a new one, updating "Last updated" — then reports
       what changed and what was left as uncertain
-- [ ] **INGEST-03**: The `fact-extractor` agent (read-only: Read, Grep, Glob) takes one
+- [x] **INGEST-03**: The `fact-extractor` agent (read-only: Read, Grep, Glob) takes one
       source path, the dossier config, and the current living-file headings, and returns a
       structured proposal grouped by target file/heading with locators, a "contradicts" list
       (existing line, proposed correction, why), and an "uncertain" list — honoring one fact
       per line, absolute dates, quotes checked in context, never paraphrasing a number, never
       inventing a source
-- [ ] **INGEST-04**: Ingesting a source already filed (same hash) is reported as already
+- [x] **INGEST-04**: Ingesting a source already filed (same hash) is reported as already
       filed, not duplicated
-- [ ] **INGEST-05**: The "given a transcript, what did we learn" baseline pressure scenario
+- [x] **INGEST-05**: The "given a transcript, what did we learn" baseline pressure scenario
       is recorded RED (summary only in chat, nothing filed, no timestamps) before
       `dossier-ingest` exists, and re-run GREEN (facts filed with sourced timestamps) after
-- [ ] **INGEST-06**: `dossier-ingest` contains the inline extraction procedure for harnesses
+- [x] **INGEST-06**: `dossier-ingest` contains the inline extraction procedure for harnesses
       without subagents, says when the main agent is doing the extractor's job itself, and
       checks that `extract-text.sh` exists before calling it (bare-skills install)
 
@@ -226,12 +226,12 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | PROTO-06 | Phase 3 | Complete (closed 2026-10-10) |
 | PROTO-07 | Phase 3 | Complete (closed 2026-10-10) |
 | PROTO-08 | Phase 3 (rule and hooks; the task-skill stop completed incrementally in Phases 4-6, verified in full at Phase 6) | Partial — Phase 3 part done 2026-10-10 (rule, hooks, entry skill) |
-| INGEST-01 | Phase 4 | Pending |
-| INGEST-02 | Phase 4 | Pending |
-| INGEST-03 | Phase 4 | Pending |
-| INGEST-04 | Phase 4 | Pending |
-| INGEST-05 | Phase 4 | Pending |
-| INGEST-06 | Phase 4 | Pending |
+| INGEST-01 | Phase 4 | Complete |
+| INGEST-02 | Phase 4 | Complete |
+| INGEST-03 | Phase 4 | Complete |
+| INGEST-04 | Phase 4 | Complete |
+| INGEST-05 | Phase 4 | Complete |
+| INGEST-06 | Phase 4 | Complete |
 | DRAFT-01 | Phase 5 | Pending |
 | DRAFT-02 | Phase 5 | Pending |
 | DRAFT-03 | Phase 5 | Pending |

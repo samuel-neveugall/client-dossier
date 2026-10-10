@@ -257,13 +257,16 @@ print("yes" if hit else "no")
 }
 
 # jsonl_skill_invoked FILE WORD — yes when any assistant tool_use named Skill
-# has an input whose JSON text contains WORD. Loose on purpose: the exact
-# input shape is not a documented contract (RESEARCH A5).
+# has an input whose JSON text contains WORD AND its tool_result (matched by
+# tool_use_id) came back with is_error not true (R4-m7: a denied call is not an
+# invocation). Loose on the input on purpose: the exact input shape is not a
+# documented contract (RESEARCH A5).
 jsonl_skill_invoked() {
   python3 -c '
 import json, sys
 path, word = sys.argv[1], sys.argv[2]
-hit = False
+uses = set()
+results = {}
 try:
     fh = open(path, encoding="utf-8", errors="replace")
 except OSError:
@@ -278,23 +281,203 @@ with fh:
             ev = json.loads(line)
         except ValueError:
             continue
-        if not isinstance(ev, dict) or ev.get("type") != "assistant":
+        if not isinstance(ev, dict) or ev.get("type") not in ("assistant", "user"):
             continue
         msg = ev.get("message")
         content = msg.get("content") if isinstance(msg, dict) else None
         if not isinstance(content, list):
             continue
         for block in content:
-            if (
-                isinstance(block, dict)
-                and block.get("type") == "tool_use"
-                and block.get("name") == "Skill"
-                and word in json.dumps(block.get("input", {}))
-            ):
-                hit = True
-print("yes" if hit else "no")
+            if not isinstance(block, dict):
+                continue
+            if ev.get("type") == "assistant" and block.get("type") == "tool_use":
+                if (
+                    block.get("name") == "Skill"
+                    and word in json.dumps(block.get("input", {}))
+                ):
+                    if isinstance(block.get("id"), str):
+                        uses.add(block["id"])
+            elif ev.get("type") == "user" and block.get("type") == "tool_result":
+                if isinstance(block.get("tool_use_id"), str):
+                    results[block["tool_use_id"]] = block.get("is_error") is True
+# R4-m7: a call counts only when its tool_result came back and is not an error
+# (a permission denial is a tool_result with is_error true).
+print("yes" if any(i in results and not results[i] for i in uses) else "no")
 ' "$1" "$2"
 }
+
+# --- Phase 4 additions (plan 04-02) -----------------------------------------
+
+# jsonl_has_agent FILE NAME — D-12. yes when the first system/init event's
+# agents list holds NAME exactly (entries may be strings or objects with a
+# name), else no (also when the key or the file is absent).
+jsonl_has_agent() {
+  _jsonl_agents_match "$1" "$2" exact
+}
+
+# jsonl_has_agent_prefix FILE PREFIX — D-12. yes when any listed agent starts
+# with PREFIX (the contamination check of the no-plugin variants).
+jsonl_has_agent_prefix() {
+  _jsonl_agents_match "$1" "$2" prefix
+}
+
+# _jsonl_agents_match FILE WANTED MODE — the shared body, modelled on
+# _jsonl_skills_match but reading the init event's `agents`.
+_jsonl_agents_match() {
+  python3 -c '
+import json, sys
+path, wanted, mode = sys.argv[1], sys.argv[2], sys.argv[3]
+agents = []
+try:
+    fh = open(path, encoding="utf-8", errors="replace")
+except OSError:
+    print("no")
+    sys.exit(0)
+with fh:
+    for line in fh:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(ev, dict) and ev.get("type") == "system" and ev.get("subtype") == "init":
+            agents = ev.get("agents") or []
+            break
+names = []
+for a in agents:
+    if isinstance(a, str):
+        names.append(a)
+    elif isinstance(a, dict) and isinstance(a.get("name"), str):
+        names.append(a["name"])
+if mode == "exact":
+    hit = wanted in names
+else:
+    hit = any(n.startswith(wanted) for n in names)
+print("yes" if hit else "no")
+' "$1" "$2" "$3"
+}
+
+# jsonl_agent_dispatched FILE SUFFIX — D-12. yes when an assistant tool_use
+# named Agent or Task has an input subagent_type ending in SUFFIX. Both names
+# are matched: in Claude Code 2.1.x the init tools list says Task while the
+# tool_use is named Agent (RESEARCH "State of the Art"). A Skill tool_use that
+# merely mentions the suffix does not count. As for skills (R4-m7), the call
+# counts only when its tool_result came back with is_error not true.
+jsonl_agent_dispatched() {
+  python3 -c '
+import json, sys
+path, word = sys.argv[1], sys.argv[2]
+uses = set()
+results = {}
+async_ids = set()
+task_of = {}
+completed = set()
+try:
+    fh = open(path, encoding="utf-8", errors="replace")
+except OSError:
+    print("no")
+    sys.exit(0)
+with fh:
+    for line in fh:
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if (
+            isinstance(ev, dict)
+            and ev.get("type") == "system"
+            and ev.get("subtype") == "task_notification"
+            and ev.get("status") == "completed"
+        ):
+            for key in ("tool_use_id", "task_id"):
+                if isinstance(ev.get(key), str):
+                    completed.add(ev[key])
+            continue
+        if not isinstance(ev, dict) or ev.get("type") not in ("assistant", "user"):
+            continue
+        msg = ev.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if ev.get("type") == "assistant" and block.get("type") == "tool_use":
+                if (
+                    block.get("name") in ("Agent", "Task")
+                    and isinstance(block.get("input"), dict)
+                    and str(block["input"].get("subagent_type", "")).endswith(word)
+                ):
+                    if isinstance(block.get("id"), str):
+                        uses.add(block["id"])
+            elif ev.get("type") == "user" and block.get("type") == "tool_result":
+                if isinstance(block.get("tool_use_id"), str):
+                    tid = block["tool_use_id"]
+                    results[tid] = block.get("is_error") is True
+                    tur = ev.get("tool_use_result")
+                    text = json.dumps(block.get("content"))
+                    if (
+                        isinstance(tur, dict) and tur.get("status") == "async_launched"
+                    ) or "Async agent launched" in text:
+                        # M3: an async dispatch is only "launched" here; the
+                        # task_id is the agentId the launch result carries.
+                        async_ids.add(tid)
+                        if isinstance(tur, dict) and isinstance(tur.get("agentId"), str):
+                            task_of[tid] = tur["agentId"]
+# R4-m7: a call counts only when its tool_result came back and is not an error
+# (a permission denial is a tool_result with is_error true).
+# M3: an asynchronous dispatch counts only once a task_notification of status
+# completed exists for it (matched by tool_use_id or by task_id).
+def ok(i):
+    if i not in results or results[i]:
+        return False
+    if i in async_ids:
+        return i in completed or task_of.get(i) in completed
+    return True
+print("yes" if any(ok(i) for i in uses) else "no")
+' "$1" "$2"
+}
+
+# backdate_last_updated DIR DATE — D-13 (RESEARCH Pitfall 6). init.py renders
+# every living file with today as `Last updated:`, so a same-day scenario could
+# never see a refresh. This rewrites the first `Last updated: YYYY-MM-DD` of
+# each of the seven living files to `Last updated: DATE` and changes no other
+# line. It dies (harness error) when a living file is missing or holds no such
+# line: the scaffold contract changed.
+backdate_last_updated() {
+  local dir="$1" date="$2"
+  python3 -c '
+import re, sys
+root, date = sys.argv[1], sys.argv[2]
+names = ("ACTORS", "HISTORY", "LEARNINGS", "TONE", "CHANNELS", "OPEN-QUESTIONS", "RELATIONSHIP")
+pattern = re.compile(r"^Last updated: [0-9]{4}-[0-9]{2}-[0-9]{2}")
+for name in names:
+    path = "{}/dossier/{}.md".format(root, name)
+    try:
+        with open(path, encoding="utf-8", newline="") as fh:
+            lines = fh.read().split("\n")
+    except OSError as exc:
+        sys.stderr.write("{}: {}\n".format(path, exc))
+        sys.exit(1)
+    for i, line in enumerate(lines):
+        if pattern.match(line):
+            lines[i] = "Last updated: " + date + line[len("Last updated: YYYY-MM-DD"):]
+            break
+    else:
+        sys.stderr.write("{}: no Last updated: line\n".format(path))
+        sys.exit(1)
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write("\n".join(lines))
+' "$dir" "$date" \
+    || scenario_die "backdate_last_updated failed in $dir: a living file has no Last updated: line (D-13)"
+}
+
+# --- end Phase 4 additions ----------------------------------------------------
 
 # file_sha FILE — sha256 (python3 hashlib, portable), MISSING when the file is
 # gone.

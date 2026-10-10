@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 04
-current_phase_name: Ingest & Fact Extraction
+current_phase: 05
+current_phase_name: drafting-doctrine-review
 status: ready_to_plan
-stopped_at: Completed 03-04-PLAN.md (03-02 still blocked at baseline gate, RED 0/3)
-last_updated: "2026-10-10T13:13:58.245Z"
+stopped_at: Phase 4 closed (verification passed 5/5, UAT complete 6/6, agent-run)
+last_updated: "2026-10-10T21:30:00.000Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 03 verified and UAT complete
-state_head: d037cf0473fbbf25cf82e46cc85081e4895a4b93
+last_activity_desc: Phase 04 executed (5/5 plans), verifier human_needed
+state_head: 8868bd0e6b49f5424a3dbb24b67cfd6a1fa7f57b
 progress:
   total_phases: 7
-  completed_phases: 3
-  total_plans: 21
-  completed_plans: 21
-  percent: 57
+  completed_phases: 4
+  total_plans: 26
+  completed_plans: 26
+  percent: 71
 ---
 
 # Project State
@@ -25,18 +25,17 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 04 — Ingest & Fact Extraction (ready to plan)
+**Current focus:** Phase 05 — Drafting & Doctrine Review (ready to plan)
 
 ## Current Position
 
-Phase: 04 (Ingest & Fact Extraction) — ready to plan
-Status: Phase 3 closed 2026-10-10: `03-VERIFICATION.md` passed 6/6 (1 override, the D-04 class, D-17);
-`03-UAT.md` complete (agent-run: GREEN 3/3 replay twice, plugin+AGENTS.md 3/3, real `claude -p`
-sessions for the 3 hooks, run.sh 11/0, plugin validate exit 0). Branch
-`feat/phase-03-protocol-skill-hooks` merges into `main` (--no-ff) and is pushed by the manager.
-Last activity: 2026-10-10 — Phase 3 verification + recette
+Phase: 05 (drafting-doctrine-review) — ready to plan (Phase 4 closed 2026-10-10)
+Status: Phase 4 done: `04-VERIFICATION.md` passed 5/5 (iter1 human_needed kept as `04-VERIFICATION.iter1.md`),
+`04-UAT.md` complete 6/6 (agent-run, evidence `evidence/uat/`, 0.660 USD). Dispatch of `fact-extractor`
+is mandatory and observed live (r2 runs + UAT). `tests/run.sh` 17 files, 0 failed; INGEST-01..06 complete.
+Last activity: 2026-10-10 — Phase 4 closure (fix-4b, verification, recette)
 
-Progress: [██████░░░░] 57%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -48,7 +47,7 @@ Progress: [██████░░░░] 57%
 
 ### Pending Todos
 
-- Phase 3 executed 2026-10-10: Q6 settled by D-15 (pressured prompt, RED 3/3), Q7 by D-16 (guard hardened); GREEN 3/3 with the plugin. Phase 4 cadrage questions Q3-Q5 pending. Details: `.planning/missions/2026-10-10-v1-phases-3-7.md`, `03-REVIEW.md`, `03-SECURITY.md`.
+- Phase 3 executed 2026-10-10: Q6 settled by D-15 (pressured prompt, RED 3/3), Q7 by D-16 (guard hardened); GREEN 3/3 with the plugin. Phase 4 closed. Details: `.planning/missions/2026-10-10-v1-phases-3-7.md`, `03-REVIEW.md`, `03-SECURITY.md`.
 
 ### Blockers/Concerns
 
@@ -73,6 +72,6 @@ Progress: [██████░░░░] 57%
 
 ## Session Continuity
 
-Last session: 2026-10-10T13:13:58.213Z
-Stopped at: Phase 3 closed (verification passed, UAT complete)
-Resume file: .planning/phases/03-protocol-skill-hooks/03-UAT.md
+Last session: 2026-10-10
+Stopped at: Phase 4 closed (verification passed, UAT complete)
+Resume file: .planning/phases/04-ingest-fact-extraction/04-UAT.md

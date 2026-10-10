@@ -73,6 +73,19 @@ last_updated: 2026-09-24T20:15:52.947Z
     "recorded_at": "2026-09-24T20:15:52.947Z",
     "resolved_at": null,
     "milestone": null
+  },
+  {
+    "id": 5,
+    "kind": "deviation",
+    "phase": "04",
+    "file": "skills/dossier-ingest/scripts/file_source.py",
+    "line": null,
+    "description": "file_source.py is one file over the global vibeflow 300-line guard, traced via the vibeflow:allow-large-file marker; one file on purpose, same reasoning as init.py (private script copied wholesale by a bare-skills install); tracked in 04-01-SUMMARY.md",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-10-10T21:00:00.000Z",
+    "resolved_at": null,
+    "milestone": null
   }
 ]
 ````

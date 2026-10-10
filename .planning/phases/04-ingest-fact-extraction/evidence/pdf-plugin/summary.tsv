@@ -1,0 +1,2 @@
+variant	run	verdict	filed_name	text_extracted	page_lines	right_file	refreshed	lint_exit	warnings	ingest_skill	extractor_dispatched	filed_date_is_content	model	claude_code_version	cost_usd	is_error	dossier	jsonl
+plugin	1	GREEN	sources/received/2026-10-06_onboarding-pack.pdf	yes	3	yes	yes	0	0	yes	no	yes	claude-sonnet-5-5	2.1.296	0.12941049999999998	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.kqaLZmnZHv	pdf-1.jsonl

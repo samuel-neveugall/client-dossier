@@ -1,0 +1,85 @@
+diff --git a/dossier/ACTORS.md b/dossier/ACTORS.md
+index af7cf7a..16214d2 100644
+--- a/dossier/ACTORS.md
++++ b/dossier/ACTORS.md
+@@ -1,6 +1,6 @@
+ # Actors
+ 
+-Last updated: 2026-09-01
++Last updated: 2026-10-10, after the onboarding pack of 2026-10-06
+ 
+ <!-- Updated when: a new actor appears or a role becomes clearer. -->
+ 
+@@ -10,6 +10,10 @@ Last updated: 2026-09-01
+ 
+ <!-- - Example: Jane Doe (Acme) asks for the deliverable by 2026-10-01 (call @12:34). -->
+ 
++### Priya Raman (Acme Consulting)
++
++- Priya Raman (Acme Consulting) is the procurement lead at Acme Consulting and the procurement contact named for suppliers as of 2026-10-06 (onboarding pack 2026-10-06 p. 2).
++
+ ## End client
+ 
+ ## Us
+diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
+index ca987e3..83a1c1a 100644
+--- a/dossier/HISTORY.md
++++ b/dossier/HISTORY.md
+@@ -1,6 +1,6 @@
+ # History
+ 
+-Last updated: 2026-09-01
++Last updated: 2026-10-10, after the onboarding pack of 2026-10-06
+ 
+ <!-- Updated when: after every call, mail or document sent. -->
+ 
+@@ -8,6 +8,8 @@ Last updated: 2026-09-01
+ 
+ <!-- - Example: Jane Doe (Acme) asks for the deliverable by 2026-10-01 (call @12:34). -->
+ 
++- Acme Consulting issued its supplier onboarding pack on 2026-10-06 (onboarding pack 2026-10-06 p. 1).
++
+ ## Commitments in progress
+ 
+ ### Ours
+diff --git a/dossier/OPEN-QUESTIONS.md b/dossier/OPEN-QUESTIONS.md
+index 91c54fd..cd536b3 100644
+--- a/dossier/OPEN-QUESTIONS.md
++++ b/dossier/OPEN-QUESTIONS.md
+@@ -1,6 +1,6 @@
+ # Open Questions
+ 
+-Last updated: 2026-09-01
++Last updated: 2026-10-10, after the onboarding pack of 2026-10-06
+ 
+ <!-- Updated when: after every call. -->
+ 
+@@ -10,6 +10,7 @@ Last updated: 2026-09-01
+ 
+ | Question | Answer | Source |
+ | --- | --- | --- |
++| When are supplier invoices paid? | Supplier invoices are paid 45 days after receipt, per the pack issued 2026-10-06. | onboarding pack 2026-10-06 p. 3 |
+ 
+ ## Still open on the counterpart side
+ 
+diff --git a/dossier/RELATIONSHIP.md b/dossier/RELATIONSHIP.md
+index e7afa74..61fdde5 100644
+--- a/dossier/RELATIONSHIP.md
++++ b/dossier/RELATIONSHIP.md
+@@ -1,6 +1,6 @@
+ # Relationship
+ 
+-Last updated: 2026-09-01
++Last updated: 2026-10-10, after the onboarding pack of 2026-10-06
+ 
+ <!-- Updated when: at every milestone and at least weekly while the deal is open. -->
+ 
+@@ -24,3 +24,5 @@ Last updated: 2026-09-01
+ ## Sales opportunities, ranked by probability
+ 
+ ## Points to keep in mind
++
++- Acme Consulting pays supplier invoices 45 days after receipt, according to its onboarding pack issued 2026-10-06 (onboarding pack 2026-10-06 p. 3).
+# untracked files:
+sources/received/2026-10-06_onboarding-pack.pdf
+sources/received/2026-10-06_onboarding-pack.txt

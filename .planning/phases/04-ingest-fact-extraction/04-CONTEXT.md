@@ -67,6 +67,13 @@ status, manifests and slash commands belong to Phases 5-7.
   `Skill` invocation naming `dossier-ingest` in the stream; the `fact-extractor` dispatch is
   recorded in the evidence but does not gate (the inline procedure is valid by spec §6).
   Reversal: drop the one assertion in the scenario script.
+- **D-12 amended after execution (manager, tier 1, 2026-10-10).** In 4/4 live GREEN runs the
+  model extracted inline and never dispatched `fact-extractor`. The spec settles it (§4.1:
+  "Dispatches `fact-extractor` on the source (one agent per source, so the long text stays out
+  of the main context)"; §4.2/§6: inline only on a harness without subagents), so this is not a
+  question for Samuel: the skill makes the dispatch mandatory whenever a subagent tool is
+  available, inline being the exception it names; GREEN in Claude Code now also requires the
+  `fact-extractor` dispatch in the stream.
 - **D-13 — The scenario fixture seeds a contradicted line** in a living file, so the
   "(corrects a line dated <date>)" behaviour (D-09) has evidence; and the harness backdates the
   scaffold's `Last updated:` lines before its baseline commit so a refresh is observable.

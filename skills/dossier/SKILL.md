@@ -143,3 +143,5 @@ bare-skills install has no scripts), say so and apply the rules above by reading
 ## Other skills
 
 `dossier-init` starts a dossier in this repository or completes a scaffold that already exists.
+`dossier-ingest` files a source that arrived (a transcript, mail, brochure, PDF or link) under
+`sources/` and turns it into dated, sourced lines in the living files.
