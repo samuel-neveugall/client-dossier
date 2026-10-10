@@ -3,11 +3,11 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Protocol Skill & Hooks
 status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-10-10T12:56:02.961Z"
+stopped_at: 03-02 blocked at baseline gate (Tasks 1-2 done, Task 3 RED 0/3)
+last_updated: "2026-10-10T13:04:23.336Z"
 last_activity: 2026-10-10
 last_activity_desc: Phase 03 execution started
-state_head: d27a25bec537944a26f42ffb793452f9dfadc9a0
+state_head: 525280573dbeca5edcb2901da8146ae266aeea67
 progress:
   total_phases: 7
   completed_phases: 2
@@ -159,6 +159,7 @@ mission, now validated by the phase's own delivery:
   2026-10-10 for Phase 4.
 - `claude plugin validate . --strict` fails on a pre-existing warning about the root `CLAUDE.md`;
   without `--strict` it passes. `CLAUDE.md`'s command line is stale; fix in Phase 3 or 7.
+- 03-02 Task 3: baseline gate FAILED (RED 0/3, GREEN 2/3 without the plugin; init.py's sources/README.md already prevents the edit). 03-05 cannot start without a recorded RED; Samuel to choose: extend P-01, harder prompt, weaker model, or relax D-10 (see 03-02-SUMMARY.md).
 
 ## Deferred Items
 
@@ -171,6 +172,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-10-10T12:56:02.927Z
-Stopped at: Completed 03-01-PLAN.md
-Resume file: None
+Last session: 2026-10-10T13:04:23.305Z
+Stopped at: 03-02 blocked at baseline gate (Tasks 1-2 done, Task 3 RED 0/3)
+Resume file: .planning/phases/03-protocol-skill-hooks/03-02-SUMMARY.md
