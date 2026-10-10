@@ -354,15 +354,16 @@ to perform the same steps inline.
 | Event | Behaviour |
 |---|---|
 | SessionStart | If a `dossier.yaml` is found from the working directory upward, inject two lines: "This repository is a client dossier. Load the `dossier` skill before acting." Nothing otherwise. |
-| PreToolUse on Write, Edit, MultiEdit, NotebookEdit | If the target path resolves under the sources folder of the nearest dossier (searched upward from the target), deny with the message "sources are immutable; file a correction in the dossier instead". New files are denied too: sources are filed by the ingest skill's script, never by the Write tool. |
+| PreToolUse on Write, Edit, MultiEdit, NotebookEdit | If the target path resolves under the sources folder of any ancestor dossier (every directory above the target that holds a `dossier.yaml` is tried, not only the nearest, so a `dossier.yaml` planted under sources cannot turn that subtree into a root), deny with the message "sources are immutable; file a correction in the dossier instead". New files are denied too: sources are filed by the ingest skill's script, never by the Write tool. |
 | PreToolUse on Bash | Heuristic, with the same message: deny a command that visibly modifies an existing file under the sources folder (an in-place edit such as `sed -i` or `perl -i`, `rm`, `mv` out of sources, `cp`, `tee` or a redirection onto an existing file, `truncate`, `git rm`), including after a `cd` into sources. Copying a new file in is allowed. It catches the likely shortcut; the skill's rule is the boundary. |
 | Stop | If `git status` shows uncommitted changes under outbound or sources and none under the dossier folder, block the stop once with a reason addressed to the agent: update the living files the work touched, or say in one sentence why none needed it (`dossier-status` is named once that skill exists). The second stop of the same turn (`stop_hook_active`) passes, so the hook never loops. |
 
 Hooks are a convenience. The skills state the same rules so that a harness without hooks
 gets the same behaviour from prose.
 
-The hook scripts are Python 3.8+ standard library, find the dossier with the same upward
-`dossier.yaml` search as `lint.py` (nearest wins), and fail open: on any internal error they
+The hook scripts are Python 3.8+ standard library, find the dossier with an upward
+`dossier.yaml` search (the linter and the Stop hook use the nearest one; the PreToolUse guard tries every ancestor, so
+it denies under the sources folder of any of them), and fail open: on any internal error they
 exit 0 and print nothing, because a crashing guard would otherwise block every write in every
 repository where the plugin is enabled. The Stop hook blocks instead of warning because in
 Claude Code a Stop hook that does not block only reaches the human, while updating the dossier
