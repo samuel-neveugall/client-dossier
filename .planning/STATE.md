@@ -4,16 +4,16 @@ current_phase: 05
 current_phase_name: drafting-doctrine-review
 status: ready_to_plan
 stopped_at: Phase 4 closed (verification passed 5/5, UAT complete 6/6, agent-run)
-last_updated: "2026-10-10T21:30:00.000Z"
+last_updated: "2026-10-10T22:16:24.592Z"
 last_activity: 2026-10-10
 last_activity_desc: Phase 04 executed (5/5 plans), verifier human_needed
-state_head: 8868bd0e6b49f5424a3dbb24b67cfd6a1fa7f57b
+state_head: 7bc1bf3ddfadf492ab5dede67cc44af1d6c2db07
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 26
+  total_plans: 31
   completed_plans: 26
-  percent: 71
+  percent: 57
 ---
 
 # Project State
@@ -29,13 +29,13 @@ human and a doctrine check.
 
 ## Current Position
 
-Phase: 05 (drafting-doctrine-review) — ready to plan (Phase 4 closed 2026-10-10)
+Phase: 05 (drafting-doctrine-review) — READY TO EXECUTE
 Status: Phase 4 done: `04-VERIFICATION.md` passed 5/5 (iter1 human_needed kept as `04-VERIFICATION.iter1.md`),
 `04-UAT.md` complete 6/6 (agent-run, evidence `evidence/uat/`, 0.660 USD). Dispatch of `fact-extractor`
 is mandatory and observed live (r2 runs + UAT). `tests/run.sh` 17 files, 0 failed; INGEST-01..06 complete.
 Last activity: 2026-10-10 — Phase 4 closure (fix-4b, verification, recette)
 
-Progress: [███████░░░] 71%
+Progress: [██████░░░░] 57%
 
 ## Performance Metrics
 

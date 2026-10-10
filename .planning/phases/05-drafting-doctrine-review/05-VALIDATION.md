@@ -35,18 +35,24 @@ created: "2026-10-10"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 05-W0-a | 01 | 1 | DRAFT-04 | T-05-01 | harness leaves confidential name out of the fixture identity | free self-test | `bash tests/scenarios/selftest-draft.sh` | ❌ W0 | ⬜ pending |
-| 05-W0-b | 01 | 1 | DRAFT-04 | — | baseline RED recorded without plugin, before SKILL.md exists | paid | `bash tests/scenarios/draft-reply.sh --variant baseline --runs 3` | ❌ W0 | ⬜ pending |
-| 05-agent | 02 | 2 | DRAFT-03, DRAFT-05 | T-05-07, T-05-08 | reviewer tools exactly Read, Grep, Glob | static | `bash tests/test-agent-doctrine-reviewer.sh` | ❌ W0 | ⬜ pending |
-| 05-skill | 03 | 3 | DRAFT-01, DRAFT-02, DRAFT-05 | T-05-02..06, T-05-10 | slug/kind validated, single quotes, never sent, no overwrite | static + unit | `bash tests/test-skill-draft.sh && bash tests/test-draft-shapes.sh` | ❌ W0 | ⬜ pending |
-| 05-pointer | 03 | 3 | D-08 | — | `dossier` names `dossier-draft` | static | `bash tests/test-skill-dossier.sh && bash tests/test-skill-ingest.sh` | ✅ edit | ⬜ pending |
-| 05-green | 04 | 4 | DRAFT-04 | T-05-01 | GREEN 3/3 with plugin, G1..G6 | paid | `bash tests/scenarios/draft-reply.sh --variant plugin --runs 3` | ❌ W0 | ⬜ pending |
+| 05-01-T1 | 01 | 1 | DRAFT-04 | T-05-15 | `build_dossier` default unchanged; the D-07 identity makes only the end client confidential; tracer path RED and GREEN against the fake claude | free self-test | `bash tests/scenarios/selftest-draft.sh && bash tests/scenarios/selftest.sh && bash tests/scenarios/selftest-ingest.sh` | ❌ W0 | ⬜ pending |
+| 05-01-T2 | 01 | 1 | DRAFT-04 | T-05-11 | G1-G6 mechanical; leak checked twice; harness errors never verdicts | free self-test | `bash tests/scenarios/selftest-draft.sh` | ❌ W0 | ⬜ pending |
+| 05-01-T3 | 01 | 1 | DRAFT-04 | T-05-09, T-05-12 | RED baseline recorded in a tree without `skills/dossier-draft/SKILL.md`, evidence scrubbed | paid (agent-run) | 05-01 task 3 `<verify>` (baseline commit tree and rows in `evidence/red-baseline/summary.tsv`) | ❌ W0 | ⬜ pending |
+| 05-02-T1 | 02 | 1 | DRAFT-03, DRAFT-05 | T-05-07, T-05-08, T-05-16, T-05-17 | reviewer tools exactly Read, Grep, Glob; read list; data not instructions; parity once the skill exists | static | `bash tests/test-agent-doctrine-reviewer.sh` | ❌ W0 | ⬜ pending |
+| 05-02-T2 | 02 | 1 | DRAFT-03 | T-05-18 | heading positions hold in the en and fr templates | static | `bash tests/test-agent-doctrine-reviewer.sh` | ❌ W0 | ⬜ pending |
+| 05-03-T1 | 03 | 2 | DRAFT-01, DRAFT-02, DRAFT-05 (D-08) | T-05-01..T-05-06, T-05-10, T-05-19, T-05-20, T-05-21 | exact command set, single quotes, slug and kind validated, never sent, no overwrite, findings as data, parity, pointer, ancestry | static + unit | `bash tests/test-skill-draft.sh && bash tests/test-draft-shapes.sh && bash tests/test-agent-doctrine-reviewer.sh && bash tests/test-skill-dossier.sh && bash tests/test-skill-ingest.sh` | ❌ W0 | ⬜ pending |
+| 05-03-T2 | 03 | 2 | DRAFT-01, DRAFT-02, DRAFT-05 | T-05-01, T-05-06 | lint reports E1-E5 the fallback names; lint accepts a sent status, so the skill rule is load-bearing | unit | `bash tests/test-draft-shapes.sh && bash tests/run.sh` | ❌ W0 | ⬜ pending |
+| 05-04-T1 | 04 | 2 | DRAFT-01, DRAFT-02 | T-05-22 | French run GREEN only on a real French draft with its deadline | free self-test | `bash tests/scenarios/selftest-draft.sh` | ❌ W0 | ⬜ pending |
+| 05-04-T2 | 04 | 2 | DRAFT-01, DRAFT-02 | T-05-22, T-05-23, T-05-24 | each GREEN condition removed is INCOMPLETE; baseline harness untouched | free self-test | `bash tests/scenarios/selftest-draft.sh && bash tests/scenarios/selftest.sh && bash tests/scenarios/selftest-ingest.sh` | ❌ W0 | ⬜ pending |
+| 05-05-T1 | 05 | 3 | DRAFT-01..DRAFT-05 | T-05-25, T-05-26, T-05-30 (T-05-01 live) | GREEN 3/3 with G1-G6 and the French run GREEN on one skill text; reviewer tools observed at runtime | paid (agent-run) | 05-05 task 1 `<verify>` (re-derived from `evidence/green-plugin/` and `evidence/fr-deadline/`) | ❌ W0 | ⬜ pending |
+| 05-05-T2 | 05 | 3 | — (docs) | T-05-28 | CLAUDE.md lists every new command; spec §4 needs no amendment | static | 05-05 task 2 `<verify>` | ✅ | ⬜ pending |
+| 05-05-T3 | 05 | 3 | all | — | full suite 20 files, self-tests, plugin validate | static | `bash tests/run.sh` (20 files, 0 failed) and the three self-tests | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
 ## Wave 0 Requirements
 
-- [ ] `tests/scenarios/draft-reply.sh` + `tests/scenarios/selftest-draft.sh` + `build_dossier` identity parameter in `lib-scenario.sh`. DRAFT-04
+- [ ] `tests/scenarios/draft-reply.sh` + `tests/scenarios/lib-draft.sh` + `tests/scenarios/selftest-draft.sh` + `build_dossier` identity arguments in `lib-scenario.sh` (plan 05-01). DRAFT-04
 - [ ] `tests/test-agent-doctrine-reviewer.sh`. DRAFT-03, DRAFT-05
 - [ ] `tests/test-skill-draft.sh` incl. git-ancestry gate on `evidence/red-baseline/summary.tsv`. DRAFT-01/02/05
 - [ ] `tests/test-draft-shapes.sh`. DRAFT-01/02

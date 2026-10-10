@@ -304,7 +304,30 @@ rules the skill applies), Phase 4 (history and learnings the draft skill reads b
      tone/history never touched, confidential name possibly leaked) to GREEN.
   5. The skill text contains the inline review procedure for a harness without subagents,
      and says what it does when `lint.py` is absent.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — tracer: build_dossier identity arguments, the draft-reply scenario harness
+  (G1-G6, reviewer dispatch gating as the 04 D-12 analogue) proven against a fake claude, then the
+  paid RED baseline without the plugin, before the skill exists (D-07)
+- [ ] 05-02-PLAN.md — tracer: the read-only doctrine-reviewer agent with its shared review-rules
+  block and frontmatter guard, and the heading positions it relies on in both template languages
+  (D-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-03-PLAN.md — tracer: the dossier-draft skill, its contract test and its own shapes through
+  the real linter, with the dossier pointer and the test-skill-ingest loop edit in one commit after
+  the baseline; then the shapes' negative and French controls (D-01 to D-06, D-08)
+- [ ] 05-04-PLAN.md — tracer: the French deadline draft scenario (ROADMAP criterion 1) proven against
+  the fake claude, without touching the baseline harness
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 05-05-PLAN.md — the paid French run then GREEN 3/3 with dossier-draft invoked and the reviewer
+  dispatched, CLAUDE.md lines and the spec check, full verification and the validation contract
 
 ### Phase 6: Calls & Status
 
