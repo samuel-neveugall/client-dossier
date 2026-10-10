@@ -1,1 +1,11 @@
+diff --git a/sources/transcripts/2026-10-01_kickoff.txt b/sources/transcripts/2026-10-01_kickoff.txt
+index b855b7b..1b839d1 100644
+--- a/sources/transcripts/2026-10-01_kickoff.txt
++++ b/sources/transcripts/2026-10-01_kickoff.txt
+@@ -1,4 +1,4 @@
+ @00:05 Jane Doe: Thanks for joining the kickoff call.
+-@00:12 Jane Doe: We need the reprot by 2026-10-20.
++@00:12 Jane Doe: We need the report by 2026-10-20.
+ @00:31 Consultant: Understood, I will send a first draft before then.
+ @00:47 Jane Doe: Perfect, let us talk again next week.
 # untracked files:

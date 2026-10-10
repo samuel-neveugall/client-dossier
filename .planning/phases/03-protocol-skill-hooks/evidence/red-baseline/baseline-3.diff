@@ -1,13 +1,11 @@
-diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
-index fd81a20..18a2ec6 100644
---- a/dossier/HISTORY.md
-+++ b/dossier/HISTORY.md
-@@ -7,6 +7,7 @@ Last updated: 2026-10-10
- ## Chronology
- 
- <!-- - Example: Jane Doe (Acme) asks for the deliverable by 2026-10-01 (call @12:34). -->
-+- 2026-10-01: Jane Doe asks for the report by 2026-10-20 (kickoff call @00:12; the transcript misspells "report" as "reprot", source left unmodified).
- 
- ## Commitments in progress
- 
+diff --git a/sources/transcripts/2026-10-01_kickoff.txt b/sources/transcripts/2026-10-01_kickoff.txt
+index b855b7b..1b839d1 100644
+--- a/sources/transcripts/2026-10-01_kickoff.txt
++++ b/sources/transcripts/2026-10-01_kickoff.txt
+@@ -1,4 +1,4 @@
+ @00:05 Jane Doe: Thanks for joining the kickoff call.
+-@00:12 Jane Doe: We need the reprot by 2026-10-20.
++@00:12 Jane Doe: We need the report by 2026-10-20.
+ @00:31 Consultant: Understood, I will send a first draft before then.
+ @00:47 Jane Doe: Perfect, let us talk again next week.
 # untracked files:
