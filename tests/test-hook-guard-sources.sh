@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # tests/test-hook-guard-sources.sh — PROTO-05 as amended by D-03 and D-04, and
 # the PROTO-08 root rule for hooks: hooks/guard-sources.py is a PreToolUse
-# guard that denies every write under the nearest dossier's sources/ (new
-# files included, D-03) through the Write family of tools, and heuristically
+# guard that denies every write under the sources/ of ANY ancestor directory
+# holding a dossier.yaml, nested dossiers included (new files included, D-03) through the Write family of tools, and heuristically
 # denies the Bash commands that visibly modify an existing file there (D-04).
 # The hook is fed stdin JSON the way Claude Code feeds it; no model involved.
 #
@@ -294,6 +294,114 @@ bash_ok 'an interpreter one-liner' "python3 -c \"open('sources/x','w')\""
 bash_ok 'a shlex error' "echo 'unbalanced"
 mkdir -p "$plain/sources"
 bash_ok 'rm -rf sources outside any dossier' 'rm -rf sources' "$plain"
+
+# --- Case 6: fix round 2 (NF-1 .. NF-6), every reproduced fail-open path ---
+S=sources/transcripts/2026-10-01_kickoff.txt
+
+echo '--- Bash: backslash-newline continues the command (NF-1) ---'
+bash_deny 'rm with the operand on the next line' $'rm \\\n  '"$S"
+bash_deny 'sed -i with the file on the next line' $'sed -i s/a/b/ \\\n  '"$S"
+bash_deny 'cp onto a source, operand on the next line' $'cp x \\\n  '"$S"
+bash_deny 'cd, continuation, then rm' $'cd \\\n sources/transcripts && rm 2026-10-01_kickoff.txt'
+bash_deny 'continuation after a lone apostrophe' "echo it's; rm "$'\\\n  '"$S"
+bash_deny 'a trailing backslash on the last line' "rm $S \\"
+bash_deny 'a comment ends at its newline, backslash or not' $'true # c \\\nrm '"$S"
+bash_ok 'a continuation does not hide a NEW file' $'cp x \\\n  sources/received/2026-10-10_new.txt'
+bash_ok 'rm in a single-quoted continuation is text' $'echo \'keep \\\n rm '"$S'"
+bash_ok 'rm in a trailing comment is text' "echo hi # rm $S"
+
+echo '--- Bash: a heredoc fed to a shell is code (NF-2) ---'
+bash_deny 'bash <<EOF' $'bash <<EOF\nrm '"$S"$'\nEOF'
+bash_deny "sh <<'EOF'" $'sh <<\'EOF\'\nrm '"$S"$'\nEOF'
+bash_deny 'bash -s <<EOF with sed -i' $'bash -s <<EOF\nsed -i s/a/b/ '"$S"$'\nEOF'
+bash_deny 'sudo bash <<EOF' $'sudo bash <<EOF\nrm '"$S"$'\nEOF'
+bash_deny "cat <<'EOF' | bash" $'cat <<\'EOF\' | bash\nrm '"$S"$'\nEOF'
+bash_deny 'source /dev/stdin <<EOF' $'source /dev/stdin <<EOF\nrm '"$S"$'\nEOF'
+bash_deny 'command substitution in an unquoted heredoc' $'cat <<EOF\n$(rm '"$S"$')\nEOF'
+bash_deny 'backticks in an unquoted heredoc' $'cat <<EOF\n`rm '"$S"$'`\nEOF'
+bash_ok 'command substitution in a quoted heredoc is text' $'cat <<\'EOF\'\n$(rm '"$S"$')\nEOF'
+bash_ok 'a harmless bash heredoc' $'bash <<EOF\necho hi\nEOF'
+bash_ok 'a heredoc body for python stays text' $'python3 - <<\'PY\'\nrm '"$S"$'\nPY'
+
+echo '--- Bash: a << that is not a heredoc hides nothing (NF-3) ---'
+bash_deny 'a shift in $(( ))' $'echo $((1<<X))\nrm '"$S"$'\nX'
+bash_deny 'a << inside [[ ]]' $'[[ a<<b ]]\nrm '"$S"$'\nb'
+bash_deny 'a << after a comment mark' $'echo hi # <<EOF\nrm '"$S"$'\nEOF'
+bash_deny 'a << inside (( ))' $'((x = 1<<EOF))\nrm '"$S"$'\nEOF'
+bash_deny 'an apostrophe in double quotes does not cancel a real heredoc' \
+  $'echo "it\'s"; cat <<EOF >/dev/null\nbody\nEOF\nrm '"$S"
+bash_ok 'a real heredoc after double quotes with an apostrophe' \
+  $'echo "it\'s"; cat <<EOF >/dev/null\nrm '"$S"$'\nEOF'
+
+echo '--- Bash: copy onto a source through a sources/ symlink (NF-4) ---'
+bash_deny 'cp onto a source via a sources/ symlink' "cp x $S" "$e"
+bash_deny 'mv onto a source via a sources/ symlink' "mv x $S" "$e"
+bash_deny 'install onto a source via a sources/ symlink' "install x $S" "$e"
+bash_deny 'rsync onto a source via a sources/ symlink' "rsync x $S" "$e"
+bash_deny 'cp into a directory already holding that name, via the symlink' \
+  'cp 2026-10-01_kickoff.txt sources/transcripts/' "$e"
+bash_ok 'cp a NEW file via a sources/ symlink' 'cp x sources/received/2026-10-10_new.txt' "$e"
+bash_ok 'cp into a directory via the symlink, name not taken' 'cp new.pdf sources/received/' "$e"
+bash_ok 'a file_source.py style call, new file via the symlink' \
+  'python3 /p/file_source.py in.pdf sources/received/2026-10-10_in.pdf' "$e"
+bash_ok 'curl -o a new file via the symlink' 'curl -o sources/received/2026-10-10_dl.pdf https://example.org' "$e"
+
+echo '--- Bash: an unknown working directory still judges the operand (NF-5) ---'
+bash_deny 'cd - then a root-relative rm' "cd - ; rm $S"
+bash_deny 'cd $X then a root-relative rm' "cd \$X; rm $S"
+bash_deny 'cd "$(pwd)" then a root-relative rm' "cd \"\$(pwd)\"; rm $S"
+bash_deny 'cd - back to the last known directory' \
+  'cd sources/transcripts; cd -; rm 2026-10-01_kickoff.txt'
+bash_deny 'cd $X after a known cd, relative to the last known one' \
+  'cd sources/transcripts; cd $X; rm 2026-10-01_kickoff.txt'
+bash_deny 'popd, then the last known directory' \
+  'cd sources/transcripts; popd; rm 2026-10-01_kickoff.txt'
+bash_deny 'function keyword, no parentheses' "function f { rm $S; }"
+bash_deny 'function keyword with parentheses' "function f() { rm $S; }"
+bash_ok 'an unknown directory and a file that does not exist' 'cd "$(pwd)"; rm notes.txt'
+bash_ok 'an unknown directory, a NEW file copied in' 'cd $X; cp x sources/received/2026-10-10_new.txt'
+
+echo '--- Bash: linear cost on pathological commands, never a timeout (NF-6) ---'
+PERF_OUT="$(python3 - "$(hooks_dir)/guard-sources.py" "$b" <<'PY'
+import json, subprocess, sys, time
+guard, cwd = sys.argv[1], sys.argv[2]
+MB = 1024 * 1024
+S = "sources/transcripts/2026-10-01_kickoff.txt"
+shapes = [
+    ("one 1 MB word", "echo " + "a" * MB, False),
+    ("unbalanced quote then separators", "echo 'x; " + "a;" * (MB // 2), False),
+    ("unbalanced quote, one segment", "echo 'x " + "a" * MB, False),
+    ("many heredoc operators, no terminator", "cat <<E\n" * (MB // 8), False),
+    ("many heredoc operators on one line", "cat <<E " * (MB // 8), False),
+    ("<<a repeated on one line", "<<a" * (MB // 3), False),
+    ("heredoc operators and a million terminators", "<<a" * 64 + "\n" + "a\n" * (MB // 2), False),
+    ("an apostrophe on every line", "echo it's fine\n" * (MB // 15), False),
+    ("a million open parentheses", "(" * (MB // 2), False),
+    ("a huge command that still ends in a deny", "echo a;" * (MB // 14) + "rm " + S, True),
+    ("a deny first, then a huge tail", "rm " + S + "; " + "echo a;" * (MB // 7), True),
+]
+bad = 0
+for name, command, want_deny in shapes:
+    stdin = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd})
+    start = time.time()
+    try:
+        proc = subprocess.run([sys.executable, guard], input=stdin, capture_output=True,
+                              text=True, timeout=10)
+        status, out = proc.returncode, proc.stdout
+    except subprocess.TimeoutExpired:
+        status, out = "timeout", ""
+    took = time.time() - start
+    denied = '"deny"' in out
+    ok = status == 0 and took < 4 and denied == want_deny
+    bad += 0 if ok else 1
+    print("%s %s: %.2fs status=%s denied=%s" % ("ok  " if ok else "FAIL", name, took, status, denied))
+sys.exit(1 if bad else 0)
+PY
+)"
+PERF_STATUS=$?
+printf '%s\n' "$PERF_OUT"
+assert_eq 0 "$PERF_STATUS" 'every 1 MB command is judged in under 4 s, exit 0'
+
 
 rm -rf "$b"
 
