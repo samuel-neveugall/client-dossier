@@ -38,7 +38,10 @@ cannot dispatch that agent and does the reviewer's job itself.
    order of the file, whatever the dossier's language. No finding when that section is empty.
    Severity minor.
 9. The category `header`: `Status:` must be `draft`; any other value is a blocker.
-10. Rank the findings by severity, blocker then major then minor, most severe first. Quote the
+10. If a human reordered or renamed the headings, so that rules 4, 5 or 8 point at the wrong
+    section, take the heading whose title means the same; if there is none, say so under
+    Informational and give no finding for that rule.
+11. Rank the findings by severity, blocker then major then minor, most severe first. Quote the
     draft's words exactly; never rewrite the draft and never propose a full new version: a fix
     is the smallest change that removes the finding.
 

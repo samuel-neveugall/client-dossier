@@ -205,6 +205,31 @@ case "$OUTSIDE" in
 esac
 assert_eq '0' "$(grep -cE '^(Bash|Write|Edit)' "$AGENT" 2>/dev/null)" 'no stray tool declarations'
 
+# --- Heading positions (05-CONTEXT discretion, T-05-18) ---
+# The block finds its sources by the position of a `## ` heading, never by its
+# translated text. skills/dossier-init/templates/<lang>/TONE.md and DOCTRINE.md must hold
+# them in both template languages (en and fr), and the
+# heading counts are pinned so that a added heading cannot shift one silently.
+T_DIR="$REPO_ROOT/skills/dossier-init/templates"
+nth_heading() { awk -v n="$2" '/^## /{c++; if (c==n) print}' "$1" 2>/dev/null; }
+count_headings() { grep -c '^## ' "$1" 2>/dev/null; }
+for lang in en fr; do
+  assert_eq '6' "$(count_headings "$T_DIR/$lang/TONE.md")" "$lang TONE.md has exactly six ## headings"
+  assert_eq '3' "$(count_headings "$T_DIR/$lang/DOCTRINE.md")" "$lang DOCTRINE.md has exactly three ## headings"
+done
+assert_eq '## Structure of a long document' "$(nth_heading "$T_DIR/en/TONE.md" 4)" 'en TONE.md: the fourth heading is the long document structure'
+assert_eq '## Structure of a short message' "$(nth_heading "$T_DIR/en/TONE.md" 5)" 'en TONE.md: the fifth heading is the short message structure'
+assert_eq '## Refused' "$(nth_heading "$T_DIR/en/TONE.md" 6)" 'en TONE.md: the sixth heading is the Refused log'
+assert_eq '## What we never say' "$(nth_heading "$T_DIR/en/DOCTRINE.md" 2)" 'en DOCTRINE.md: the second heading is the forbidden claims'
+assert_eq "## Structure d'un document long" "$(nth_heading "$T_DIR/fr/TONE.md" 4)" 'fr TONE.md: the fourth heading is the long document structure'
+assert_eq "## Structure d'un message court" "$(nth_heading "$T_DIR/fr/TONE.md" 5)" 'fr TONE.md: the fifth heading is the short message structure'
+assert_eq '## Refusé' "$(nth_heading "$T_DIR/fr/TONE.md" 6)" 'fr TONE.md: the sixth heading is the Refused log'
+assert_eq "## Ce qu'on ne dit pas" "$(nth_heading "$T_DIR/fr/DOCTRINE.md" 2)" 'fr DOCTRINE.md: the second heading is the forbidden claims'
+# The reordering fallback: a human may have reordered or renamed the headings.
+block_has 'If a human reordered or renamed the headings' 'fallback: headings reordered or renamed'
+block_has 'whose title means the same' 'fallback: find the heading by meaning'
+block_has 'if there is none, say so under Informational' 'fallback: say so when no heading matches'
+
 # --- Parity with the skill (DRAFT-05, T-05-19): once the skill exists ---
 if [ -f "$SKILL_MD" ]; then
   assert_eq '1' "$(grep -cF -- "$START" "$SKILL_MD" 2>/dev/null)" 'SKILL.md: the start marker occurs once'
