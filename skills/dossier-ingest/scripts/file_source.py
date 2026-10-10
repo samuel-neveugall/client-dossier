@@ -17,6 +17,15 @@ are denied there by hooks/guard-sources.py, so filing is this script's job.
 Usage:
     file_source.py --kind received|transcript|raw [--date YYYY-MM-DD]
                    [--slug TEXT] PATH
+    file_source.py fetch URL
+
+The filing form copies a local file into sources/. The fetch form (D-02)
+downloads a URL as-is (no cookies, no authentication, no proxy) into a
+staging folder OUTSIDE the dossier and prints where; the skill reads the
+staged file, then files it with the filing form, because the content date and
+the kind are only known once the bytes have been read. Residual risk named by
+the plan (T-04-14): DNS can change between the address check and the
+connection; the user's explicit URL and the manual-download route remain.
 
 Every path prints exactly one ASCII-only JSON object on stdout and exits
 0 (filed), 1 (refused or failed), 2 (no dossier.yaml upward, as lint.py) or
@@ -28,13 +37,19 @@ Python 3 standard library only, targeting Python >= 3.8.
 import argparse
 import datetime
 import hashlib
+import ipaddress
 import json
 import os
 import shutil
+import socket
 import stat
 import sys
 import tempfile
+import time
 import unicodedata
+import urllib.error
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 CONFIG_NAME = "dossier.yaml"
@@ -53,6 +68,29 @@ KIND_DIRS = {
 }
 
 CHUNK = 1 << 16
+
+# D-02 / T-04-06: bounds on a download.
+MAX_REDIRECTS = 5
+FETCH_TIMEOUT_SECONDS = 30
+FETCH_DEADLINE_SECONDS = 120
+FETCH_MAX_BYTES = 100 * 1024 * 1024
+USER_AGENT = "client-dossier"
+DOWNLOAD_HINT = "Download it manually and re-run on the local file."
+
+# A fixed table, never `mimetypes`: the extension must not depend on the
+# machine, and the Content-Disposition header is not read at all.
+EXT_BY_TYPE = {
+    "application/pdf": ".pdf",
+    "text/plain": ".txt",
+    "text/html": ".html",
+    "application/json": ".json",
+    "text/vtt": ".vtt",
+    "application/x-subrip": ".srt",
+    "message/rfc822": ".eml",
+    "text/markdown": ".md",
+    "text/csv": ".csv",
+}
+
 # GitHub refuses a file above 100 MiB; the result carries a warning above this.
 LARGE_FILE_WARNING_BYTES = 100 * 1024 * 1024
 SLUG_MAX = 60
@@ -186,9 +224,9 @@ def require_root():
     return root
 
 
-def make_stage(root):
+def make_stage(root, prefix="client-dossier-file-"):
     """A fresh staging directory that must resolve outside the dossier."""
-    stage = tempfile.mkdtemp(prefix="client-dossier-file-")
+    stage = tempfile.mkdtemp(prefix=prefix)
     if inside(os.path.realpath(stage), os.path.realpath(root)):
         shutil.rmtree(stage, ignore_errors=True)
         raise Refusal(
@@ -330,6 +368,196 @@ def run_file(argv):
     )
 
 
+class Unresolvable(Exception):
+    """The host name does not resolve to any address."""
+
+
+def download_refusal(code, message):
+    return Refusal(code, message, hint=DOWNLOAD_HINT)
+
+
+def is_public(host):
+    """True when every address HOST resolves to is globally routable.
+
+    Loopback, link-local (169.254.169.254 included), RFC 1918, CGNAT and
+    IPv4-mapped or 6to4-embedded private addresses are refused (T-04-01).
+    """
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except (socket.gaierror, UnicodeError):
+        raise Unresolvable(host)
+    addrs = set(info[4][0].split("%")[0] for info in infos)
+    if not addrs:
+        raise Unresolvable(host)
+    for text in addrs:
+        addr = ipaddress.ip_address(text)
+        embedded = getattr(addr, "ipv4_mapped", None) or getattr(addr, "sixtofour", None)
+        if embedded is not None:
+            addr = embedded
+        if not addr.is_global:
+            return False
+    return True
+
+
+def check_url(url):
+    """Raise a download Refusal unless URL is a safe http(s) target."""
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host = parts.hostname
+        parts.port  # validates the port
+    except ValueError:
+        raise download_refusal("bad_url", "the URL is malformed")
+    if parts.scheme not in ("http", "https"):
+        raise download_refusal("bad_url", "only http and https URLs are downloaded")
+    if "@" in parts.netloc:
+        raise download_refusal(
+            "bad_url", "a URL carrying credentials is refused (no authentication, D-02)"
+        )
+    if not host:
+        raise download_refusal("bad_url", "the URL has no host")
+    try:
+        public = is_public(host)
+    except Unresolvable:
+        raise download_refusal("unresolvable", "the host name does not resolve")
+    if not public:
+        raise download_refusal("not_public", "the host is not a public internet address")
+
+
+class SafeRedirect(urllib.request.HTTPRedirectHandler):
+    """Re-checks every hop with check_url and bounds the chain (T-04-03)."""
+
+    max_redirections = MAX_REDIRECTS
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        try:
+            check_url(newurl)
+        except Refusal as refusal:
+            raise urllib.error.HTTPError(
+                newurl, code, "redirect refused: " + refusal.message, headers, fp
+            )
+        return urllib.request.HTTPRedirectHandler.redirect_request(
+            self, req, fp, code, msg, headers, newurl
+        )
+
+
+def make_opener():
+    """An explicit opener: no proxy, file, ftp, data or unknown-scheme handler."""
+    opener = urllib.request.OpenerDirector()
+    for handler in (
+        urllib.request.HTTPHandler(),
+        urllib.request.HTTPSHandler(),
+        urllib.request.HTTPDefaultErrorHandler(),
+        SafeRedirect(),
+        urllib.request.HTTPErrorProcessor(),
+    ):
+        opener.add_handler(handler)
+    return opener
+
+
+def build_fetch_parser():
+    parser = _Parser(
+        description="Download a URL as-is into a staging folder (mechanics tier).",
+        add_help=False,
+        allow_abbrev=False,
+    )
+    parser.add_argument("url")
+    return parser
+
+
+def download(url, stage):
+    """Stream URL into STAGE; return (path, ext, size, digest, final_host, slug)."""
+    request = urllib.request.Request(
+        url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "identity"}
+    )
+    try:
+        response = make_opener().open(request, timeout=FETCH_TIMEOUT_SECONDS)
+    except urllib.error.HTTPError as exc:
+        exc.close()
+        if 300 <= exc.code < 400:
+            raise download_refusal(
+                "redirect_refused",
+                "a redirect was refused (non-public target, unsupported scheme "
+                "or more than {} hops)".format(MAX_REDIRECTS),
+            )
+        raise download_refusal("http_{}".format(exc.code), "the server answered HTTP {}".format(exc.code))
+    except urllib.error.URLError as exc:
+        if isinstance(exc.reason, socket.timeout):
+            raise download_refusal("timeout", "the server did not answer in time")
+        raise download_refusal("network", "could not reach the server")
+
+    part = os.path.join(stage, "download.part")
+    digest = hashlib.sha256()
+    total = 0
+    try:
+        declared = response.headers.get("Content-Length")
+        if declared and declared.isdigit() and int(declared) > FETCH_MAX_BYTES:
+            raise download_refusal("too_large", "the download exceeds {} bytes".format(FETCH_MAX_BYTES))
+        read = getattr(response, "read1", response.read)
+        deadline = time.monotonic() + FETCH_DEADLINE_SECONDS
+        with open(part, "xb") as out:
+            while True:
+                chunk = read(CHUNK)
+                if not chunk:
+                    break
+                total += len(chunk)
+                if total > FETCH_MAX_BYTES:
+                    raise download_refusal(
+                        "too_large", "the download exceeds {} bytes".format(FETCH_MAX_BYTES)
+                    )
+                if time.monotonic() > deadline:
+                    raise download_refusal("timeout", "the download took too long")
+                out.write(chunk)
+                digest.update(chunk)
+        final_url = response.geturl()
+        ctype = (response.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+    except Refusal:
+        raise
+    except socket.timeout:
+        raise download_refusal("timeout", "the server stopped answering")
+    except OSError:
+        raise download_refusal("network", "the connection failed during the download")
+    except Exception as exc:
+        if type(exc).__module__ == "http.client":
+            raise download_refusal("network", "the connection failed during the download")
+        raise
+    finally:
+        response.close()
+
+    final = urllib.parse.urlsplit(final_url)
+    segment = urllib.parse.unquote(final.path.rstrip("/").rsplit("/", 1)[-1])
+    ext = EXT_BY_TYPE.get(ctype) or extension_of(segment) or ".bin"
+    slug = slugify(os.path.splitext(segment)[0])
+    path = os.path.join(stage, slug + ext)
+    os.rename(part, path)
+    return path, ext, total, digest.hexdigest(), final.hostname or "", slug
+
+
+def run_fetch(argv):
+    args = build_fetch_parser().parse_args(argv)
+    root = require_root()
+    stage = make_stage(os.path.realpath(root), "client-dossier-fetch-")
+    kept = False
+    try:
+        check_url(args.url)
+        path, ext, size, digest, host, slug = download(args.url, stage)
+        kept = True
+    finally:
+        if not kept:
+            shutil.rmtree(stage, ignore_errors=True)
+    return (
+        {
+            "status": "fetched",
+            "path": path,
+            "ext": ext,
+            "bytes": size,
+            "sha256": digest,
+            "final_url_host": host,
+            "suggested_slug": slug,
+        },
+        EXIT_OK,
+    )
+
+
 def emit(result):
     sys.stdout.write(json.dumps(result, ensure_ascii=True) + "\n")
     sys.stdout.flush()
@@ -338,7 +566,10 @@ def emit(result):
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
     try:
-        result, code = run_file(argv)
+        if argv[:1] == ["fetch"]:
+            result, code = run_fetch(argv[1:])
+        else:
+            result, code = run_file(argv)
     except Refusal as refusal:
         result, code = refusal.result(), refusal.status
     except Exception as exc:  # never a traceback: the agent reads one JSON object
