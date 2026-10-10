@@ -44,7 +44,7 @@ has_line_with() { # FIXED_STRING LABEL
 }
 has_line_with 'file_source.py fetch' 'the fetch line'
 has_line_with 'file_source.py --kind' 'the filing line'
-has_line_with 'extract-text.sh "' 'the extraction line'
+has_line_with "extract-text.sh '" 'the extraction line'
 if printf '%s\n' "$BASH_LINES" | grep -qxF 'test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh'; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -55,7 +55,7 @@ assert_eq '0' "$(printf '%s\n' "$BASH_LINES" | grep -c '\\$' | tr -d ' ')" 'no b
 
 LINE_FETCH="$(printf '%s\n' "$BASH_LINES" | grep -F 'file_source.py fetch' | head -1)"
 LINE_FILE="$(printf '%s\n' "$BASH_LINES" | grep -F 'file_source.py --kind' | head -1)"
-LINE_EXTRACT="$(printf '%s\n' "$BASH_LINES" | grep -F 'extract-text.sh "' | head -1)"
+LINE_EXTRACT="$(printf '%s\n' "$BASH_LINES" | grep -F "extract-text.sh '" | head -1)"
 LINE_CP="$(printf '%s\n' "$BASH_LINES" | grep -F 'cp -n' | head -1)"
 LINE_PDFTOTEXT="$(printf '%s\n' "$BASH_LINES" | grep -F 'pdftotext -enc UTF-8' | head -1)"
 
@@ -65,7 +65,7 @@ LINE_PDFTOTEXT="$(printf '%s\n' "$BASH_LINES" | grep -F 'pdftotext -enc UTF-8' |
 # ${CLAUDE_PLUGIN_ROOT} by the absolute skill folder and repository root.
 subst() {
   python3 -c '
-import shlex, sys
+import os, shlex, sys
 m = {
     "url": "http://127.0.0.1:9/brochure.pdf",
     "kind": "transcript",
@@ -73,9 +73,12 @@ m = {
     "slug": "kickoff-call",
     "path": "incoming/Call transcript.txt",
     "filed pdf": "sources/received/2026-10-02_price-list.pdf",
+    "abs_path": os.environ.get("SUBST_ROOT", ".") + "/sources/received/2026-10-02_price-list.pdf",
+    "root": os.environ.get("SUBST_ROOT", "."),
+    "stage": "/tmp/client-dossier-fetch-x",
     "folder": "transcripts",
     "ext": ".txt",
-    "txt": "sources/received/2026-10-02_price-list.txt",
+    "txt": os.environ.get("SUBST_ROOT", ".") + "/sources/received/2026-10-02_price-list.txt",
 }
 absolute = False
 for a in sys.argv[3:]:
@@ -102,6 +105,7 @@ assert_eq '' "$LEFTOVER" 'every placeholder of the skill is in the substitution 
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 d="$WORK/dossier"
+export SUBST_ROOT="$d"
 mkdir -p "$d"
 git init -q "$d"
 python3 "$(init_py)" --target "$d" --language en \
@@ -157,14 +161,14 @@ $BASH_LINES
 EOF
 # The extraction line also works from the folder of the PDF, with the file name only.
 guard_silent 'extract from sources/received with the file name only' "$d/sources/received" \
-  "$(printf '%s\n' "$LINE_EXTRACT" | subst --abs 'filed pdf=2026-10-02_price-list.pdf')"
+  "$(printf '%s\n' "$LINE_EXTRACT" | subst --abs 'abs_path=2026-10-02_price-list.pdf')"
 
 # --- 2. Denied (D-03, D-04): the shortcuts the guard exists for ----------------
 echo '--- guard: the shortcuts stay denied ---'
 guard_denies 'line cp -n onto the existing brochure .txt' \
   "$(hook_json PreToolUse "$d" Bash command "$(printf '%s\n' "$LINE_CP" | subst folder=received YYYY-MM-DD=2026-10-01 slug=brochure ext=.txt)")"
 guard_denies 'line pdftotext redirected onto the existing brochure .txt' \
-  "$(hook_json PreToolUse "$d" Bash command "$(printf '%s\n' "$LINE_PDFTOTEXT" | subst 'txt=sources/received/2026-10-01_brochure.txt' 'filed pdf=sources/received/2026-10-01_brochure.pdf')")"
+  "$(hook_json PreToolUse "$d" Bash command "$(printf '%s\n' "$LINE_PDFTOTEXT" | subst "txt=$d/sources/received/2026-10-01_brochure.txt" 'filed pdf=sources/received/2026-10-01_brochure.pdf')")"
 guard_denies 'cp over the existing brochure PDF' \
   "$(hook_json PreToolUse "$d" Bash command 'cp "incoming/Call transcript.txt" sources/received/2026-10-01_brochure.pdf')"
 guard_denies 'Write tool on a new .txt under sources/' \
@@ -192,7 +196,7 @@ except Exception:
 }
 
 # The extraction line on a PDF whose .txt exists: the guard cannot see it, the script says exists:.
-run_line "$d" "$(printf '%s\n' "$LINE_EXTRACT" | subst --abs 'filed pdf=sources/received/2026-10-01_brochure.pdf')"
+run_line "$d" "$(printf '%s\n' "$LINE_EXTRACT" | subst --abs "abs_path=$d/sources/received/2026-10-01_brochure.pdf")"
 assert_eq 0 "$RUN_STATUS" 'extract on a PDF whose .txt exists: exit 0'
 case "$RUN_OUT" in
   exists:*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
@@ -240,6 +244,19 @@ run_line "$d" "$(printf '%s\n' "$LINE_FETCH" | subst --abs)"
 assert_eq 1 "$RUN_STATUS" 'fetch line on a loopback URL: exit 1'
 assert_eq 'not_public' "$(jget error)" 'fetch line on a loopback URL: not_public (no network reached)'
 
+# --- 4b. A4-F1: a hostile value is data inside single quotes, never executed ---
+echo '--- real run: $(...) in a URL, a path or a slug does not run ---'
+MARK="$WORK/MARK"
+run_line "$d" "$(printf '%s\n' "$LINE_FETCH" | subst --abs "url=http://127.0.0.1:9/\$(touch $MARK-url)")"
+assert_eq 1 "$RUN_STATUS" 'hostile URL: refused, not run'
+assert_file_absent() { if [ -e "$1" ]; then echo "FAIL: $2 ($1 exists)" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)); else TESTS_PASSED=$((TESTS_PASSED + 1)); fi; }
+assert_file_absent "$MARK-url" 'hostile URL: the command substitution did not run'
+run_line "$d" "$(printf '%s\n' "$LINE_FILE" | subst --abs "path=incoming/\$(touch $MARK-path).txt")"
+assert_file_absent "$MARK-path" 'hostile path: the command substitution did not run'
+run_line "$d" "$(printf '%s\n' "$LINE_FILE" | subst --abs "slug=\`touch $MARK-slug\`")"
+assert_file_absent "$MARK-slug" 'hostile slug: the backticks did not run'
+assert_eq 0 "$(printf '%s\n' "$BASH_LINES" | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line of the skill double-quotes a placeholder'
+
 # --- 5. pdftotext hidden from PATH (ROADMAP criterion 5) -----------------------
 echo '--- real run: pdftotext hidden from PATH ---'
 SHIM="$WORK/shim"
@@ -255,7 +272,7 @@ assert_eq 'filed' "$(jget status)" 'pdftotext hidden: the PDF is filed'
 FILED_OFFER="$(jget path)"
 assert_eq 'sources/received/2026-10-10_offer.pdf' "$FILED_OFFER" 'pdftotext hidden: filed under sources/received/'
 OFFER_SHA="$(sha "$d/$FILED_OFFER")"
-run_line "$d" "$(printf '%s\n' "$LINE_EXTRACT" | subst --abs "filed pdf=$FILED_OFFER")" "$SHIM"
+run_line "$d" "$(printf '%s\n' "$LINE_EXTRACT" | subst --abs "abs_path=$d/$FILED_OFFER")" "$SHIM"
 assert_eq 69 "$RUN_STATUS" 'pdftotext hidden: the extraction line exits 69'
 case "$RUN_ERR" in
   *'brew install poppler'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;

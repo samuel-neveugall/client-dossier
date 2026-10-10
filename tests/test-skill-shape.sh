@@ -37,6 +37,16 @@ else
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 
+# --- R4-M4: no skill carries allowed-tools (a Skill call that needs approval never loads headless) ---
+for skill_file in "$REPO_ROOT"/skills/*/SKILL.md; do
+  if grep -qE '^allowed-tools:' "$skill_file"; then
+    echo "FAIL: $(basename "$(dirname "$skill_file")") carries allowed-tools in its frontmatter (R4-M4)" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+  else
+    TESTS_PASSED=$((TESTS_PASSED + 1))
+  fi
+done
+
 # --- Bundled-resource reference pattern (never a repository-relative path) ---
 SKILL_DIR_COUNT=$(grep -c 'CLAUDE_SKILL_DIR' "$SKILL_MD")
 if [ "$SKILL_DIR_COUNT" -ge 2 ]; then
