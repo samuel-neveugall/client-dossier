@@ -128,7 +128,7 @@ producer and consumer are aligned in one move):
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
 **Plans**: 9/9 plans complete (3 gap-closure plans added after the 2026-09-25 UAT, executed
-and re-verified the same day on branch `feat/phase-02-gap-closure`; awaiting Samuel's recette)
+and re-verified the same day on branch `feat/phase-02-gap-closure`; recette and sign-off 2026-10-10)
 
 Plans:
 **Wave 1**
