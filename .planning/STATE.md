@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: ingest-fact-extraction
-status: ready_to_plan
-stopped_at: Completed 03-04-PLAN.md (03-02 still blocked at baseline gate, RED 0/3)
+status: executed_verification_human_needed
+stopped_at: Completed 04-05-PLAN.md (Phase 4 executed; verifier human_needed on fact-extractor dispatch)
 last_updated: "2026-10-10T18:25:13.246Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 03 verified and UAT complete
+last_activity_desc: Phase 04 executed (5/5 plans), verifier human_needed
 state_head: 8868bd0e6b49f5424a3dbb24b67cfd6a1fa7f57b
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 26
-  completed_plans: 21
-  percent: 43
+  completed_plans: 26
+  percent: 57
 ---
 
 # Project State
@@ -25,18 +25,17 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 04 — Ingest & Fact Extraction (ready to plan)
+**Current focus:** Phase 04 — Ingest & Fact Extraction (executed; verification human_needed)
 
 ## Current Position
 
-Phase: 04 (ingest-fact-extraction) — READY TO EXECUTE
-Status: Phase 3 closed 2026-10-10: `03-VERIFICATION.md` passed 6/6 (1 override, the D-04 class, D-17);
-`03-UAT.md` complete (agent-run: GREEN 3/3 replay twice, plugin+AGENTS.md 3/3, real `claude -p`
-sessions for the 3 hooks, run.sh 11/0, plugin validate exit 0). Branch
-`feat/phase-03-protocol-skill-hooks` merges into `main` (--no-ff) and is pushed by the manager.
-Last activity: 2026-10-10 — Phase 3 verification + recette
+Phase: 04 (ingest-fact-extraction) — EXECUTED, awaiting verification sign-off
+Status: 5/5 plans done 2026-10-10 (RED baseline 3/3, GREEN plugin 3/3 transcript + 1/1 PDF, paid cost 0.783 USD of 2).
+`04-VERIFICATION.md`: human_needed (4/5) because the `fact-extractor` subagent was never dispatched live
+(inline extraction used each run; allowed by D-12 / spec section 6). `tests/run.sh` 17 files, 0 failed.
+Last activity: 2026-10-10 — Phase 4 execution
 
-Progress: [████░░░░░░] 43%
+Progress: [██████░░░░] 57%
 
 ## Performance Metrics
 
