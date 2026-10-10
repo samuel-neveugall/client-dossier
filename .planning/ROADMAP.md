@@ -259,7 +259,29 @@ never touches sources, updates before handoff)
   5. With `pdftotext` absent from PATH, the PDF is still filed and the skill reports the
      extraction as skipped with an install hint; the skill text contains the inline
      extraction procedure for a harness without subagents.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 04-01-PLAN.md — tracer: the skill's filing command through the real guard into sources/
+  (file_source.py), then sha256 dedup, no overwrite, refusals, and the URL fetch with its SSRF
+  guard-rails (D-01, D-02, D-04, D-06, D-07, D-14)
+- [ ] 04-02-PLAN.md — the ingest-transcript scenario harness proven against a fake claude, and the
+  paid RED baseline without the plugin, before the skill (D-10, D-12, D-13; 03 D-15 branch planned)
+- [ ] 04-03-PLAN.md — extract-text.sh in the skill folder: page markers, no overwrite, scan and
+  missing-pdftotext exits with the install hint (D-05, D-15)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-04-PLAN.md — the read-only fact-extractor agent, the dossier-ingest skill with its inline
+  procedure and the dossier pointer (one commit, after the baseline), and the skill's own commands
+  through the real guard (D-03, D-08, D-09, D-11)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 04-05-PLAN.md — spec and CLAUDE.md amendments, the paid GREEN run 3/3 with dossier-ingest
+  invoked, full verification and the validation contract
 
 ### Phase 5: Drafting & Doctrine Review
 

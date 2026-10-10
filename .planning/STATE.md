@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
 current_phase: 04
-current_phase_name: Ingest & Fact Extraction
+current_phase_name: ingest-fact-extraction
 status: ready_to_plan
 stopped_at: Completed 03-04-PLAN.md (03-02 still blocked at baseline gate, RED 0/3)
-last_updated: "2026-10-10T13:13:58.245Z"
+last_updated: "2026-10-10T18:25:13.246Z"
 last_activity: 2026-10-10
 last_activity_desc: Phase 03 verified and UAT complete
-state_head: d037cf0473fbbf25cf82e46cc85081e4895a4b93
+state_head: 8868bd0e6b49f5424a3dbb24b67cfd6a1fa7f57b
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 21
+  total_plans: 26
   completed_plans: 21
-  percent: 57
+  percent: 43
 ---
 
 # Project State
@@ -29,14 +29,14 @@ human and a doctrine check.
 
 ## Current Position
 
-Phase: 04 (Ingest & Fact Extraction) — ready to plan
+Phase: 04 (ingest-fact-extraction) — READY TO EXECUTE
 Status: Phase 3 closed 2026-10-10: `03-VERIFICATION.md` passed 6/6 (1 override, the D-04 class, D-17);
 `03-UAT.md` complete (agent-run: GREEN 3/3 replay twice, plugin+AGENTS.md 3/3, real `claude -p`
 sessions for the 3 hooks, run.sh 11/0, plugin validate exit 0). Branch
 `feat/phase-03-protocol-skill-hooks` merges into `main` (--no-ff) and is pushed by the manager.
 Last activity: 2026-10-10 — Phase 3 verification + recette
 
-Progress: [██████░░░░] 57%
+Progress: [████░░░░░░] 43%
 
 ## Performance Metrics
 
