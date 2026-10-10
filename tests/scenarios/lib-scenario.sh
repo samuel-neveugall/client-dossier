@@ -340,6 +340,11 @@ scrub_check() {
       echo "scrub_check: $f contains the git user email" >&2
       rc=1
     fi
+    # Warning only (A/R-F6): a home path is not a secret, and the existing
+    # evidence already holds some; it never fails the check.
+    if grep -qE -- '/Users/|\$HOME' "$f"; then
+      echo "scrub_check: warning: $f holds a home path (/Users/ or \$HOME)" >&2
+    fi
   done
   return "$rc"
 }

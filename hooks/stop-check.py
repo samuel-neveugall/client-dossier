@@ -66,7 +66,7 @@ def git_output(root, args):
     """
     try:
         result = subprocess.run(
-            ["git", "--no-optional-locks", "-C", root] + args,
+            ["git", "--no-optional-locks", "-c", "core.fsmonitor=false", "-C", root] + args,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=GIT_TIMEOUT,
