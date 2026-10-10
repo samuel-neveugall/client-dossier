@@ -206,6 +206,17 @@ run_case pointer-only FAKE_MODE=refuse
 assert_eq 0 "$CASE_STATUS" 'pointer-only + refuse: exit 0 (informational)'
 assert_eq INCOMPLETE "$(col 3)" 'pointer-only + refuse: verdict INCOMPLETE'
 
+# --- Case 9b: plugin-pointer (plugin + AGENTS.md) is informational, keeps AGENTS.md ---
+run_case plugin-pointer FAKE_MODE=refuse
+assert_eq 0 "$CASE_STATUS" 'plugin-pointer + refuse: exit 0 (informational)'
+assert_eq INCOMPLETE "$(col 3)" 'plugin-pointer + refuse: verdict INCOMPLETE'
+assert_eq yes "$(col 4)" 'plugin-pointer: AGENTS.md kept'
+run_case plugin-pointer FAKE_MODE=file
+assert_eq GREEN "$(col 3)" 'plugin-pointer + file: verdict GREEN'
+assert_eq yes "$(col 8)" 'plugin-pointer + file: skill invoked recorded'
+run_case plugin-pointer FAKE_MODE=file FAKE_NOSKILL=1
+assert_eq 2 "$CASE_STATUS" 'plugin-pointer + NOSKILL: exit 2 (D-12)'
+
 # --- Case 10: a flag missing from --help is caught by the preflight ---
 run_case plugin FAKE_MODE=file FAKE_HELP_MISSING=--permission-prompts
 assert_eq 2 "$CASE_STATUS" 'missing --permission-prompts in --help: exit 2'
