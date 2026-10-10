@@ -205,7 +205,30 @@ PROTO-08
      correction instead (GREEN).
   6. Invoked from a subfolder of a dossier, a skill finds the nearest `dossier.yaml` upward;
      invoked outside any dossier, every skill except `dossier-init` stops with a message.
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — tracer: the sources guard end to end (hooks.json → guard-sources.py →
+  deny), Write family (D-03) then the heuristic Bash guard (D-04), with the hook test helpers and
+  the config test
+- [ ] 03-02-PLAN.md — the headless scenario harness proven against a fake claude, the provisional
+  AGENTS.md removal (P-01), and the RED baseline recorded without the plugin, before the skill
+- [ ] 03-03-PLAN.md — spec, PROJECT, ROADMAP and REQUIREMENTS amendments for D-01, D-03, D-04,
+  D-07, D-09; `.gsd/` ignored
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-04-PLAN.md — the SessionStart reminder, the block-once Stop check (D-01, D-02) and the
+  provisional dossier-status sentence (P-02)
+- [ ] 03-05-PLAN.md — the `dossier` entry skill (triggering, nearest dossier, protocol body,
+  language rule, pointers to existing skills only)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 03-06-PLAN.md — CLAUDE.md and STATE.md amendments with the validate command observed, the
+  GREEN run with the plugin (3/3), full verification and the finalized validation contract
 
 ### Phase 4: Ingest & Fact Extraction
 
