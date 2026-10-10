@@ -143,27 +143,20 @@ mission, now validated by the phase's own delivery:
 
 ### Pending Todos
 
-- **Phase 2 recette (gap closure)** — `/gsd-verify-work 02` re-runs UAT items 2 and 4 of
-  `02-UAT.md` on the corrected code, and decides whether three residuals stay tracked debt
-  (see Deferred Items). The three `human_verification` items are listed in `02-VERIFICATION.md`.
-- **Merge `feat/phase-02-gap-closure` into `main`** once the recette passes (no remote, so no
-  PR): `git checkout main && git merge --ff-only feat/phase-02-gap-closure`.
-- **Validate the planning assumptions** A-01…A-06 (`02-CONTEXT.md` § Assumptions) and Q-1…Q-6
-  (`02-01-PLAN.md`) at the end-of-phase recette; none of them blocks execution.
-- **Review two manager arbitrations** taken with Samuel offline: D-24 (typing strategy) and
-  D-28 (clean fixture generated, not committed). Both are reversible; D-28's reversal path is
-  written out in `02-01-PLAN.md`.
+- **Phase 3 planning** — mission `v1-phases-3-7` (2026-10-10) drives Phases 3-7 on per-phase
+  branches; Phase 3 plans await Samuel's answers on the scenario pointer (research Q1) and the
+  `dossier-status` sentence of the Stop hook (research Q2).
 
 ### Blockers/Concerns
 
-- **A freshly scaffolded dossier would fail its own linter** unless the README exemption is
-  implemented: the Phase 1 template `README-outbound.md` quotes the status header verbatim
-  (`Deadline: YYYY-MM-DD`, `sent <date time> by <name>`). Phase 2's acceptance criterion is
-  therefore "a scaffolded dossier lints with 0 errors AND 0 warnings" (plans 02-01, 02-06).
-- **Phase 3 planning must decide** whether the Stop hook ships in v1 (spec §11 #3), with
-  Samuel — not unilaterally.
-- `pdftotext` (poppler) is an external dependency of Phase 4 with a defined fallback; check
-  it is installed on the dev machine before Phase 4.
+- Phase 2 is merged into `main` (`6fbd08d`); its planning assumptions and the D-24/D-28
+  arbitrations were validated at the 2026-10-10 sign-off.
+- The Stop-hook question (spec §11 #3) is settled by `03-CONTEXT.md` D-01 (ships, block-once);
+  the spec, `CLAUDE.md` and PROJECT.md are amended during Phase 3.
+- `pdftotext` (poppler) is installed on the dev machine (`/opt/homebrew/bin/pdftotext`), checked
+  2026-10-10 for Phase 4.
+- `claude plugin validate . --strict` fails on a pre-existing warning about the root `CLAUDE.md`;
+  without `--strict` it passes. `CLAUDE.md`'s command line is stale; fix in Phase 3 or 7.
 
 ## Deferred Items
 

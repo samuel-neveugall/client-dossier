@@ -1,0 +1,342 @@
+{
+  "nodes": [
+    {
+      "id": "decide-3",
+      "step": "Samuel: Q1 AGENTS.md scenario, Q2 dossier-status pointer",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "plan-3",
+      "step": "plan phase 3 (validation, patterns, planner, checker)",
+      "stage": "",
+      "deps": [
+        "decide-3"
+      ],
+      "scope": [
+        ".planning/phases/03-protocol-skill-hooks/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-3",
+      "step": "execute phase 3",
+      "stage": "",
+      "deps": [
+        "plan-3"
+      ],
+      "scope": [
+        "skills/dossier/",
+        "hooks/",
+        "tests/",
+        "docs/",
+        "CLAUDE.md",
+        ".planning/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-3",
+      "step": "code review phase 3",
+      "stage": "",
+      "deps": [
+        "exec-3"
+      ],
+      "scope": [
+        "skills/dossier/",
+        "hooks/",
+        "tests/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "audit-3",
+      "step": "security audit phase 3 (guards fail-open)",
+      "stage": "",
+      "deps": [
+        "exec-3"
+      ],
+      "scope": [
+        "hooks/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "verify-3",
+      "step": "goal verification phase 3",
+      "stage": "",
+      "deps": [
+        "revue-3",
+        "audit-3"
+      ],
+      "scope": [
+        ".planning/phases/03-protocol-skill-hooks/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "uat-3",
+      "step": "agent-run UAT + scenario phase 3",
+      "stage": "",
+      "deps": [
+        "verify-3"
+      ],
+      "scope": [
+        ".planning/phases/03-protocol-skill-hooks/"
+      ],
+      "status": "blocked"
+    },
+    {
+      "id": "discuss-4",
+      "step": "cadrage phase 4 with Samuel",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "plan-4",
+      "step": "plan phase 4",
+      "stage": "",
+      "deps": [
+        "discuss-4",
+        "uat-3"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-4",
+      "step": "execute phase 4",
+      "stage": "",
+      "deps": [
+        "plan-4",
+        "uat-3"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-4",
+      "step": "code review phase 4",
+      "stage": "",
+      "deps": [
+        "exec-4"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verify-4",
+      "step": "goal verification phase 4",
+      "stage": "",
+      "deps": [
+        "revue-4"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "uat-4",
+      "step": "agent-run UAT phase 4",
+      "stage": "",
+      "deps": [
+        "verify-4"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "discuss-5",
+      "step": "cadrage phase 5 with Samuel",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "plan-5",
+      "step": "plan phase 5",
+      "stage": "",
+      "deps": [
+        "discuss-5",
+        "uat-4"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-5",
+      "step": "execute phase 5",
+      "stage": "",
+      "deps": [
+        "plan-5",
+        "uat-4"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-5",
+      "step": "code review phase 5",
+      "stage": "",
+      "deps": [
+        "exec-5"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verify-5",
+      "step": "goal verification phase 5",
+      "stage": "",
+      "deps": [
+        "revue-5"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "uat-5",
+      "step": "agent-run UAT phase 5",
+      "stage": "",
+      "deps": [
+        "verify-5"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "discuss-6",
+      "step": "cadrage phase 6 with Samuel",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "plan-6",
+      "step": "plan phase 6",
+      "stage": "",
+      "deps": [
+        "discuss-6",
+        "uat-5"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-6",
+      "step": "execute phase 6",
+      "stage": "",
+      "deps": [
+        "plan-6",
+        "uat-5"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-6",
+      "step": "code review phase 6",
+      "stage": "",
+      "deps": [
+        "exec-6"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verify-6",
+      "step": "goal verification phase 6",
+      "stage": "",
+      "deps": [
+        "revue-6"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "uat-6",
+      "step": "agent-run UAT phase 6",
+      "stage": "",
+      "deps": [
+        "verify-6"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "discuss-7",
+      "step": "cadrage phase 7 with Samuel",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "plan-7",
+      "step": "plan phase 7",
+      "stage": "",
+      "deps": [
+        "discuss-7",
+        "uat-6"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "exec-7",
+      "step": "execute phase 7",
+      "stage": "",
+      "deps": [
+        "plan-7",
+        "uat-6"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "revue-7",
+      "step": "code review phase 7",
+      "stage": "",
+      "deps": [
+        "exec-7"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "verify-7",
+      "step": "goal verification phase 7",
+      "stage": "",
+      "deps": [
+        "revue-7"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "uat-7",
+      "step": "agent-run UAT phase 7",
+      "stage": "",
+      "deps": [
+        "verify-7"
+      ],
+      "scope": [],
+      "status": "blocked"
+    },
+    {
+      "id": "docs",
+      "step": "hygiène documentaire",
+      "stage": "",
+      "deps": [
+        "uat-7"
+      ],
+      "scope": [],
+      "status": "blocked"
+    }
+  ]
+}
