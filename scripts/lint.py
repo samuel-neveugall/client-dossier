@@ -28,6 +28,7 @@ import argparse
 import bisect
 import datetime
 import difflib
+import html
 import json
 import os
 import re
@@ -111,13 +112,23 @@ BINARY_EXTS = frozenset((
     ".odt", ".pptx", ".xlsx",
 ))
 
-# Never descended into (D-03's other half: sub-dossiers are pruned too).
+# Never descended into (D-03's other half: sub-dossiers are pruned too). A
+# name in here is silently pruned only outside the fixed layout; inside it,
+# walk_tree still never descends into it but records its path instead of
+# dropping it, so it can be reported rather than pruned in silence
+# (D-GAP-3, G-02-4e).
 PRUNED_DIRS = frozenset((".git",))
 
 # The fixed-layout folders (spec Sec3.2). No sub-dossier can legitimately
 # live in one of them or below, so a dossier.yaml there is never a D-03
-# boundary: pruning on it would hide the folder from every check (WR-03).
+# boundary: pruning on it would hide the folder from every check (WR-03). A
+# folder spelt as a case variant of one of these names, or of an
+# OUTBOUND_SUBS name directly under outbound/, is ERROR [E1] at the folder
+# (D-GAP-2, CR-01, G-02-4a): on a case-insensitive filesystem it is the same
+# folder the agent writes to, and its files would otherwise meet no check
+# at all.
 LAYOUT_DIRS = frozenset(("sources", LIVING_DIR, "outbound", "knowledge"))
+_LAYOUT_DIRS_FOLDED = frozenset(d.casefold() for d in LAYOUT_DIRS)
 
 # The agent folder (D-14, spec Sec4.4 check 7). Allowed at exactly
 # `<root>/.claude` and nowhere below it: a second one under the dossier means
@@ -222,8 +233,59 @@ GATE_KEYS = frozenset(("confidential_names", "consent_recorded", "consent_source
 
 # How close an unknown key must be to a gate key to be read as a misspelling
 # of it (difflib ratio, WR-01). `confidental_names` scores 0.97; every other
-# key of spec Sec3.2 (and name/role/contacts) scores under 0.5.
+# key of spec Sec3.2 (and name/role/contacts) scores under 0.5. A near-miss
+# is C1 only while the gate key it resembles is absent from the top level
+# (D-22, D-GAP-1, 2026-09-25 UAT G-02-2): a legitimate extension key such as
+# `consent_scope` or `confidential_notes` sitting beside the exact gate key
+# is a different, known key, and is ignored -- not every near-miss is an
+# error. Exception (gap closure option (a), arbitrage Samuel, relayed by the
+# main session via SendMessage, 2026-09-25): a `confidential_names` near-miss
+# that is itself a probable typo -- see CONFIDENTIAL_NAMES_TYPO_CUTOFF below
+# -- stays C1 even while the exact key is present, because leaking the
+# confidential names it lists is the one failure this gate exists to
+# prevent. consent_recorded and consent_source keep the presence exemption
+# unconditionally.
 GATE_KEY_CUTOFF = 0.8
+
+# How a `confidential_names` near-miss earns the exception above: its OSA
+# (Optimal String Alignment) distance to "confidential_names" -- Levenshtein
+# plus a single adjacent-transposition edit -- must be <= this cutoff.
+# Plain Levenshtein cannot separate a typo from a legitimate different key:
+# `confidentail_names` (transposed "ai"/"ia") and `confidential_notes` (a
+# real, different key from the gate-key-extras fixture) are BOTH Levenshtein
+# distance 2 from `confidential_names` -- two substitutions either way.
+# Scoring the transposition as one edit instead of two separates them
+# cleanly: `confidentail_names` becomes OSA distance 1 (a typo), while
+# `confidential_notes` stays at OSA distance 2 (o/t vs a/m, no beneficial
+# transposition) and keeps its presence exemption, same as
+# `non_confidential_names` (OSA distance 4). Cutoff 1 is therefore "one
+# keystroke away downstream of _fold_key" -- a single substitution,
+# insertion, deletion, or adjacent swap.
+CONFIDENTIAL_NAMES_TYPO_CUTOFF = 1
+
+# Gap closure CR-02 bis (arbitrage Samuel, relayed by the main session via
+# SendMessage, 2026-09-25): CONFIDENTIAL_NAMES_TYPO_CUTOFF alone lets a
+# double typo in the LAST `_`-separated word through, because it costs two
+# edits against the full key while still obviously meaning "name(s)" --
+# `confidential_nam` (missing "es") and `confidental_name` (missing "i" in
+# "confidential" AND the trailing "s" of "names") both score OSA distance 2
+# against "confidential_names", the same distance as the legitimate
+# `confidential_notes`. The two are told apart by looking at the last word
+# alone: `confidential_notes`' last word is "notes" (OSA 2 from "names", OSA
+# 3 from "name"), while "nam" and "name" are each OSA <= 1 from "name" or
+# "names". So a near-miss also stays C1 when its whole-key OSA distance is
+# <= this looser cutoff AND its last `_`-separated word is within
+# CONFIDENTIAL_NAMES_WORD_CUTOFF of "name" or "names" -- see
+# _forces_c1_despite_presence().
+CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD = 2
+
+# Checked against BOTH "name" and "names" (not "names" alone), because a
+# key's last word may itself be missing the trailing "s": `confidential_nam`
+# has last word "nam", OSA distance 2 from "names" (insert "e", insert "s")
+# but only 1 from "name" (insert "e"). Reading "within 1 of names" alone
+# would miss it and let it through unflagged, which is not what Samuel's
+# arbitrage asks for.
+CONFIDENTIAL_NAMES_WORD_CUTOFF = 1
 
 # Which key an UNREADABLE line belongs to, used to word the C1 message.
 # Looser than _KEY_RE on purpose: it accepts a quoted key and no space after
@@ -511,17 +573,112 @@ def _fold_key(text):
 
 
 def gate_key_for(key):
-    """The gate key KEY spells, exactly or nearly, else None (WR-01).
+    """The gate key KEY spells, exactly or nearly, else None.
 
     Nearly: after _fold_key (`Confidential-Names`), or within
     GATE_KEY_CUTOFF of one (`confidental_names`). A key that is not the
     exact spelling is never READ as the gate -- the caller reports it.
+    `_skipped_key()` uses this to word an unreadable line's message; that
+    line is C1 whatever the wording (D-FIX-8). `_misplaced_gate_keys()`
+    applies its own presence rule on top of this call (D-22, D-GAP-1): a
+    near-miss is reported only while the exact gate key is absent.
     """
     folded = _fold_key(key)
     if folded in GATE_KEYS:
         return folded
     close = difflib.get_close_matches(folded, sorted(GATE_KEYS), n=1, cutoff=GATE_KEY_CUTOFF)
     return close[0] if close else None
+
+
+def _certain_gate_key_for(key):
+    """The gate key KEY certainly spells: equal to it after _fold_key, else None.
+
+    A case, hyphen or space variant of a gate key (`Confidential-Names`,
+    `confidential-names`) always means that gate key, whatever else is
+    present in the config (D-GAP-1) -- unlike a difflib-only near-miss,
+    which `gate_key_for()` also returns but which `_misplaced_gate_keys()`
+    reports only while the exact gate key is absent.
+    """
+    folded = _fold_key(key)
+    return folded if folded in GATE_KEYS else None
+
+
+def _osa_distance(a, b):
+    """Optimal String Alignment distance between A and B: Levenshtein plus a
+    single adjacent-transposition edit, stdlib-only DP (no import beyond
+    what the module already uses). Each character participates in at most
+    one transposition -- the "restricted" variant, simpler than full
+    Damerau-Levenshtein and sufficient for scoring a one-keystroke typo.
+    """
+    m, n = len(a), len(b)
+    d = [[0] * (n + 1) for _ in range(m + 1)]
+    for i in range(m + 1):
+        d[i][0] = i
+    for j in range(n + 1):
+        d[0][j] = j
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            cost = 0 if a[i - 1] == b[j - 1] else 1
+            d[i][j] = min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
+            if i > 1 and j > 1 and a[i - 1] == b[j - 2] and a[i - 2] == b[j - 1]:
+                d[i][j] = min(d[i][j], d[i - 2][j - 2] + 1)
+    return d[m][n]
+
+
+def _forces_c1_despite_presence(key, near):
+    """True when a `confidential_names` near-miss stays C1 even though the
+    exact gate key is present in `raw` (gap closure option (a), arbitrage
+    Samuel, relayed by the main session via SendMessage, 2026-09-25; refined
+    CR-02 bis, same arbitrage channel, same date, option (2)).
+
+    Only near-misses of `confidential_names` are ever forced; `consent_
+    recorded` and `consent_source` near-misses keep the unconditional
+    presence exemption from D-22 (a legitimate extension key beside the
+    exact gate key stays silent). A `confidential_names` near-miss is forced
+    when, on the folded key:
+
+    - its whole-key OSA distance to "confidential_names" is <=
+      CONFIDENTIAL_NAMES_TYPO_CUTOFF (a single-keystroke typo anywhere in
+      the key, `confidentail_names`, `confidentialnames`), OR
+    - its whole-key OSA distance is <= CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD
+      AND its last `_`-separated word is within CONFIDENTIAL_NAMES_WORD_
+      CUTOFF of "name" OR "names" (a double typo concentrated in the word
+      that says what the key holds, `confidental_name`, `confidential_nam`).
+
+    The first clause alone is kept (not folded into the second) because it
+    is what still catches `confidentialnames`, which has no `_` and so no
+    last word to test.
+
+    The second clause checks "name" as well as "names" because a key's last
+    word may itself be missing the plural: `confidential_nam` has last word
+    "nam", OSA distance 2 from "names" but only 1 from "name" -- "within 1
+    of names" alone would miss it. Checking both is what separates a typo of
+    "name(s)" from a different, legitimate word: `confidential_notes`' last
+    word "notes" is OSA distance 2 from "names" and 3 from "name", so it
+    stays outside the word cutoff and keeps its presence exemption, same as
+    `non_confidential_names` (whole-key OSA distance 4, outside even the
+    looser cutoff).
+
+    Residual limit (documented, not fixed here): a double typo INSIDE the
+    last word that still lands within 2 keystrokes of "name"/"names" only
+    by chance is not specifically hunted beyond this rule -- e.g.
+    `confidential_nmes` (transposed "am"/"ma", OSA 1 from "names") is
+    actually still caught by the first clause; a harder case such as a
+    last word two-or-more keystrokes from both "name" and "names" is, by
+    design, read as a different key and ignored, per 02-CONTEXT.md.
+    """
+    if near != "confidential_names":
+        return False
+    folded = _fold_key(key)
+    whole = _osa_distance(folded, near)
+    if whole <= CONFIDENTIAL_NAMES_TYPO_CUTOFF:
+        return True
+    if whole <= CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD:
+        last_word = folded.rsplit("_", 1)[-1]
+        if (_osa_distance(last_word, "name") <= CONFIDENTIAL_NAMES_WORD_CUTOFF
+                or _osa_distance(last_word, "names") <= CONFIDENTIAL_NAMES_WORD_CUTOFF):
+            return True
+    return False
 
 
 def _skipped_key(body, owner):
@@ -793,13 +950,34 @@ def _schema_counterparts(value, findings):
 
 
 def _misplaced_gate_keys(raw, findings):
-    """C1 for every key that spells a gate key without being it (WR-01).
+    """C1 for every key that certainly spells a gate key without being it,
+    or that only resembles one while the exact key is absent (D-22, D-GAP-1,
+    2026-09-25 UAT G-02-2).
 
-    A misspelt top-level key (`confidential-names`, `Confidential_names`,
-    `confidental_names`) and a gate key nested anywhere below the top level
-    (a counterparts entry, a mapping) are both keys D-22 would otherwise
-    ignore in silence, with E5 off. Returns True when one was found, so the
-    caller keeps the leak check armed.
+    The presence rule applies at every depth (top level and, through
+    visit(), any nesting below it). Let G be the gate key a key resembles:
+
+    - A key equal to G after _fold_key (case, `-`, space -- `confidential-
+      names`, `Confidential_names`) certainly means G, and is reported
+      whatever else is present in the config.
+    - A key that only difflib-resembles G (`confidental_names`) is reported
+      only while G is not itself a key of `raw`, the top-level mapping the
+      parser produced. When G is present, the near-miss is a different,
+      legitimate key (`consent_scope` beside `consent_source`) and D-22
+      ignores it -- at every depth, so a counterpart-level `confidential_
+      notes` beside a top-level `confidential_names` is silent too.
+    - Exception (gap closure option (a), 2026-09-25): a near-miss of
+      `confidential_names` specifically is reported even while the exact
+      key is present, when `_forces_c1_despite_presence()` judges it a
+      probable typo (OSA distance <= CONFIDENTIAL_NAMES_TYPO_CUTOFF) rather
+      than a legitimate different key such as `confidential_notes`.
+      `consent_recorded` and `consent_source` near-misses keep the
+      unconditional presence exemption.
+    - A key exactly equal to a gate key at the top level is never reported
+      (unchanged).
+
+    Returns True when at least one key was reported, so the caller keeps
+    `config["gate_damaged"]` -- and with it E5 -- armed exactly then.
     """
     found = False
 
@@ -807,12 +985,20 @@ def _misplaced_gate_keys(raw, findings):
         nonlocal found
         if isinstance(value, dict):
             for key, entry in value.items():
-                gate = gate_key_for(key)
-                if gate is not None:
+                certain = _certain_gate_key_for(key)
+                if certain is not None:
                     found = True
                     findings.append(Finding(CONFIG_NAME, _line_of(entry), ERROR, "C1",
                                             "{} is written under {}: it is read only at the top level, "
-                                            "the confidentiality gate fails closed".format(gate, where)))
+                                            "the confidentiality gate fails closed".format(certain, where)))
+                else:
+                    near = gate_key_for(key)
+                    if near is not None and (near not in raw or _forces_c1_despite_presence(key, near)):
+                        found = True
+                        findings.append(Finding(CONFIG_NAME, _line_of(entry), ERROR, "C1",
+                                                "'{}' at {} looks like a misspelling of {}, which is read "
+                                                "only at the top level: the confidentiality gate fails "
+                                                "closed until it is corrected".format(key, where, near)))
                 visit(entry, where + "." + key)
         elif isinstance(value, list):
             for entry in value:
@@ -820,12 +1006,17 @@ def _misplaced_gate_keys(raw, findings):
 
     for key, value in raw.items():
         if key not in GATE_KEYS:
-            gate = gate_key_for(key)
+            gate = _certain_gate_key_for(key)
+            if gate is None:
+                near = gate_key_for(key)
+                if near is not None and (near not in raw or _forces_c1_despite_presence(key, near)):
+                    gate = near
             if gate is not None:
                 found = True
                 findings.append(Finding(CONFIG_NAME, _line_of(value), ERROR, "C1",
-                                        "key '{}' is not {}: write the key exactly, "
-                                        "the confidentiality gate fails closed".format(key, gate)))
+                                        "key '{}' looks like a misspelling of {}: it is not read as the "
+                                        "gate, the confidentiality gate fails closed until it is "
+                                        "corrected".format(key, gate)))
         visit(value, key)
     return found
 
@@ -992,16 +1183,25 @@ class Tree:
     on an info line so a skipped subtree is never silent (WR-03).
     `symlinks` lists the directory symlinks the walk did not follow
     (T-02-03): an E1 error under outbound/, an info line elsewhere (WR-02).
+    `unreadable` lists the folders os.walk could not list at all (a
+    permission error from os.scandir): an E1 error under outbound/, an info
+    line elsewhere (D-GAP-3, G-02-4e) -- never dropped in silence, the same
+    treatment as a symlink. `git_dirs` lists the `.git` folders met inside
+    the fixed layout: still never descended into (walking a repository's
+    object store would otherwise bury the finding under one per object
+    file), but recorded and reported the same way as `unreadable`.
     """
 
-    __slots__ = ("files", "dirs", "file_set", "pruned", "symlinks")
+    __slots__ = ("files", "dirs", "file_set", "pruned", "symlinks", "unreadable", "git_dirs")
 
-    def __init__(self, files, dirs, pruned=(), symlinks=()):
+    def __init__(self, files, dirs, pruned=(), symlinks=(), unreadable=(), git_dirs=()):
         self.files = files
         self.dirs = dirs
         self.file_set = frozenset(files)
         self.pruned = list(pruned)
         self.symlinks = list(symlinks)
+        self.unreadable = list(unreadable)
+        self.git_dirs = list(git_dirs)
 
 
 def walk_tree(root):
@@ -1018,22 +1218,38 @@ def walk_tree(root):
     everywhere (LINT-01). A dossier.yaml inside the fixed layout (LAYOUT_DIRS)
     is not a boundary: that folder is walked as usual, and under outbound/
     the stray file meets the outbound checks like any other (WR-03).
+
+    A folder os.scandir cannot list raises inside os.walk; the `onerror`
+    callback records its path in `unreadable` instead of the default
+    (silent drop, D-GAP-3, G-02-4e) -- it was already listed as an entry of
+    its parent, so it still shows up in `dirs`, just with none of its own
+    children walked. `.git` is still never descended into anywhere, but a
+    `.git` met inside the fixed layout is recorded in `git_dirs` rather than
+    dropped in silence like one met outside it (D-GAP-3).
     """
     files = []
     dirs = []
     pruned = []
     symlinks = []
-    for dirpath, dirnames, filenames in os.walk(root, topdown=True):
+    unreadable = []
+    git_dirs = []
+
+    def _onerror(err):
+        unreadable.append(os.path.relpath(err.filename, root).replace(os.sep, "/"))
+
+    for dirpath, dirnames, filenames in os.walk(root, topdown=True, onerror=_onerror):
         dirnames.sort()
         filenames.sort()
         rel_dir = os.path.relpath(dirpath, root)
         prefix = "" if rel_dir == os.curdir else rel_dir.replace(os.sep, "/") + "/"
-        in_layout = prefix.split("/", 1)[0] in LAYOUT_DIRS
+        in_layout = prefix.split("/", 1)[0].casefold() in _LAYOUT_DIRS_FOLDED
         kept = []
         for name in dirnames:
             if name in PRUNED_DIRS:
+                if in_layout:
+                    git_dirs.append(prefix + name)
                 continue
-            if (not in_layout and not (prefix == "" and name in LAYOUT_DIRS)
+            if (not in_layout and not (prefix == "" and name.casefold() in _LAYOUT_DIRS_FOLDED)
                     and os.path.isfile(os.path.join(dirpath, name, CONFIG_NAME))):
                 pruned.append(prefix + name)
                 continue
@@ -1046,7 +1262,7 @@ def walk_tree(root):
         for name in filenames:
             if name != GITKEEP:
                 files.append(prefix + name)
-    return Tree(files, dirs, pruned, symlinks)
+    return Tree(files, dirs, pruned, symlinks, unreadable, git_dirs)
 
 
 def read_text_safe(path, follow_symlink=False):
@@ -1187,13 +1403,40 @@ def check_outbound_headers(root, tree, config, findings):
     Sec3.2); there is no per-format parser and no per-language label table.
     A symlinked folder under outbound/ (or outbound/ itself) is E1 too: the
     walk does not follow it (T-02-03), so none of E1-E5 reached its files,
-    and a leak check that did not run must not exit 0 (WR-02).
+    and a leak check that did not run must not exit 0 (WR-02). The same
+    rule covers a folder spelt as a case variant of a fixed layout name, or
+    of an OUTBOUND_SUBS name directly under outbound/ (D-GAP-2, CR-01,
+    G-02-4a): on a case-insensitive filesystem it is the very folder an
+    agent writes to, yet none of E1-E5 would otherwise read it. Two more
+    routes to the same failure (D-GAP-3, G-02-4e): a folder os.walk could
+    not list at all, and a `.git` folder met inside the fixed layout -- both
+    are never walked, so under outbound/ both are E1 too.
     """
     for rel in tree.symlinks:
         if _in_outbound(rel):
             findings.append(Finding(rel, 0, ERROR, "E1",
                                     "folder is a symlink, never followed: none of its files is checked "
                                     "(status header, name, confidential names); make it a real folder"))
+    for rel in tree.unreadable:
+        if _in_outbound(rel):
+            findings.append(Finding(rel, 0, ERROR, "E1",
+                                    "folder cannot be read: none of its files is checked (status header, "
+                                    "name, confidential names); fix its permissions"))
+    for rel in tree.git_dirs:
+        if _in_outbound(rel):
+            findings.append(Finding(rel, 0, ERROR, "E1",
+                                    "folder is a .git folder, never walked: none of its files is checked "
+                                    "(status header, name, confidential names); move it out of outbound/"))
+    for rel in tree.dirs:
+        parent, _, name = rel.rpartition("/")
+        expected = LAYOUT_DIRS if parent == "" else (OUTBOUND_SUBS if parent == OUTBOUND_DIR else ())
+        for fixed in sorted(expected):
+            if name != fixed and name.casefold() == fixed.casefold():
+                findings.append(Finding(rel, 0, ERROR, "E1",
+                                        "folder is spelt {} but the layout name is {}: none of its files "
+                                        "is checked (status header, name, confidential names); rename it "
+                                        "(git mv, in two steps on a case-insensitive filesystem)".format(
+                                            name, fixed)))
     for rel in outbound_files(tree):
         if not _is_header_target(rel):
             continue
@@ -1362,52 +1605,207 @@ def folded_text_pattern(needle):
     return re.compile(r"(?<![^\W_])(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
 
 
+# A quoted reply's markers, stripped from the START of every line only
+# (multiline mode) before the text is searched: optional leading spaces or
+# tabs, then one or more `>` each optionally followed by one space or tab,
+# which also strips a nested `> > ` in one pass. No `\n` is ever touched, so
+# the line contract e5_haystacks() promises still holds; no configured name
+# begins with `>`, so nothing is lost (D-GAP-4, G-02-4f, WR-04 of the
+# iteration-3 review).
+_QUOTE_STRIP_RE = re.compile(r"^[ \t]*(?:>[ \t]?)+", re.MULTILINE)
+
+
+def _decode_html_entities(text):
+    """TEXT with every HTML character reference decoded, line by line (D-GAP-5).
+
+    `html.unescape()` runs per line and the result is normalise()d again (a
+    reference can yield a decomposed accent or U+2019): a numeric reference
+    that would otherwise produce a `\\n` (`&#10;`) is turned into a space
+    instead, so the line contract e5_haystacks() promises still holds.
+    """
+    return "\n".join(normalise(html.unescape(line)).replace("\n", " ")
+                      for line in text.split("\n"))
+
+
+# Every Default_Ignorable_Code_Point (Unicode DerivedCoreProperties) -- the
+# characters a renderer draws as nothing. Most are category Cf; the ones that
+# are not (CGJ, the variation selectors, the Hangul fillers, the Mongolian
+# free variation selectors, two Khmer inherent vowels) hid a name from E5 all
+# the same (WR-01 of the Phase 2 re-verification, 2026-10-10). Hard-coded: the
+# standard library exposes the category, not this property.
+_DEFAULT_IGNORABLE_RE = re.compile(
+    "[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f"
+    "\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0\ufff0-\ufff8"
+    "\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0000-\U000e0fff]")
+
+
+def is_invisible(ch):
+    """True for a format character (category Cf) or any other default-ignorable code point."""
+    return unicodedata.category(ch) == "Cf" or _DEFAULT_IGNORABLE_RE.match(ch) is not None
+
+
+def format_readings(text):
+    """The one or two invisible-blind readings of TEXT (D-GAP-6, CR-02 of the iteration-3 review).
+
+    TEXT itself when it holds no invisible character (is_invisible(): a
+    format character of category Cf -- ZWSP, BOM, a soft hyphen, ZWNJ, the
+    word joiner, among others -- or any other default-ignorable code point,
+    such as a variation selector or CGJ, WR-01 of the re-verification).
+    Otherwise two strings, in this order: the deletion reading (every
+    invisible character removed -- what one sitting inside a single word
+    needs, `Ac<SHY>me` -> `Acme`) and the space reading (every invisible
+    character replaced by one space -- what one sitting between two words
+    needs, `Big<ZWSP>Telco` -> `Big Telco`). Either reading alone misses a
+    real case, so both are always returned together, without duplicates.
+    No invisible character is `\\n`, so neither reading adds or removes
+    one -- callers that need the line contract e5_haystacks() promises may
+    rely on that.
+    """
+    if not any(is_invisible(ch) for ch in text):
+        return [text]
+    deleted = "".join(ch for ch in text if not is_invisible(ch))
+    spaced = "".join(" " if is_invisible(ch) else ch for ch in text)
+    return [deleted, spaced] if deleted != spaced else [deleted]
+
+
+def e5_haystacks(text):
+    """The ordered list of line-preserving haystacks E5 searches (D-GAP-4, D-GAP-5, D-GAP-6).
+
+    TEXT is a file's content, already normalise()d with `\\r\\n` and `\\r`
+    turned into `\\n`. Every string this returns has exactly as many `\\n`
+    as TEXT, and line k of every string comes from line k of TEXT, so a line
+    number computed on any of them from its own newline index is the file's
+    own line -- check_confidential_names() runs the exact and the folded
+    pass on each one, keeping one newline index per string.
+
+    Three stages, each built on the last:
+    1. A quoted reply's markers are stripped from the start of every line,
+       in place -- the stripped text replaces the base rather than joining
+       it as a second variant, since a leading `>` never appears inside a
+       name (D-GAP-4).
+    2. When decoding HTML character references (`&amp;`, `&#39;`, a named or
+       numeric reference) changes the already-stripped text, a decoded
+       variant is appended (D-GAP-5): `.html` is a sanctioned outbound
+       format, but `&amp;`-style text also reaches Markdown and mail drafts
+       pasted from a web page, so this applies to every outbound text file,
+       not only `.html`. The exact pass is what finds a name holding `&`,
+       since folded_text_pattern() deliberately refuses one.
+    3. Every string built so far is replaced, in place, by its
+       format_readings() (D-GAP-6): a soft hyphen, ZWSP, BOM, ZWNJ or word
+       joiner hides no name whichever way it is read, including one
+       decoded from an HTML reference by stage 2 (`&shy;`). Order is kept
+       and duplicates are dropped.
+    """
+    stripped = _QUOTE_STRIP_RE.sub("", text)
+    haystacks = [stripped]
+    decoded = _decode_html_entities(stripped)
+    if decoded != stripped:
+        haystacks.append(decoded)
+    result = []
+    for haystack in haystacks:
+        for reading in format_readings(haystack):
+            if reading not in result:
+                result.append(reading)
+    return result
+
+
+def _build_needle(name):
+    """One configured NAME -> (display, exact_patterns, name_pattern, folded_pattern), or
+    None when NAME is made only of format characters (D-GAP-6).
+
+    `display` is the last of format_readings() applied to the normalised
+    name, whitespace collapsed: the deletion reading when the name holds no
+    invisible character, otherwise the space reading -- what every E5 message and
+    the (line, name) de-duplication name the leak as. `exact_patterns` is
+    boundary_pattern() of every reading, distinct patterns only and
+    _NEVER_RE dropped, so the exact pass catches a format character read
+    either way (an embedded one needs the deletion reading, one between two
+    words needs the space reading). `name_pattern` and `folded_pattern` are
+    built from `display` alone: their separator classes already accept an
+    empty run between tokens, so the deletion reading is already covered.
+    """
+    readings = format_readings(normalise(name))
+    display = " ".join(readings[-1].split())
+    if not display:
+        return None
+    exact_patterns = []
+    seen_patterns = set()
+    for reading in readings:
+        pattern = boundary_pattern(reading)
+        if pattern is _NEVER_RE or pattern.pattern in seen_patterns:
+            continue
+        seen_patterns.add(pattern.pattern)
+        exact_patterns.append(pattern)
+    return display, exact_patterns, filename_pattern(display), folded_text_pattern(display)
+
+
 def check_confidential_names(root, tree, config, findings):
     """E5: a confidential name in the text or the filename of an outbound file.
 
     Suppressed only when consent is recorded AND sourced; a malformed
     consent_recorded reads as False in the schema, so the check stays armed
     (T-02-02). Both sides are NFC-normalised (P-05). The text half searches
-    the whole file, so a name wrapped across two lines is found, and reports
-    the line the match starts on, once per (line, name). It runs twice: the
-    exact pattern on the NFC text, then folded_text_pattern() on the text as
-    fold_ascii() spells it (WR-03). Folding never adds or removes a `\n`,
-    so a line number read off either string is the same line. The filename half
-    matches the slug spellings E4 allows (filename_pattern). A file that
-    will not decode, is symlinked or is oversized skips the text half only;
-    the filename half always runs (P-07). The message names the needle and
-    the location, never the surrounding sentence (T-02-09).
+    every string e5_haystacks() returns for the file (D-GAP-4, D-GAP-5,
+    D-GAP-6), so a name wrapped across two lines, wrapped again inside a
+    quoted reply, spelt with an HTML character reference, or carrying a
+    Unicode format character is found, and reports the line the match
+    starts on, once per (line, name) across every one of those strings.
+    Each is searched with every exact pattern _build_needle() built for the
+    name, then with folded_text_pattern() on it as fold_ascii() spells it
+    (WR-03). Neither stage of e5_haystacks() nor format_readings() adds or
+    removes a `\n`, so a line number read off any of them is the same line.
+    The filename half matches the slug spellings E4 allows
+    (filename_pattern), searched against every format_readings() of the
+    path below outbound/ too (D-GAP-6), at most one finding per (file,
+    name). A file that will not decode, is symlinked or is oversized skips
+    the text half only; the filename half always runs (P-07). The message
+    names the needle and the location, never the surrounding sentence
+    (T-02-09).
     """
     if consent_is_recorded(config) or not config["confidential_names"]:
         return
-    needles = [(name, boundary_pattern(name), filename_pattern(name), folded_text_pattern(name))
-               for name in config["confidential_names"]]
+    needles = [needle for needle in
+               (_build_needle(name) for name in config["confidential_names"])
+               if needle is not None]
     prefix_len = len(OUTBOUND_DIR) + 1
     for rel in outbound_files(tree):
         # No EXEMPT_PATHS skip here, on purpose: a leaked name is a leak wherever it sits.
-        path_name = fold_ascii(normalise(rel[prefix_len:]))
-        for name, _pattern, name_pattern, _folded in needles:
-            if name_pattern.search(path_name):
+        path_readings = []
+        for reading in format_readings(normalise(rel[prefix_len:])):
+            folded_reading = fold_ascii(reading)
+            if folded_reading not in path_readings:
+                path_readings.append(folded_reading)
+        for name, _exact_patterns, name_pattern, _folded_pattern in needles:
+            if any(name_pattern.search(path_reading) for path_reading in path_readings):
                 findings.append(Finding(rel, 0, ERROR, "E5",
                                         "confidential name '{}' in the file name under outbound/".format(name)))
         text = read_text_safe(os.path.join(root, *rel.split("/")))
         if text is None:
             continue
         norm = normalise(text).replace("\r\n", "\n").replace("\r", "\n")
-        haystacks = {False: norm}
-        newlines = {}
         seen = set()
-        for name, pattern, _name_pattern, folded_pattern in needles:
-            for folded, regex in ((False, pattern), (True, folded_pattern)):
-                if regex is _NEVER_RE:
+        for haystack in e5_haystacks(norm):
+            newline_idx = None
+            folded_haystack = None
+            folded_idx = None
+            for name, exact_patterns, _name_pattern, folded_pattern in needles:
+                if exact_patterns and newline_idx is None:
+                    newline_idx = [m.start() for m in re.finditer("\n", haystack)]
+                for regex in exact_patterns:
+                    for match in regex.finditer(haystack):
+                        number = bisect.bisect_right(newline_idx, match.start()) + 1
+                        if (number, name) in seen:
+                            continue
+                        seen.add((number, name))
+                        findings.append(Finding(rel, number, ERROR, "E5",
+                                                "confidential name '{}' under outbound/".format(name)))
+                if folded_pattern is _NEVER_RE:
                     continue
-                if folded not in haystacks:
-                    haystacks[True] = fold_ascii(norm)
-                haystack = haystacks[folded]
-                for match in regex.finditer(haystack):
-                    if folded not in newlines:
-                        newlines[folded] = [m.start() for m in re.finditer("\n", haystack)]
-                    number = bisect.bisect_right(newlines[folded], match.start()) + 1
+                if folded_haystack is None:
+                    folded_haystack = fold_ascii(haystack)
+                    folded_idx = [m.start() for m in re.finditer("\n", folded_haystack)]
+                for match in folded_pattern.finditer(folded_haystack):
+                    number = bisect.bisect_right(folded_idx, match.start()) + 1
                     if (number, name) in seen:
                         continue
                     seen.add((number, name))
@@ -1693,7 +2091,11 @@ def _run(start):
         "sub-dossier {}/ skipped: it holds its own {} (lint it separately)".format(rel, CONFIG_NAME)
         for rel in tree.pruned] + [
         "folder {}/ is a symlink, not followed: its files are not checked".format(rel)
-        for rel in tree.symlinks if not _in_outbound(rel)]
+        for rel in tree.symlinks if not _in_outbound(rel)] + [
+        "folder {}/ cannot be read: its files are not checked".format(rel)
+        for rel in tree.unreadable if not _in_outbound(rel)] + [
+        "folder {}/ is a .git folder, never walked: its files are not checked".format(rel)
+        for rel in tree.git_dirs if not _in_outbound(rel)]
     errors, _warnings = report(findings, infos)
     return EXIT_ERRORS if errors else EXIT_CLEAN
 

@@ -22,10 +22,34 @@ FIXTURES=""
 EMPTY=""
 READONLY=""
 GEN_TMP=""
+# Folders this file chmod 000s to exercise the unreadable-folder checks
+# (G-02-4e, T-02-28): newline-separated, appended to as each one is locked
+# -- never space-separated (IN-02 of the iteration-4 review): unquoted `for
+# _d in $LOCKED_DIRS` word-splits on any space in $TMPDIR or the fixture
+# parent too, unlocking fragments instead of the real path and leaving the
+# mode-000 folder (and the trap's rm -rf on it) behind. Restored here too,
+# not only right after the lint run that needed them locked, so a failed
+# assertion never leaves a mode-000 folder behind.
+LOCKED_DIRS=""
+
+# unlock_locked_dirs — chmod u+rwx every path recorded in LOCKED_DIRS, one
+# per line, read with IFS= so a path holding a space still comes back whole.
+unlock_locked_dirs() {
+  local _d
+  while IFS= read -r _d; do
+    [ -n "$_d" ] && chmod u+rwx "$_d" 2>/dev/null
+  done <<EOF
+$LOCKED_DIRS
+EOF
+  return 0
+}
+
 # The one cleanup for everything this file creates, the generator's parent
 # included: the generator installs no handler of its own, so a failed
-# assertion anywhere below still leaks nothing.
-trap 'rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
+# assertion anywhere below still leaks nothing. Unlocking runs first: rm -rf
+# on a mode-000 folder fails silently and leaks it.
+trap 'unlock_locked_dirs
+rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
 # fires and every other one stays silent.
@@ -421,10 +445,72 @@ for case_name in gate-key-dash gate-key-case gate-key-typo gate-key-space gate-n
   assert_out_line '^dossier\.yaml:[0-9]+: ERROR \[C1\] .*confidential_names' "$case_name: [C1] names the gate key"
   assert_no_finding C0 "$case_name: never a mere [C0] warning"
 done
+# A top-level near-miss, certain or difflib-only, is worded "looks like a misspelling of"
+# (D-22, G-02-2): the old wording invited a gate-weakening rename.
+for case_name in gate-key-dash gate-key-case gate-key-typo gate-json-key-case; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: a names line the schema cannot read as the gate exits 1"
+  assert_out_line 'ERROR \[C1\] .*looks like a misspelling of confidential_names' \
+    "$case_name: the [C1] message says it looks like a misspelling"
+done
+# A legitimate extension key beside the exact gate keys is ignored, not reported (D-22,
+# 2026-09-25 UAT test 2, G-02-2): consent_scope, confidential_notes and the rest of WR-01's
+# measured mappings, at top level and nested under a counterpart, lint clean.
+assert_lint "$FIXTURES/gate-key-extras" 0 'gate-key-extras: extension keys beside the exact gate keys exit 0'
+assert_clean 'gate-key-extras'
+assert_lint "$FIXTURES/gate-key-extras-leak" 1 'gate-key-extras-leak: the same config with a leak exits 1'
+assert_only E5 'gate-key-extras-leak: the extension keys neither fail the run nor switch [E5] off'
+# A confidential_names near-miss that is itself a probable typo stays C1 even beside the exact
+# gate key (gap closure option (a), arbitrage Samuel, relayed by the main session via
+# SendMessage, 2026-09-25, CR-02): unlike consent_recorded/consent_source near-misses, and
+# unlike a genuinely different key such as confidential_notes above (OSA distance 2, still
+# ignored), a one-edit-away typo of confidential_names is never silent. The exact key still
+# reads an empty list here (the typo line is where the name sits, and the schema never reads
+# it), so the leak stays undetected by [E5] itself -- the point is [C1] alone already fails
+# the run closed.
+for case_name in gate-key-beside-names-drop gate-key-beside-names-swap; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: a typo of confidential_names beside the exact key exits 1"
+  assert_out_line 'ERROR \[C1\] .*looks like a misspelling of confidential_names' \
+    "$case_name: [C1] names confidential_names even though it is present"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
+# A DOUBLE typo of confidential_names -- two edits from the exact key, the same whole-key OSA
+# distance as the legitimate confidential_notes in gate-key-extras above -- still stays C1
+# beside the exact key, because its LAST `_`-separated word ("name", "nam") is within one OSA
+# edit of "name" or "names" (CR-02 bis gap closure, arbitrage Samuel, relayed by the main
+# session via SendMessage, 2026-09-25, option (2)). confidentialnames (no `_` at all) stays C1
+# too, caught by the plain single-keystroke cutoff alone.
+for case_name in gate-key-beside-names-double gate-key-beside-names-double2 \
+  gate-key-beside-names-nounderscore; do
+  assert_lint "$FIXTURES/$case_name" 1 "$case_name: a double typo of confidential_names beside the exact key exits 1"
+  assert_out_line 'ERROR \[C1\] .*looks like a misspelling of confidential_names' \
+    "$case_name: [C1] names confidential_names even though it is present"
+  assert_no_finding C0 "$case_name: never a mere [C0] warning"
+done
+# confidential_notes beside the exact gate key stays outside the word-boundary rule above (its
+# last word "notes" is OSA distance 2 from "names" and 3 from "name", both over the cutoff) and
+# is already exercised clean by gate-key-extras above -- not duplicated here.
+# A JSON nested near-miss stays C1 while the exact gate key it resembles is absent from the
+# top level (D-22, D-GAP-1, G-02-2).
+assert_lint "$FIXTURES/gate-nested-typo" 1 'gate-nested-typo: a nested near-miss with the gate key absent exits 1'
+assert_out_line '^dossier\.yaml:0: ERROR \[C1\] .*confidential_names' 'gate-nested-typo: [C1] names the gate key'
+assert_no_finding C0 'gate-nested-typo: never a mere [C0] warning'
 assert_lint "$FIXTURES/gate-key-consent" 1 'gate-key-consent: a misspelt consent_recorded exits 1'
 assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' 'gate-key-consent: [C1] names consent_recorded'
 assert_finding E5 'gate-key-consent: the leak check stays armed'
 assert_no_finding C0 'gate-key-consent: never a mere [C0] warning'
+# A certain misspelling of consent_recorded beside a recorded, sourced consent still keeps
+# E5 armed (iteration-3 review WR-02): only gate_damaged explains it, since the exact
+# consent pair alone would suppress the leak check.
+assert_lint "$FIXTURES/gate-key-beside-consent" 1 'gate-key-beside-consent: exits 1'
+assert_out_line '^dossier\.yaml:[1-9][0-9]*: ERROR \[C1\] .*consent_recorded' \
+  'gate-key-beside-consent: [C1] names consent_recorded'
+assert_finding E5 'gate-key-beside-consent: the leak check stays armed'
+assert_no_finding C0 'gate-key-beside-consent: never a mere [C0] warning'
+# A gate key two levels below the top is still seen: the YAML subset cannot express that
+# depth, but the JSON branch's recursion must (iteration-3 review WR-02).
+assert_lint "$FIXTURES/gate-json-deep" 1 'gate-json-deep: exits 1'
+assert_out_line '^dossier\.yaml:0: ERROR \[C1\] .*confidential_names' 'gate-json-deep: [C1] names the gate key'
+assert_no_finding C0 'gate-json-deep: never a mere [C0] warning'
 assert_lint "$FIXTURES/gate-skip-armed" 1 'gate-skip-armed: an unreadable line beside a sourced consent exits 1'
 assert_finding C1 'gate-skip-armed: the unreadable line is a [C1]'
 assert_finding E5 'gate-skip-armed: and the leak check stays armed'
@@ -458,6 +544,78 @@ done
 assert_last_line '10 error(s), 0 warning(s)' 'linebreak-words: five names, each in a body and a filename'
 assert_lint "$FIXTURES/linebreak-yaml" 1 'linebreak-yaml: a U+2028 inside a quoted name still reads the line'
 assert_only E5 'linebreak-yaml: only [E5] fires, no [C0] or [C1] for a split line'
+# --- A Unicode format character (Cf) hides no name, hand-written, through init.py, or in the
+# body/path -- neither reading alone is enough (D-GAP-6, G-02-4b, CR-02 of the iteration-3
+# review and D-FIX-12 of its fix round) ---
+fny="$FIXTURES/format-name-yaml/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/format-name-yaml" 1 'format-name-yaml: five hand-written names, each carrying a format character, hide nothing'
+assert_only E5 'format-name-yaml: only [E5] fires'
+for pair in 'Acme Corp:Acme Corp today' 'Big Telco:Big Telco called' 'Nord Star:Nord Star joined' \
+  'Red Fox:Red Fox signed' 'Glo bex:Finally Globex agreed'; do
+  name="${pair%%:*}"
+  frag="${pair#*:}"
+  assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fny" "$frag"): ERROR \\[E5\\] .*'$name'" \
+    "format-name-yaml: '$name' is the space reading of the configured name"
+done
+assert_last_line '5 error(s), 0 warning(s)' 'format-name-yaml: one finding per name'
+fni="$FIXTURES/format-name-init/dossier.yaml"
+for ch in '\342\200\213' '\357\273\277' '\342\201\240' '\342\200\214' '\302\255'; do
+  assert_eq 0 "$(grep -c -F -- "$(printf "$ch")" "$fni")" \
+    "format-name-init: init.py writes no raw format character into dossier.yaml ($ch)"
+done
+# Every name whose two readings differ once whitespace is collapsed gets both
+# as separate list entries (CR-03 of the iteration-4 review): the space
+# reading (what a human reads back) and the deletion reading (the only one
+# an exact-pass-only name like Procter & Gamble or AT&T can ever match on).
+for name in 'Acme Corp' 'AcmeCorp' 'Big Telco' 'Nord Star' 'Red Fox' 'RedFox' \
+  'Glo bex' 'Globex' 'Pro cter & Gamble' 'Procter & Gamble' 'AT &T' 'AT&T'; do
+  assert_grep "\"$name\"" "$fni"
+done
+assert_lint "$FIXTURES/format-name-init" 1 'format-name-init: init.py -> lint.py round trip, every leak exits 1'
+assert_only E5 'format-name-init: only [E5] fires'
+fnirelance="$FIXTURES/format-name-init/outbound/mails/2026-09-17_relance.md"
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fnirelance" "We met Procter"): ERROR \\[E5\\] .*'Procter & Gamble'" \
+  'format-name-init: Procter & Gamble (the deletion reading -- the space reading never occurs in prose) is found'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fnirelance" "We met Procter"): ERROR \\[E5\\] .*'AT&T'" \
+  'format-name-init: AT&T (the deletion reading) is found'
+assert_last_line '14 error(s), 0 warning(s)' \
+  'format-name-init: five names each in a body line and a conforming slug (Globex/Glo bex match twice, once per reading, since the contiguous filename and body spelling admit both), plus Procter & Gamble and AT&T in the body only'
+fb="$FIXTURES/format-body/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/format-body" 1 'format-body: a format character embedded, between two words, or decoded from &shy; hides nothing'
+assert_only E5 'format-body: only [E5] fires'
+for marker in L1 L2 L3 L4 L5 L6 L7 L8; do
+  assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$fb" "$marker:"): ERROR \\[E5\\] " \
+    "format-body: $marker's format character hides nothing"
+done
+assert_out_line '^outbound/mails/archive/2026-09-17_ac.*me\.md:0: ERROR \[E5\] ' \
+  "format-body: the name surviving only in a path below E4's scope is still found"
+assert_last_line '9 error(s), 0 warning(s)' 'format-body: eight body lines plus one path, one finding each'
+# --- A Default_Ignorable_Code_Point outside category Cf (a variation selector, CGJ, a Hangul
+# filler) hides no name either, in the body, hand-written in the config, or through init.py
+# (WR-01 of the re-verification, 2026-10-10) ---
+ib="$FIXTURES/ignorable-body/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/ignorable-body" 1 'ignorable-body: a default-ignorable character inside a name hides nothing'
+assert_only E5 'ignorable-body: only [E5] fires'
+for marker in L1 L2 L3 L4 L5 L6 L7 L8; do
+  assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ib" "$marker:"): ERROR \\[E5\\] " \
+    "ignorable-body: $marker's default-ignorable character hides nothing"
+done
+assert_last_line '8 error(s), 0 warning(s)' 'ignorable-body: one finding per line'
+assert_lint "$FIXTURES/ignorable-name-yaml" 1 'ignorable-name-yaml: a default-ignorable character in a configured name hides nothing'
+assert_only E5 'ignorable-name-yaml: only [E5] fires'
+assert_last_line '2 error(s), 0 warning(s)' 'ignorable-name-yaml: one finding per name'
+ini="$FIXTURES/ignorable-name-init/dossier.yaml"
+for ch in '\315\217' '\357\270\217'; do
+  assert_eq 0 "$(grep -c -F -- "$(printf "$ch")" "$ini")" \
+    "ignorable-name-init: init.py writes no raw default-ignorable character into dossier.yaml ($ch)"
+done
+assert_grep '"Globex"' "$ini"
+assert_grep '"AT&T"' "$ini"
+assert_lint "$FIXTURES/ignorable-name-init" 1 'ignorable-name-init: init.py -> lint.py round trip, every leak exits 1'
+assert_only E5 'ignorable-name-init: only [E5] fires'
+iir="$FIXTURES/ignorable-name-init/outbound/mails/2026-09-17_relance.md"
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$iir" "We met Globex"): ERROR \\[E5\\] .*'AT&T'" \
+  'ignorable-name-init: AT&T (the deletion reading) is found'
 # --- E5 on multi-word names: slugs and whitespace variants (CR-03) ---
 assert_lint "$FIXTURES/e5-slug" 1 'e5-slug: big-telco in a conforming filename exits 1'
 assert_only E5 'e5-slug: only [E5] fires'
@@ -499,13 +657,41 @@ assert_clean 'e5-text-fold-boundary'
 assert_lint "$FIXTURES/e5-slug-boundary" 0 'e5-slug-boundary: bigtelcom, Bigger Telco and Big Telcom exit 0'
 assert_last_line '0 error(s), 0 warning(s)' 'e5-slug-boundary: a longer word is still not the name'
 ew="$FIXTURES/e5-wrapped/outbound/mails/2026-09-17_relance.md"
-assert_lint "$FIXTURES/e5-wrapped" 1 'e5-wrapped: a name split across two lines exits 1'
+assert_lint "$FIXTURES/e5-wrapped" 1 'e5-wrapped: a name split across two lines, or wrapped inside a quoted reply, exits 1'
 assert_only E5 'e5-wrapped: only [E5] fires'
 assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'people at Big'): ERROR \\[E5\\] " \
   'e5-wrapped: reported at the line the name starts on'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'we should meet Big'): ERROR \\[E5\\] " \
+  'e5-wrapped: a single "> " quote marker does not stop the match (D-GAP-4)'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'Earlier still: the Big'): ERROR \\[E5\\] " \
+  'e5-wrapped: a nested "> > " quote marker does not stop the match'
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$(line_of "$ew" 'Tightly quoted: Big'): ERROR \\[E5\\] " \
+  'e5-wrapped: a bare ">" with no space does not stop the match'
+assert_last_line '4 error(s), 0 warning(s)' 'e5-wrapped: the plain wrap plus the three quoted wraps'
 assert_lint "$FIXTURES/e5-spacing" 1 'e5-spacing: whitespace variants exit 1'
 assert_only E5 'e5-spacing: only [E5] fires'
 assert_last_line '3 error(s), 0 warning(s)' 'e5-spacing: two spaces, a no-break space and a tab all match'
+# --- HTML character references never hide a name (D-GAP-5, G-02-4c, CR-03 of the
+# iteration-3 review) ---
+he="$FIXTURES/e5-html-entities/outbound/deliverables/2026-09-17_proposal.html"
+he_mail="$FIXTURES/e5-html-entities/outbound/mails/2026-09-17_relance.md"
+assert_lint "$FIXTURES/e5-html-entities" 1 'e5-html-entities: named and numeric HTML references hide no name'
+assert_only E5 'e5-html-entities: only [E5] fires'
+he_a="$(line_of "$he" 'Prepared for Johnson')"
+he_b="$(line_of "$he" 'Soci')"
+he_c="$(line_of "$he" 'Dear Mr O')"
+he_mail_line="$(line_of "$he_mail" 'Pasted from the portal')"
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_a: ERROR \\[E5\\] .*'Johnson & Johnson'" \
+  'e5-html-entities: Johnson &amp; Johnson decodes to Johnson & Johnson'
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_a: ERROR \\[E5\\] .*'AT&T'" \
+  'e5-html-entities: AT&amp;T decodes to AT&T, same line as Johnson & Johnson'
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_b: ERROR \\[E5\\] .*'Soci" \
+  'e5-html-entities: the eacute and decimal 233 references both decode to Société Exemple'
+assert_out_line "^outbound/deliverables/2026-09-17_proposal\\.html:$he_c: ERROR \\[E5\\] .*O.Brien'" \
+  "e5-html-entities: the decimal 39 and rsquo references both decode to O'Brien"
+assert_out_line "^outbound/mails/2026-09-17_relance\\.md:$he_mail_line: ERROR \\[E5\\] .*'AT&T'" \
+  'e5-html-entities: a pasted amp reference in a Markdown mail decodes too (D-GAP-5)'
+assert_last_line '5 error(s), 0 warning(s)' 'e5-html-entities: one finding per (line, name), decoded references deduplicated'
 # --- `''` inside a single-quoted scalar is an escape, not a closing quote (WR-01) ---
 assert_lint "$FIXTURES/gate-sq-names" 1 "gate-sq-names: [ 'O''Brien, Jr', Acme ] is read, the leak exits 1"
 assert_only E5 'gate-sq-names: only [E5] fires, the names line is not skipped'
@@ -551,6 +737,74 @@ assert_no_finding C1 'symlink-outbound-sub: no config finding'
 # Elsewhere it gates no leak check: an info line, never silence.
 assert_lint "$FIXTURES/symlink-knowledge" 0 'symlink-knowledge: a symlinked knowledge/ exits 0'
 assert_out_line '^info: .*knowledge' 'symlink-knowledge: the unfollowed folder is named on an info line'
+# --- A case variant of a fixed layout folder fails closed (G-02-4a, CR-01) ---
+# An adopted repository on a case-insensitive filesystem (the macOS default)
+# may keep Outbound/; init.py's makedirs(exist_ok) keeps it too. Until the
+# rename is applied, the linter must not exit 0 while a leak sits under it.
+assert_lint "$FIXTURES/case-outbound" 1 'case-outbound: a case-variant Outbound/ exits 1'
+assert_out_line '^Outbound:0: ERROR \[E1\] ' 'case-outbound: the folder itself is reported'
+assert_last_line '1 error(s), 0 warning(s)' \
+  'case-outbound: nothing else fires -- the exact-prefix outbound/ checks never see its files'
+assert_no_finding C1 'case-outbound: no config finding'
+
+# --- Outbound/ holding its own dossier.yaml is still walked, never pruned
+# as a D-03 sub-dossier boundary (CR-01 of the iteration-4 review) ---
+assert_lint "$FIXTURES/case-outbound-config" 1 \
+  'case-outbound-config: a case-variant Outbound/ with its own dossier.yaml still exits 1'
+assert_out_line '^Outbound:0: ERROR \[E1\] ' \
+  'case-outbound-config: the folder itself is reported, not pruned in silence'
+
+assert_lint "$FIXTURES/case-outbound-sub" 1 'case-outbound-sub: a case-variant outbound/Mails/ exits 1'
+assert_out_line '^outbound/Mails:0: ERROR \[E1\] ' 'case-outbound-sub: the folder itself is reported'
+assert_finding E5 'case-outbound-sub: E5 still reads it -- the file sits under the correctly-spelled outbound/'
+assert_no_finding E4 'case-outbound-sub: E4 stays silent -- Mails is not the exact outbound sub name'
+
+assert_lint "$FIXTURES/case-knowledge" 1 'case-knowledge: a case-variant Knowledge/ exits 1'
+assert_out_line '^Knowledge:0: ERROR \[E1\] ' 'case-knowledge: the folder itself is reported'
+assert_last_line '1 error(s), 0 warning(s)' 'case-knowledge: nothing else fires'
+
+assert_lint "$FIXTURES/case-lookalike" 0 'case-lookalike: outbound-old/ and Outbounds/ exit 0'
+assert_clean 'case-lookalike: an exact case-insensitive match is required, never a prefix'
+# --- An unreadable folder or a .git folder under outbound/ is never skipped
+# in silence; elsewhere in the layout it is named on an info line, never
+# dropped (G-02-4e, WR-03) ---
+# The generator lays out the leak; locking the folder is this test's job
+# (the generator never changes a mode, T-02-28). Each locked folder is
+# recorded in LOCKED_DIRS so the EXIT trap can still unlock it if an
+# assertion aborts the script before the per-case unlock below runs.
+dir="$FIXTURES/unreadable-outbound/outbound/mails"
+chmod 000 "$dir" 2>/dev/null
+LOCKED_DIRS="$LOCKED_DIRS
+$dir"
+if ls "$dir" >/dev/null 2>&1; then
+  skip "unreadable-outbound: $dir is still listable after chmod 000 (root, or a permission-less filesystem)"
+else
+  assert_lint "$FIXTURES/unreadable-outbound" 1 'unreadable-outbound: exits 1'
+  assert_out_line '^outbound/mails:0: ERROR \[E1\] ' 'unreadable-outbound: the folder itself is reported'
+  assert_last_line '1 error(s), 0 warning(s)' 'unreadable-outbound: nothing else fires -- its files are never walked'
+fi
+chmod u+rwx "$dir" 2>/dev/null
+
+dir="$FIXTURES/unreadable-knowledge/knowledge/watch"
+chmod 000 "$dir" 2>/dev/null
+LOCKED_DIRS="$LOCKED_DIRS
+$dir"
+if ls "$dir" >/dev/null 2>&1; then
+  skip "unreadable-knowledge: $dir is still listable after chmod 000 (root, or a permission-less filesystem)"
+else
+  assert_lint "$FIXTURES/unreadable-knowledge" 0 'unreadable-knowledge: exits 0'
+  assert_out_line '^info: .*knowledge/watch' 'unreadable-knowledge: the folder is named on an info line'
+  assert_last_line '0 error(s), 0 warning(s)' 'unreadable-knowledge: nothing else fires'
+fi
+chmod u+rwx "$dir" 2>/dev/null
+
+assert_lint "$FIXTURES/git-outbound" 1 'git-outbound: a .git folder under outbound/ exits 1'
+assert_out_line '^outbound/mails/\.git:0: ERROR \[E1\] ' 'git-outbound: the .git folder itself is reported'
+assert_last_line '1 error(s), 0 warning(s)' 'git-outbound: nothing else fires -- it is never walked'
+
+assert_lint "$FIXTURES/git-knowledge" 0 'git-knowledge: a .git folder elsewhere in the layout exits 0'
+assert_out_line '^info: .*knowledge/\.git' 'git-knowledge: the .git folder is named on an info line'
+assert_last_line '0 error(s), 0 warning(s)' 'git-knowledge: nothing else fires'
 # --- A non-UTF-8 stdout never turns a finding into a crash (WR-06) ---
 # A Windows console or a legacy locale: the E5 line must still be printed
 # (escaped) and the exit code must stay 1, never 3.

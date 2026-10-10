@@ -9,6 +9,21 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 TESTS_PASSED=0
 TESTS_FAILED=0
+TESTS_SKIPPED=0
+
+# skip LABEL — a coverage gap tests/run.sh must not report as green in
+# silence (WR-02 of the iteration-4 review): the caller's environment made
+# a check impossible to run (e.g. chmod 000 has no effect as root), never a
+# pass or a fail. Printed to stdout, not stderr, so it survives
+# tests/run.sh's `bash "$f" >file 2>&1` capture and its own summary line
+# whether the run as a whole passes or fails, and counted separately so
+# `finish` can name how many happened without ever touching TESTS_PASSED or
+# TESTS_FAILED -- tests/run.sh's pass/fail decision stays exactly what it
+# was.
+skip() {
+  TESTS_SKIPPED=$((TESTS_SKIPPED + 1))
+  echo "SKIP: $1"
+}
 
 # The last lint run's stdout and stderr, set by assert_lint(). Initialised
 # here because set -u aborts on a read before the first assert_lint.
@@ -152,8 +167,15 @@ assert_no_finding() {
 }
 
 # finish — prints the summary line and exits 1 when any assertion failed.
+# The skip count is informational only: it never turns a pass into a fail,
+# and it is silent when zero so today's output is unchanged everywhere
+# skip() is not yet called (WR-02).
 finish() {
-  echo "PASS $TESTS_PASSED FAIL $TESTS_FAILED"
+  if [ "$TESTS_SKIPPED" -gt 0 ]; then
+    echo "PASS $TESTS_PASSED FAIL $TESTS_FAILED SKIP $TESTS_SKIPPED"
+  else
+    echo "PASS $TESTS_PASSED FAIL $TESTS_FAILED"
+  fi
   if [ "$TESTS_FAILED" -gt 0 ]; then
     exit 1
   fi

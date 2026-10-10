@@ -574,6 +574,13 @@ make_named_case gate-key-consent --confidential-name Acme --consent-recorded tru
   --consent-source 'mail 2026-09-16 from Jane'
 replace_line "$parent/gate-key-consent/dossier.yaml" 'consent_recorded: true' 'consent-recorded: true'
 write_file "$parent/gate-key-consent/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-beside-consent: a certain misspelling of consent_recorded beside a recorded,
+# sourced consent still keeps E5 armed (iteration-3 review WR-02; kills mutation M1, which
+# forces the near-miss scan's contribution to gate_damaged to False) ---
+make_named_case gate-key-beside-consent --confidential-name Acme --consent-recorded true \
+  --consent-source 'mail 2026-09-16 from Jane'
+printf 'Consent_recorded: false\n' >>"$parent/gate-key-beside-consent/dossier.yaml"
+write_file "$parent/gate-key-beside-consent/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-json-key-case / gate-json-nested: the same two mistakes in a JSON config (WR-01) ---
 make_case gate-json-key-case
 write_file "$parent/gate-json-key-case/dossier.yaml" '{
@@ -591,6 +598,73 @@ write_file "$parent/gate-json-nested/dossier.yaml" '{
 }
 '
 write_file "$parent/gate-json-nested/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-json-deep: a gate key two levels below the top, a depth the YAML subset cannot
+# express (iteration-3 review WR-02; kills mutation M2, which drops visit()'s recursion below
+# the first nesting level) ---
+make_case gate-json-deep
+write_file "$parent/gate-json-deep/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "counterparts": [{"name": "Jane", "meta": {"confidential_names": ["Acme"]}}]
+}
+'
+write_file "$parent/gate-json-deep/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-extras / gate-key-extras-leak: legitimate extension keys beside the exact
+# gate keys are ignored, not reported (D-22, 2026-09-25 UAT test 2, G-02-2) ---
+# consent_scope, confidential_notes and the rest of WR-01's measured mappings sit right next
+# to confidential_names, consent_recorded and consent_source -- at top level and nested under
+# a counterpart. The exact gate key is present each time, so a near-miss beside it is a
+# different, legitimate key, not a misspelling.
+build_gate_key_extras() {
+  make_named_case "$1" --confidential-name Acme --counterpart 'Acme|ordering party'
+  printf 'consent_scope: "mails only"\nconsent_sources: "see HISTORY"\nconsent_required: true\nconsent_revoked: false\nconsent_recorded_at: "2026-09-16"\nconfidential: "internal"\nconfidential_notes: "ask Jane first"\nnon_confidential_names: [ Beta ]\n' \
+    >>"$parent/$1/dossier.yaml"
+  replace_line "$parent/$1/dossier.yaml" '    role: "ordering party"' \
+    "$(printf '    role: "ordering party"\n    confidential_notes: "ask Jane first"')"
+}
+build_gate_key_extras gate-key-extras
+build_gate_key_extras gate-key-extras-leak
+write_file "$parent/gate-key-extras-leak/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+# --- gate-key-beside-names-drop / gate-key-beside-names-swap: a confidential_names near-miss
+# that is itself a probable typo stays C1 even though the exact gate key sits right beside it
+# (gap closure option (a), arbitrage Samuel, relayed by the main session via SendMessage,
+# 2026-09-25; CR-02 of 02-REVIEW.md). Both are one OSA edit away from confidential_names --
+# -drop loses the trailing `s` (deletion), -swap transposes the "ia"/"ai" of "confidential"
+# (adjacent transposition) -- unlike confidential_notes in gate-key-extras above, which is a
+# real, different key at OSA distance 2 and keeps the D-22 presence exemption.
+make_gate_case gate-key-beside-names-drop \
+  "$(printf 'confidential_name: [ "Acme" ]\nconfidential_names: []')"
+make_gate_case gate-key-beside-names-swap \
+  "$(printf 'confidentail_names: [ "Acme" ]\nconfidential_names: []')"
+# --- gate-key-beside-names-double / gate-key-beside-names-double2: a DOUBLE typo of
+# confidential_names -- two edits from the exact key -- still stays C1 beside it (CR-02 bis
+# gap closure, arbitrage Samuel, relayed by the main session via SendMessage, 2026-09-25,
+# option (2)). `confidental_name` is missing the "i" of "confidential" AND the trailing "s"
+# of "names" (whole-key OSA distance 2, same distance as confidential_notes in
+# gate-key-extras above); `confidential_nam` is missing the trailing "es" of "names" (also
+# OSA distance 2). Both are told apart from a legitimate different key such as
+# confidential_notes by their LAST `_`-separated word alone: "name" and "nam" are each within
+# one OSA edit of "name" or "names", while confidential_notes' last word "notes" is not
+# (see CONFIDENTIAL_NAMES_TYPO_CUTOFF_WORD / CONFIDENTIAL_NAMES_WORD_CUTOFF in lint.py).
+make_gate_case gate-key-beside-names-double \
+  "$(printf 'confidental_name: [ "Acme" ]\nconfidential_names: []')"
+make_gate_case gate-key-beside-names-double2 \
+  "$(printf 'confidential_nam: [ "Acme" ]\nconfidential_names: []')"
+# --- gate-key-beside-names-nounderscore: confidentialnames (no separator at all) stays C1
+# beside the exact key too -- whole-key OSA distance 1 (a missing `_`), caught by the plain
+# CONFIDENTIAL_NAMES_TYPO_CUTOFF clause alone (it has no `_`, so no last word to test) ---
+make_gate_case gate-key-beside-names-nounderscore \
+  "$(printf 'confidentialnames: [ "Acme" ]\nconfidential_names: []')"
+# --- gate-nested-typo: a JSON nested near-miss stays C1 while the exact gate key it
+# resembles is absent from the top level (D-22, D-GAP-1, G-02-2) ---
+make_case gate-nested-typo
+write_file "$parent/gate-nested-typo/dossier.yaml" '{
+  "version": 1,
+  "language": "en",
+  "counterparts": [{"name": "Jane", "confidental_names": ["Acme"]}]
+}
+'
+write_file "$parent/gate-nested-typo/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
 # --- gate-skip-armed: consent recorded and sourced, plus one unreadable line (CR-01) ---
 # Any skipped line may have been the gate, so the leak check stays armed.
 make_named_case gate-skip-armed --confidential-name Acme --consent-recorded true \
@@ -664,6 +738,90 @@ printf '%s\n' 'The budget is decided tomorrow.' >>"$parent/symlink-knowledge/kno
 mkdir -p "$parent/symlink-knowledge/elsewhere"
 mv "$parent/symlink-knowledge/knowledge" "$parent/symlink-knowledge/elsewhere/knowledge-real"
 ln -s elsewhere/knowledge-real "$parent/symlink-knowledge/knowledge"
+# ---------------------------------------------------------------------------
+# case-outbound / case-outbound-sub / case-knowledge / case-lookalike: a case
+# variant of a fixed layout name fails closed (G-02-4a, CR-01 of the
+# iteration-3 review). An adopted repository on a case-insensitive
+# filesystem (the macOS default) may keep `Outbound/`; init.py's
+# `makedirs(exist_ok=True)` keeps it too. Until the rename is applied, the
+# linter must not exit 0 while a leak sits under it. Every rename below goes
+# through a temporary name in two `mv` steps: a one-step case-only rename is
+# a no-op on a case-insensitive filesystem, so these fixtures mean the same
+# thing there and on a case-sensitive one.
+# ---------------------------------------------------------------------------
+
+# --- case-outbound: outbound/ itself renamed to Outbound/ (top-level LAYOUT_DIRS) ---
+# outbound/mails/acme.md is headerless and outbound/mails/2026-09-17_relance.md
+# is a well-formed leak: once the folder is Outbound/, neither is selected by
+# the exact `outbound/` prefix any outbound check uses, so only the folder's
+# own case-variant finding fires.
+make_named_case case-outbound --confidential-name Acme
+write_file "$parent/case-outbound/outbound/mails/acme.md" 'We met Acme.
+'
+write_file "$parent/case-outbound/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+mv "$parent/case-outbound/outbound" "$parent/case-outbound/outbound-tmp-rename"
+mv "$parent/case-outbound/outbound-tmp-rename" "$parent/case-outbound/Outbound"
+
+# --- case-outbound-config: Outbound/ additionally holds its own dossier.yaml
+# (CR-01 of the iteration-4 review). walk_tree used to test layout
+# membership case-sensitively, so this variant was pruned as a D-03
+# sub-dossier boundary before the case-variant E1 loop above ever saw it --
+# its leak never surfaced. Layout membership is now case-folded, so Outbound/
+# is walked like any other case variant and its own E1 still fires.
+make_named_case case-outbound-config --confidential-name Acme
+write_file "$parent/case-outbound-config/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+cp "$parent/case-outbound-config/dossier.yaml" "$parent/case-outbound-config/outbound/dossier.yaml"
+mv "$parent/case-outbound-config/outbound" "$parent/case-outbound-config/outbound-tmp-rename"
+mv "$parent/case-outbound-config/outbound-tmp-rename" "$parent/case-outbound-config/Outbound"
+
+# --- case-outbound-sub: outbound/mails/ renamed to outbound/Mails/ (OUTBOUND_SUBS) ---
+# outbound/ itself keeps its correct spelling, so the leak is still under the
+# exact `outbound/` prefix: E1-E3 and E5 still read it, only E4 (which needs
+# the exact sub name) stays silent.
+make_named_case case-outbound-sub --confidential-name Acme
+write_file "$parent/case-outbound-sub/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+mv "$parent/case-outbound-sub/outbound/mails" "$parent/case-outbound-sub/outbound/mails-tmp-rename"
+mv "$parent/case-outbound-sub/outbound/mails-tmp-rename" "$parent/case-outbound-sub/outbound/Mails"
+
+# --- case-knowledge: knowledge/ renamed to Knowledge/ (top-level LAYOUT_DIRS) ---
+make_case case-knowledge
+mv "$parent/case-knowledge/knowledge" "$parent/case-knowledge/knowledge-tmp-rename"
+mv "$parent/case-knowledge/knowledge-tmp-rename" "$parent/case-knowledge/Knowledge"
+
+# --- case-lookalike: folder names that only start with a layout name -- clean ---
+# The rule is an exact case-insensitive match, never a prefix or substring
+# match: neither name here is a case variant of outbound/.
+make_case case-lookalike
+write_file "$parent/case-lookalike/outbound-old/notes.md" 'Not a layout folder.
+'
+write_file "$parent/case-lookalike/Outbounds/notes.md" 'Not a layout folder either.
+'
+# ---------------------------------------------------------------------------
+# unreadable-outbound / unreadable-knowledge / git-outbound / git-knowledge:
+# a folder the walk cannot list, or a .git folder, inside the fixed layout
+# is reported rather than skipped in silence (G-02-4e, WR-03 of the
+# iteration-3 review). The chmod that makes a folder unreadable is the
+# test's job, never the generator's (a mode-000 folder would make this very
+# tree undeletable by anyone who forgets to restore it) -- the two
+# unreadable cases only lay out the leak; tests/test-lint.sh does the
+# locking.
+# ---------------------------------------------------------------------------
+
+# --- unreadable-outbound: tests/test-lint.sh chmod 000s outbound/mails ---
+make_named_case unreadable-outbound --confidential-name Acme
+write_file "$parent/unreadable-outbound/outbound/mails/2026-09-17_relance.md" "$LEAK_MAIL"
+
+# --- unreadable-knowledge: tests/test-lint.sh chmod 000s knowledge/watch ---
+make_case unreadable-knowledge
+
+# --- git-outbound: a .git folder under outbound/, never walked but reported ---
+make_named_case git-outbound --confidential-name Acme
+write_file "$parent/git-outbound/outbound/mails/.git/2026-09-17_relance.md" "$LEAK_MAIL"
+
+# --- git-knowledge: same, elsewhere in the layout -- an info line, not E1 ---
+make_case git-knowledge
+write_file "$parent/git-knowledge/knowledge/.git/HEAD" 'ref: refs/heads/main
+'
 # --- enc-leak: a finding that a non-UTF-8 stdout cannot encode (WR-06) ---
 # The name is L-with-stroke + ukasz, outside latin-1, so a strict encoder
 # raises on the E5 line itself.
@@ -726,6 +884,104 @@ replace_line "$parent/linebreak-yaml/dossier.yaml" 'confidential_names: []' \
   "confidential_names: [ \"Acme${LS}Corp\", \"Sam${NEL}Co\", \"Beta\" ]"
 write_file "$parent/linebreak-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 Beta asked for the audit.
+"
+# --- format-name-yaml / format-name-init / format-body: a Unicode format character (category
+# Cf) inside a configured name, an outbound body, or a path below outbound/ never hides the
+# name, on either side, and init.py never writes one raw (D-GAP-6, G-02-4b, CR-02 of the
+# iteration-3 review and D-FIX-12 of its fix round, which already does this for line breaks).
+# Built from bytes: bash 3.2 has no \u. ZWSP U+200B, BOM U+FEFF, SHY (soft hyphen) U+00AD,
+# ZWNJ U+200C, WJ (word joiner) U+2060.
+ZWSP="$(printf '\342\200\213')"
+BOM="$(printf '\357\273\277')"
+SHY="$(printf '\302\255')"
+ZWNJ="$(printf '\342\200\214')"
+WJ="$(printf '\342\201\240')"
+
+# format-name-yaml (consumer side, hand-written): five names, each carrying a format character
+# either inside a word (the deletion reading is what matches) or between two words (the space
+# reading is what matches); the message names the space reading (D-GAP-6).
+make_case format-name-yaml
+replace_line "$parent/format-name-yaml/dossier.yaml" 'confidential_names: []' \
+  "confidential_names: [ \"Acme${ZWSP}Corp\", \"Big Telco${BOM}\", \"${WJ}Nord Star\", \"Red${ZWNJ}Fox\", \"Glo${SHY}bex\" ]"
+write_file "$parent/format-name-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Acme Corp today.
+Then Big Telco called.
+Nord Star joined the call.
+Red Fox signed.
+Finally Globex agreed.
+"
+
+# format-name-init (producer side, round trip): the same five names through init.py, plus two
+# names whose punctuation (`&`) defeats the folded pass -- Pro<SHY>cter & Gamble and AT<SHY>&T
+# (CR-03 of the iteration-4 review). dossier.yaml must hold both the space and the deletion
+# reading of each name whose two readings differ, never the raw format character (D-FIX-12
+# extended, CR-03): the deletion reading is the only one an exact-pass-only name like these two
+# can ever match on.
+make_named_case format-name-init --confidential-name "Acme${ZWSP}Corp" --confidential-name "Big Telco${BOM}" \
+  --confidential-name "${WJ}Nord Star" --confidential-name "Red${ZWNJ}Fox" --confidential-name "Glo${SHY}bex" \
+  --confidential-name "Pro${SHY}cter & Gamble" --confidential-name "AT${SHY}&T"
+write_file "$parent/format-name-init/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Acme Corp, Big Telco, Nord Star, Red Fox and Globex today.
+We met Procter & Gamble and AT&T.
+"
+for slug in acme-corp big-telco nord-star red-fox globex; do
+  write_file "$parent/format-name-init/outbound/mails/2026-09-17_${slug}.md" "$GOOD_MAIL"
+done
+
+# format-body (haystack side): eight lines each hide a plain "Acme" or "Big Telco" behind a
+# format character read one of the two ways the readings cover -- embedded inside a word
+# (deletion), or between two words (space) -- plus a boundary that was already open before this
+# fix (L7: a format character already counts as non-word for boundary_pattern(), which a
+# deletion-only fix would break, D-GAP-6), an &shy; HTML reference that needs Task 2's decode
+# and this task's readings together (L8), and the name surviving only in a path below E4's
+# scope.
+make_named_case format-body --confidential-name Acme --confidential-name 'Big Telco'
+write_file "$parent/format-body/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+L1: Ac${SHY}me signed.
+L2: Ac${ZWSP}me signed.
+L3: Ac${WJ}me signed.
+L4: Ac${ZWNJ}me signed.
+L5: Ac${BOM}me signed.
+L6: Big${ZWSP}Telco called.
+L7: Contact${ZWSP}Acme today.
+L8: Ac&shy;me in a pasted snippet.
+"
+write_file "$parent/format-body/outbound/mails/archive/2026-09-17_ac${SHY}me.md" "$GOOD_MAIL"
+
+# --- ignorable-body / ignorable-name-yaml / ignorable-name-init: a Default_Ignorable_Code_Point
+# that is NOT category Cf hides no name either (WR-01 of the re-verification, closed before the
+# Phase 2 sign-off, 2026-10-10). Built from bytes: CGJ U+034F (Mn), HANGUL CHOSEONG FILLER
+# U+115F (Lo), KHMER VOWEL INHERENT AQ U+17B4 (Mn), MONGOLIAN FVS1 U+180B (Mn), HANGUL FILLER
+# U+3164 (Lo), VS16 U+FE0F (Mn), HALFWIDTH HANGUL FILLER U+FFA0 (Lo), VS17 U+E0100 (Mn).
+CGJ="$(printf '\315\217')"
+HCF="$(printf '\341\205\237')"
+KIV="$(printf '\341\236\264')"
+FVS="$(printf '\341\240\213')"
+HF="$(printf '\343\205\244')"
+VS16="$(printf '\357\270\217')"
+HHF="$(printf '\357\276\240')"
+VS17="$(printf '\363\240\204\200')"
+make_named_case ignorable-body --confidential-name Acme
+write_file "$parent/ignorable-body/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+L1: Ac${CGJ}me signed.
+L2: Ac${HCF}me signed.
+L3: Ac${KIV}me signed.
+L4: Ac${FVS}me signed.
+L5: Ac${HF}me signed.
+L6: Ac${VS16}me signed.
+L7: Ac${HHF}me signed.
+L8: Ac${VS17}me signed.
+"
+make_case ignorable-name-yaml
+replace_line "$parent/ignorable-name-yaml/dossier.yaml" 'confidential_names: []' \
+  "confidential_names: [ \"Acme${VS16}Corp\", \"Glo${CGJ}bex\" ]"
+write_file "$parent/ignorable-name-yaml/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Acme Corp today.
+Finally Globex agreed.
+"
+make_named_case ignorable-name-init --confidential-name "Glo${CGJ}bex" --confidential-name "AT${VS16}&T"
+write_file "$parent/ignorable-name-init/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+We met Globex and AT&T.
 "
 # --- Multi-word names: filename slugs and whitespace variants (CR-03) ---
 # E4 only accepts a lowercase ASCII slug joined by hyphens, so the only
@@ -796,16 +1052,43 @@ make_named_case e5-text-fold-boundary --confidential-name 'Big Telco' --confiden
 write_file "$parent/e5-text-fold-boundary/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 We asked Big, Telco answered. See section c of the plan, c'est clair.
 "
+# --- e5-html-entities: HTML character references never hide a name (D-GAP-5, G-02-4c, CR-03
+# of the iteration-3 review) --- .html is a sanctioned outbound format, and standard
+# serialisation escapes `&` and often `'` and accented letters as named or numeric references;
+# a decoded haystack must catch them, in an .html deliverable and in a Markdown mail pasted
+# from a web page alike.
+make_named_case e5-html-entities --confidential-name 'Johnson & Johnson' --confidential-name 'AT&T' \
+  --confidential-name "$(printf 'Soci\303\251t\303\251 Exemple')" --confidential-name "O'Brien"
+write_file "$parent/e5-html-entities/outbound/deliverables/2026-09-17_proposal.html" '<!-- Status: draft -->
+<!-- To: Jane Doe -->
+<!-- Written by: Sam -->
+<p>Prepared for Johnson &amp; Johnson and AT&amp;T.</p>
+<p>Soci&eacute;t&eacute; Exemple, Soci&#233;t&#233; Exemple</p>
+<p>Dear Mr O&#39;Brien, Mr O&rsquo;Brien</p>
+'
+write_file "$parent/e5-html-entities/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
+Pasted from the portal: AT&amp;T
+"
 # The boundary still holds in both halves: longer words are not the name.
 make_named_case e5-slug-boundary --confidential-name 'Big Telco'
 write_file "$parent/e5-slug-boundary/outbound/mails/2026-09-17_bigtelcom-offer.md" "${GOOD_MAIL}
 Bigger Telco and Big Telcom are unrelated.
 "
-# The name hard-wrapped across two lines of a mail body.
+# The name hard-wrapped across two lines of a mail body, then wrapped again
+# inside three styles of quoted reply -- a single '> ', a nested '> > ', and
+# a bare '>' with no space -- none of which may stop the match either
+# (D-GAP-4, G-02-4f, WR-04 of the iteration-3 review).
 make_named_case e5-wrapped --confidential-name 'Big Telco'
 write_file "$parent/e5-wrapped/outbound/mails/2026-09-17_relance.md" "${GOOD_MAIL}
 We met the people at Big
 Telco last week.
+
+> On Monday you wrote: we should meet Big
+> Telco next week.
+> > Earlier still: the Big
+> > Telco board met.
+>Tightly quoted: Big
+>Telco again.
 "
 # Two spaces, a no-break space, a tab: one finding each.
 make_named_case e5-spacing --confidential-name 'Big Telco'

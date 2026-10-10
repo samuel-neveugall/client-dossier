@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: complete
 phase: 02-linter-test-harness
 source: [02-VERIFICATION.md, 02-REVIEW.md]
 started: 2026-09-24T21:30:53Z
-updated: 2026-09-25T11:56:45Z
+updated: 2026-10-10T11:12:52.479Z
 ---
 
 ## Current Test
@@ -38,10 +38,22 @@ result: issue
 reported: "tout" (fix CR-01..03 and WR-02..04 in the same gap-closure round as WR-01)
 severity: blocker
 
+### 5. Re-test item 2 — extension keys beside the gate keys (G-02-2, after 02-07)
+expected: Recette scenarios 1-2. consent_scope + confidential_notes beside the exact keys lint clean (exit 0); a typo confidental_names beside the exact key is ERROR [C1] "looks like a misspelling of confidential_names" (exit 1).
+result: pass
+source: agent-run (Samuel delegated the recette, 2026-10-10: "test tout toi meme")
+evidence: recette scenario 1 -> "0 error(s), 0 warning(s)", exit 0; scenario 2 -> "ERROR [C1] key 'confidental_names' looks like a misspelling of confidential_names", exit 1
+
+### 6. Re-test item 4 — CR-01..03 and WR-02..04 closed (G-02-4a..4f, after 02-07..02-09)
+expected: Recette scenarios 3-9 each exit 1 with the named error, no confidential name passes — Outbound/ case variant E1; zero-width/soft-hyphen in the name E5; HTML entities in .html E5 (AT&T and Société Exemple); outbound/mails/.git E1; unreadable folder E1; name wrapped across "> " quoted lines E5; misspelt Consent_recorded beside a recorded consent gives C1 AND E5.
+result: pass
+source: agent-run (Samuel delegated the recette, 2026-10-10: "test tout toi meme")
+evidence: recette scenarios 3-9 all exit 1 with the expected class (3 E1 Outbound, 4 E5, 5 E5 x2, 6 E1 .git, 7 E1 unreadable, 8 E5, 9 C1+E5); bash tests/run.sh: 6 files, 0 failed
+
 ## Summary
 
-total: 4
-passed: 2
+total: 6
+passed: 4
 issues: 2
 pending: 0
 skipped: 0
@@ -51,7 +63,9 @@ blocked: 0
 
 - gap_id: G-02-2
   truth: "A legitimate extension key beside the exact gate keys (consent_scope, confidential_notes) is ignored per D-22; only certain near-misses of a gate key fail the run"
-  status: failed
+  status: resolved
+  resolved_by: 02-07-PLAN.md
+  resolved_at: 2026-10-10
   reason: "User reported: corrige — apply the iteration-3 WR-01 fix"
   severity: major
   test: 2
@@ -68,7 +82,9 @@ blocked: 0
 
 - gap_id: G-02-4a
   truth: "A case variant of a fixed layout folder (Outbound/, Mails/, Deliverables/, Calls/) never escapes the outbound checks: the linter fails closed"
-  status: failed
+  status: resolved
+  resolved_by: 02-08-PLAN.md
+  resolved_at: 2026-10-10
   reason: "User reported: tout — fix CR-01 of the iteration-3 review"
   severity: blocker
   test: 4
@@ -85,7 +101,9 @@ blocked: 0
 
 - gap_id: G-02-4b
   truth: "A Unicode format character (Cf: ZWSP, BOM, soft hyphen, ZWNJ, word joiner) in a confidential name or in a body never hides the name from E5"
-  status: failed
+  status: resolved
+  resolved_by: 02-09-PLAN.md
+  resolved_at: 2026-10-10
   reason: "User reported: tout — fix CR-02 of the iteration-3 review"
   severity: blocker
   test: 4
@@ -103,7 +121,9 @@ blocked: 0
 
 - gap_id: G-02-4c
   truth: "HTML character references in an outbound .html file (&amp; &#39; &eacute; &#233; &rsquo;) never hide a confidential name"
-  status: failed
+  status: resolved
+  resolved_by: 02-09-PLAN.md
+  resolved_at: 2026-10-10
   reason: "User reported: tout — fix CR-03 of the iteration-3 review"
   severity: blocker
   test: 4
@@ -118,7 +138,9 @@ blocked: 0
 
 - gap_id: G-02-4d
   truth: "Every gate line is pinned by a test: gate_damaged keeps E5 armed beside a recorded consent, and nested-key recursion is exercised"
-  status: failed
+  status: resolved
+  resolved_by: 02-07-PLAN.md
+  resolved_at: 2026-10-10
   reason: "User reported: tout — fix WR-02 of the iteration-3 review"
   severity: major
   test: 4
@@ -135,7 +157,9 @@ blocked: 0
 
 - gap_id: G-02-4e
   truth: "An unreadable folder or a .git/ folder under outbound/ is reported (E1), never skipped silently with exit 0"
-  status: failed
+  status: resolved
+  resolved_by: 02-08-PLAN.md
+  resolved_at: 2026-10-10
   reason: "User reported: tout — fix WR-03 of the iteration-3 review"
   severity: major
   test: 4
@@ -151,7 +175,9 @@ blocked: 0
 
 - gap_id: G-02-4f
   truth: "A confidential name hard-wrapped inside a quoted mail reply ('> ' prefix) is found by E5"
-  status: failed
+  status: resolved
+  resolved_by: 02-09-PLAN.md
+  resolved_at: 2026-10-10
   reason: "User reported: tout — fix WR-04 of the iteration-3 review"
   severity: major
   test: 4

@@ -1,243 +1,167 @@
 ---
 phase: 02-linter-test-harness
-reviewed: 2026-09-24T22:45:00Z
+reviewed: 2026-09-25T13:49:34Z
 depth: standard
-iteration: 3
-files_reviewed: 5
+files_reviewed: 4
 files_reviewed_list:
   - scripts/lint.py
   - skills/dossier-init/scripts/init.py
-  - tests/test-lint.sh
-  - tests/test-init-empty.sh
   - tests/fixtures/make-lint-fixtures.sh
+  - tests/test-lint.sh
 findings:
   critical: 3
-  warning: 4
-  info: 10
-  total: 17
+  warning: 2
+  info: 2
+  total: 7
 status: issues_found
 ---
 
-# Phase 2: Code Review Report (iteration 3)
+# Phase 02: Code Review Report (iteration 4, gap-closure plans 02-07, 02-08, 02-09)
 
-**Reviewed:** 2026-09-24T22:45:00Z
+**Reviewed:** 2026-09-25T13:49:34Z
 **Depth:** standard
-**Files Reviewed:** 5
+**Files Reviewed:** 4
 **Status:** issues_found
 
 ## Summary
 
-This pass re-reviewed the iteration-2 fix diff (`git diff 4947368..HEAD`, 8 code and test commits) against the five source files. `bash tests/run.sh` is green (6 files, 0 failed).
+Scope: only the diff `8c2ed0f..HEAD` (commits b224542, 91581ea, 6f881ac, d50c3a2, 856b5bc, 7ca0e42, 616e7e7), meaning the presence-aware gate near-miss rule, case-variant/unreadable/`.git` walk-level E1, and the E5 haystack stages (quote strip, HTML decode, Cf readings) plus `init.py`'s Cf mapping. `bash tests/run.sh` is green (`TOTAL: 6 files, 0 failed`). Every finding below was reproduced against the real `scripts/lint.py` / `init.py` in a scratch dossier. None of them depends on a hostile writer. Each one is a plausible accident that makes the linter exit 0 while a confidential name sits under `outbound/`.
 
-**Are the iteration-2 findings closed?** Each original scenario was rebuilt on a scratch dossier:
+Most of the new code does what its commits claim. Three holes remain, and each lets a leak exit 0:
 
-| Iter-2 | Scenario reproduced | Result now | Verdict |
-|---|---|---|---|
-| CR-01 | `  confidential_names: [ Acme ]` indented under a `counterparts` block and under a scalar. Also a counterpart-level key, and a column-0 list followed by a mis-indented item | Each one is `ERROR [C1]` naming `confidential_names`, exit 1, no `[C0]` | Closed |
-| CR-02 | `init.py --confidential-name "Acme<sep>Corp"` for U+2028, TAB, LF, NEL, NBSP and U+3000, with the leak in a body and in `2026-09-17_acme-corp.md` | Written as `"Acme Corp"`, 2 × E5, exit 1 | Closed for whitespace and controls. Invisible *format* characters are still kept (new CR-02) |
-| CR-03 | `Łukasz Nowak`, `Øresund Bank`, `Æther Labs`, `Œuvre SA`, `Đorđe Petrović` (both `dj` and `d`) in slugs | E5 on each, exit 1 | Closed |
-| WR-01 | `confidential-names`, `Confidential_names`, `confidentialnames`, `confidential_name`, `  - - Acme`, a counterpart-nested key | C1 on each, exit 1 | Closed. The threshold now overshoots (new WR-01) |
-| WR-02 | `outbound/` replaced by a symlink; `outbound/mails/archive` as a symlink | `ERROR [E1]` on the link, exit 1 | Closed. The same silent skip is still reachable through another route (new WR-03) |
-| WR-03 | "Societe Exemple" and "Big-Telco" in a body | E5 on both | Closed |
-| WR-04 | JSON with `consent_recorded` true then false | pinned by `gate-json-consent-dup` | Closed |
-
-**Did the parser become too strict?** No regression found. 30,000 random `render_dossier_yaml()` configurations were fuzzed through `parse_yaml_subset()` + `apply_schema()`. The inputs mixed quotes, `: `, `#`, brackets, backslashes, controls, U+2028, NEL, NBSP, ZWSP and BOM in every field. Each run gave zero skipped lines and zero findings, and every name came back exactly as written. Fresh `en` and `fr` scaffolds, and the spec §3.2 example `dossier.yaml` verbatim, lint `0 error(s), 0 warning(s)`. The near-miss key rule does overreach on legitimate extension keys (WR-01), but it only fires on keys a user adds.
-
-**Would the new tests fail without the fixes?** Yes. I ran the current `tests/test-lint.sh` against `lint.py` and `init.py` from `4947368`: 85 assertions fail. The 86th failure is a git-tracking check that only fails in my untracked copy. The failures span every new fixture except `gate-json-consent-dup` and `c0-dup`, which are coverage cases by design. I then applied 8 targeted mutations to the new lines. 6 were caught. 2 survived (WR-02): wiring `_misplaced_gate_keys()` into `gate_damaged`, and its recursion below the first nesting level.
-
-**New findings.** None of the three Criticals below was introduced by the iteration-2 diff. All three are older fail-open paths that earlier passes did not report. Each one was reproduced end to end, and each exits 0 while a configured confidential name sits in an outbound file:
-- A case variant of `outbound/` on macOS.
-- An invisible format character in a name, which `init.py` keeps.
-- HTML character references in an `.html` deliverable.
+1. The case-variant fix (G-02-4a) is bypassed when the case-variant folder holds a `dossier.yaml`. The walk prunes it as a sub-dossier before the E1 check ever sees it.
+2. The presence rule (G-02-2) regresses a case the linter caught at `8c2ed0f`. A misspelt `confidential_name:` holding the real names, placed next to an empty exact `confidential_names: []`, is now silently ignored.
+3. `init.py`'s new Cf→space mapping drops the deletion reading on the producer side. After the round trip, a name that holds a soft hyphen and a `&` is never matched. The docstring claim that "the folded pass still matches the word run together" is false for exactly those names.
 
 ## Narrative Findings (AI reviewer)
 
 ## Critical Issues
 
-### CR-01: On a case-insensitive filesystem (the macOS default), an `Outbound/` folder gets no outbound check at all, including files the agent writes to `outbound/`
+### CR-01: A case-variant layout folder holding a `dossier.yaml` is pruned as a sub-dossier, so its leak exits 0 (G-02-4a bypass)
 
-**File:** `scripts/lint.py:1131-1134` (`outbound_files`, exact `outbound/` prefix), `scripts/lint.py:1026-1049` (`walk_tree` reports the on-disk spelling), `skills/dossier-init/scripts/init.py` (`os.makedirs(..., exist_ok=True)` keeps an existing `Outbound/`)
-**Issue:** Every outbound check (E1-E5, E9) selects files by the exact prefix `outbound/`. `os.walk` returns the spelling stored on disk. When the folder is `Outbound/` (or `OUTBOUND/`), nothing under it is ever checked, and nothing reports that. On APFS/HFS+ with default settings, `outbound/mails/x.md` and `Outbound/mails/x.md` are the same file. So a skill following the protocol writes into `outbound/`, and the linter sees `Outbound/...` and skips it. Reproduced on this Mac:
+**File:** `scripts/lint.py:1113`, `scripts/lint.py:1120-1123`, `scripts/lint.py:1298-1307`
+**Issue:** The new case-variant E1 loop iterates `tree.dirs`. `walk_tree` decides "inside the fixed layout" with exact, case-sensitive membership:
+`in_layout = prefix.split("/", 1)[0] in LAYOUT_DIRS` (1113), and the root-level sub-dossier exemption is `not (prefix == "" and name in LAYOUT_DIRS)` (1120). `Outbound` is not in `LAYOUT_DIRS`. If `Outbound/` holds a `dossier.yaml` (the case WR-03 already said must never be a boundary), it is therefore pruned as a D-03 sub-dossier. It never reaches `dirs`, so the new E1 never fires and only an info line is printed. Linting it "separately", as the info line suggests, does not help either: its files sit at `mails/…`, not under `outbound/`, so E5 never runs there. Reproduced:
 
 ```
-mkdir -p d/Outbound/mails && printf 'We met Acme.\n' > d/Outbound/mails/acme.md
-init.py --target d --language en --confidential-name Acme   # keeps Outbound/ (makedirs exist_ok)
-printf 'Status: draft\n...\nWe met Acme.\n' > d/outbound/mails/2026-09-17_x.md   # the agent's write
-lint.py d   ->  0 error(s), 0 warning(s), exit 0
+$ mv outbound ob-tmp && mv ob-tmp Outbound && cp dossier.yaml Outbound/
+$ python3 scripts/lint.py .      # Outbound/mails/2026-09-17_relance.md says "We met Acme."
+info: sub-dossier Outbound/ skipped: it holds its own dossier.yaml (lint it separately)
+0 error(s), 0 warning(s)          # exit 0
 ```
 
-`d/Outbound/mails/` then holds a headerless, misnamed file and a draft, and both name Acme. `--propose-renames` does print `Outbound -> outbound`, but the linter is fail-open until someone applies it, and forever if the rename is declined. Adopting an existing repository is a spec feature, and a capitalised `Outbound/` is exactly what the rename proposal anticipates. The same applies to `Mails/`, `Deliverables/` and `Calls/` for E4 (E1-E3 and E5 still run on them).
-**Fix:** Refuse a case variant of a fixed-layout name, fail closed. In `check_outbound_headers` (or a dedicated walk-level pass):
+On a case-insensitive filesystem this is the very folder the agent writes into, so this closes neither G-02-4a nor WR-03 when both conditions hold together. The same applies to `Sources/`, `Knowledge/` and `Dossier/`. `.git` pruning inside a case variant is also silent (`in_layout` False), although the folder's own E1 would cover that once it is reached.
+
+**Fix:** Make the layout membership in `walk_tree` case-insensitive, so a case variant is walked, never pruned, and reaches the E1 loop:
 
 ```python
-for rel in tree.dirs:
-    parent, _, name = rel.rpartition("/")
-    expected = LAYOUT_DIRS if parent == "" else (OUTBOUND_SUBS if parent == OUTBOUND_DIR else ())
-    for fixed in expected:
-        if name != fixed and name.casefold() == fixed:
-            findings.append(Finding(rel, 0, ERROR, "E1",
-                "folder is spelt {} but the layout name is {}: none of its files is checked; "
-                "rename it (git mv)".format(name, fixed)))
+_LAYOUT_FOLDED = frozenset(d.casefold() for d in LAYOUT_DIRS)
+...
+in_layout = prefix.split("/", 1)[0].casefold() in _LAYOUT_FOLDED
+...
+if (not in_layout and not (prefix == "" and name.casefold() in _LAYOUT_FOLDED)
+        and os.path.isfile(os.path.join(dirpath, name, CONFIG_NAME))):
 ```
 
-Add a fixture `case-outbound` (`Outbound/mails/…` naming Acme) that asserts exit 1 and `^Outbound:0: ERROR [E1]`. It is meaningful on case-sensitive filesystems too.
+Add a fixture `case-outbound-config` (`Outbound/` + `Outbound/dossier.yaml` + a leak) asserting `Outbound:0: ERROR [E1]` and exit 1.
 
-### CR-02: An invisible format character in a confidential name (ZWSP, BOM, soft hyphen, ZWNJ, word joiner) switches the body check off for that name
+### CR-02: The presence rule silently ignores a misspelt `confidential_names` that carries the names (regression against 8c2ed0f)
 
-**File:** `skills/dossier-init/scripts/init.py:184` (`_SCALAR_BREAKS_RE` covers Cc and U+2028/2029 only), `scripts/lint.py:1254-1273` (`boundary_pattern`), `scripts/lint.py:1336` (`_TEXT_FOLDABLE_RE`), `scripts/lint.py:853`
-**Issue:** `yaml_quote()` now turns controls and line breaks into spaces. Unicode *format* characters (category Cf) still pass through unchanged. `str.split()` does not treat them as whitespace, so the linter keeps them inside the needle:
-- The exact pattern then needs a literal U+200B (or U+FEFF, U+00AD, and so on).
-- `_TEXT_FOLDABLE_RE` (`[\w\s'.\-]+`) rejects the needle, so the folded pass is disabled.
-- Only the filename half still works, because it tokenises on `[^\W_]+`.
-
-A trailing or embedded invisible character is what copy-paste from web pages, chat apps and spreadsheets commonly carries. Reproduced end to end, `init.py --confidential-name <name>` then a mail saying "We met Acme Corp today.":
+**File:** `scripts/lint.py:862-869`, `scripts/lint.py:876-881`
+**Issue:** `near not in raw` exempts every difflib-only near-miss once the exact key is present, whatever it holds. The motivating cases were extension keys (`consent_scope`, `confidential_notes`). The rule also swallows plain misspellings of `confidential_names` sitting next to the template's own `confidential_names: []`, and those misspellings hold the names E5 should use. The linter at `8c2ed0f` reported these as C1. HEAD exits 0:
 
 ```
-"Acme\u200bCorp", "Acme Corp\u200b", "\u200bAcme"   -> 0 error(s), 0 warning(s), exit 0
-same with U+FEFF, U+00AD, U+200C, U+2060            -> 0 error(s), 0 warning(s), exit 0
+confidential_names: []
+confidential_name: [ "Acme" ]      # also: confidentail_names, Confidential_name, confidential_namess
+# outbound mail: "We met Acme."
+base 8c2ed0f: dossier.yaml:6: ERROR [C1] key 'confidential_name' is not confidential_names ... exit 1
+HEAD:         0 error(s), 0 warning(s)                                                 exit 0
 ```
 
-This is iteration-2 CR-02's class (the producer keeps a character that stops the name from matching), reached through a character set the fix did not cover. The same characters inside the *body* (`Ac\u00adme`) also hide a name.
-**Fix:** Make both sides blind to Cf. In `lint.py`, before building the needles and the haystacks:
+This is a realistic edit. The scaffold always writes `confidential_names: []`, and a user adding a line by hand types the singular. Ignoring a consent_* near-miss cannot open the gate, because the exact consent keys still decide it. Ignoring a `confidential_names` near-miss drops data and turns E5 off for those names. D-GAP-1 did not weigh this asymmetry. Samuel should re-confirm the rule before it ships.
+
+**Fix:** Keep the presence exemption for consent_* near-misses, but do not let it silently drop a near-miss of `confidential_names` that is only a small edit away. For example, near-misses within an edit distance of 2 stay C1 even when the exact key is present. That still exempts `non_confidential_names` and `confidential_notes`, which are 4+ edits away, so `gate-key-extras` stays clean:
 
 ```python
-def _drop_format(text, repl):
-    return "".join(repl if unicodedata.category(ch) == "Cf" else ch for ch in text)
+def _small_edit(a, b):
+    m = difflib.SequenceMatcher(None, a, b)
+    return sum(max(i2 - i1, j2 - j1) for op, i1, i2, j1, j2 in m.get_opcodes() if op != "equal") <= 2
 
-# needles: a format char may separate words -> space, then collapse
-names = [" ".join(_drop_format(n, " ").split()) for n in config["confidential_names"]]
-# haystack: delete (Cf never contains "\n", so line numbers are unchanged)
-norm = _drop_format(normalise(text), "").replace("\r\n", "\n").replace("\r", "\n")
+if near is not None and (near not in raw
+                         or (near == "confidential_names" and _small_edit(_fold_key(key), near))):
+    ...report C1...
 ```
 
-The folded pass allows an empty separator, so `Acme Corp` then also matches `Acme\u200bCorp` written in a body. As a producer-side safeguard, add Cf to `_SCALAR_BREAKS_RE` in `init.py`, for example by filtering on `unicodedata.category(ch) == "Cf"` before the regex. Add a fixture `linebreak-format` (an init round trip with `Acme Corp\u200b` and `Acme\u00adCorp`) that asserts E5 in the body.
+Add fixtures for `confidential_name` and `confidentail_names` beside `confidential_names: []`, both expecting C1 + exit 1.
 
-### CR-03: HTML character references in an `.html` outbound file hide names containing `&`, `'` or accented letters
+### CR-03: `init.py` maps every Cf character to a space, so the init round trip loses the deletion reading and a name holding `&`/`+` is never matched
 
-**File:** `scripts/lint.py:1386-1409` (`check_confidential_names` searches the raw text), `scripts/lint.py:134` (`.html` is an accepted render source)
-**Issue:** `.html` is a sanctioned outbound text format: E9 accepts it as the source beside a PDF. The file uses an HTML-comment status header, so E1-E3 pass. Standard HTML serialisation escapes `&` as `&amp;` (`html.escape`, pandoc, every templating engine). Python's `html.escape` and Jinja autoescape also write `'` as `&#39;`, and older tooling writes accents as named references. E5 searches the raw text, so none of these spellings match. Reproduced on `outbound/deliverables/2026-09-17_proposal.html` with a valid comment header:
+**File:** `skills/dossier-init/scripts/init.py:206` (and the claim at `init.py:198-202`); consumer side `scripts/lint.py:1561-1588` (`_build_needle`)
+**Issue:** D-GAP-6's premise is that neither reading alone is enough. `lint.py` builds both readings when the config holds the raw Cf character, but `init.py` now writes only the space reading into `dossier.yaml`, so the linter never sees the deletion reading of a scaffolded name. The docstring says this is "cosmetic only: scripts/lint.py's folded pass still matches the word run together". That is false for every name `folded_text_pattern()` refuses (`_TEXT_FOLDABLE_RE` rejects `&`, `+`, `#` …), because only the exact pass remains and it now requires the spurious space. A soft hyphen is exactly what text copied from a hyphenated web page carries. Reproduced:
 
 ```
-confidential_names: [ "Johnson & Johnson", "AT&T", "Société Exemple", "O'Brien" ]
-<p>Prepared for Johnson &amp; Johnson and AT&amp;T.</p>
-<p>Soci&eacute;t&eacute; Exemple, Soci&#233;t&#233; Exemple</p>
-<p>Dear Mr O&#39;Brien, Mr O&rsquo;Brien</p>
--> 0 error(s), 0 warning(s), exit 0
+$ init.py --confidential-name $'Pro\u00adcter & Gamble' --confidential-name $'AT\u00ad&T'
+confidential_names: [ "Pro cter & Gamble", "AT &T" ]
+# mail body: "We met Procter & Gamble and AT&T."
+0 error(s), 0 warning(s)           # exit 0 -- both leaks missed
+# same names hand-written with the raw U+00AD in dossier.yaml: 2 x ERROR [E5], exit 1
 ```
 
-For names with `&` the folded pass cannot help: `_TEXT_FOLDABLE_RE` disables it for those names on purpose.
-**Fix:** Add a third haystack that decodes the character references, line by line so line numbers survive. Run the exact and the folded passes on it as well:
+The `format-name-init` fixture does not catch this because all five of its names pass the folded pass. It also pins the lossy `"Glo bex"` output as expected.
+
+**Fix:** Keep both readings on the producer side. For `confidential_names` only, emit the deletion reading as an extra list entry whenever it differs from the space reading, and keep the space reading for every other scalar. A simpler alternative is to delete U+00AD (by definition an intra-word hyphenation point) and map the other Cf characters to a space:
 
 ```python
-import html
-decoded = "\n".join(normalise(html.unescape(line)).replace("\n", " ")
-                    for line in norm.split("\n"))
-if decoded != norm:
-    haystacks["decoded"] = decoded
-    haystacks["decoded_folded"] = fold_ascii(decoded)
+def _confidential_entries(name):
+    deleted = "".join(ch for ch in name if unicodedata.category(ch) != "Cf")
+    spaced = "".join(" " if unicodedata.category(ch) == "Cf" else ch for ch in name)
+    return [deleted] if " ".join(deleted.split()) == " ".join(spaced.split()) else [spaced, deleted]
+
+quoted_names = ", ".join(yaml_quote(e) for n in confidential_names for e in _confidential_entries(n))
 ```
 
-This is cheap enough to apply to every text file, not only `.html`, since `&amp;` also appears in Markdown and mail drafts pasted from HTML. Add a fixture `e5-html-entities` with the four spellings above, asserting four `[E5]` lines.
+Correct the docstring. Add a `format-name-init` case with `Pro<SHY>cter & Gamble` / `AT<SHY>&T` expecting E5.
 
 ## Warnings
 
-### WR-01: The near-miss rule reports distinct, legitimate keys as misspelt gate keys, and its message asks for a gate-weakening edit
+### WR-01: `format_readings` covers category Cf only, so other invisible default-ignorable characters still hide a name
 
-**File:** `scripts/lint.py:226` (`GATE_KEY_CUTOFF = 0.8`), `scripts/lint.py:513-524`, `scripts/lint.py:821-828`
-**Issue:** A difflib ratio of 0.8 also catches keys that mean something else. Measured with `gate_key_for()`:
-- `consent_scope`, `consent_sources`, `consent_source_url` and `content_source` map to `consent_source`.
-- `consent_required`, `consent_revoked` and `consent_recorded_at/_on/_by` map to `consent_recorded`.
-- `confidential`, `confidential_notes`, `confidential_terms`, `confidential_name_notes` and `non_confidential_names` map to `confidential_names`.
+**File:** `scripts/lint.py:1498-1517`
+**Issue:** G-02-4b is closed only for `unicodedata.category(ch) == "Cf"`. Several Default_Ignorable_Code_Point characters are not Cf and have combining class 0, so `fold_ascii()` keeps them too: U+034F COMBINING GRAPHEME JOINER (Mn), variation selectors U+FE00–FE0F (Mn; VS16 routinely follows pasted emoji), Mongolian free variation selectors U+180B–180D (Mn), and the Hangul fillers U+115F/U+1160/U+3164/U+FFA0 (Lo). Reproduced: `Ac\u034fme`, `Ac\ufe0fme`, `Ac\u180bme` and `Ac\u3164me` in a mail body against the configured name `Acme` give `0 error(s), 0 warning(s)`, exit 0.
+**Fix:** Widen the predicate to an explicit default-ignorable set (the standard library exposes no property API), and share it with `init.py`'s `yaml_quote()`:
 
-Reproduced: a dossier with the exact gate keys plus `consent_scope: "mails only"` and `confidential_notes: "ask Jane first"` gives two `ERROR [C1]`, exit 1. D-22 says unknown keys are ignored, and D-FIX-9 only claims that the *spec's* keys score under 0.5. The message is also actively misleading: "key 'consent_scope' is not consent_source: write the key exactly". If `consent_source` is absent, following that advice turns a scope note into the consent source. With `consent_recorded: true`, that suppresses E5.
-**Fix:** Keep C1 for the certain near-misses: equal after `_fold_key` (case, `-`, space). Also keep it for a difflib near-miss while the exact gate key is **absent** at the top level. When the exact key is present, a difflib-only sibling is a different key: ignore it (D-22), or at most emit a `WARNING [C0]` that does not name a replacement. Reword the message to "looks like a misspelling of X" instead of "write the key exactly". Add a fixture with `consent_scope` + `confidential_notes` beside the exact keys, asserting exit 0.
+```python
+_IGNORABLE_RE = re.compile("[\u00ad\u034f\u061c\u115f\u1160\u17b4\u17b5\u180b-\u180f\u200b-\u200f"
+                           "\u202a-\u202e\u2060-\u206f\u3164\ufe00-\ufe0f\ufeff\uffa0￰-￸"
+                           "\U0001bca0-\U0001bca3\U0001d173-\U0001d17a\U000e0000-\U000e0fff]")
+def _is_invisible(ch):
+    return unicodedata.category(ch) == "Cf" or _IGNORABLE_RE.match(ch) is not None
+```
 
-### WR-02: Two new gate lines are not pinned by any test (surviving mutations)
+Extend `format-body` with CGJ, VS16 and U+3164 lines.
 
-**File:** `scripts/lint.py:841` (`config = {"gate_damaged": _misplaced_gate_keys(raw, findings)}`), `scripts/lint.py:816` (`visit(entry, where + "." + key)`)
-**Issue:** Both mutations leave `tests/test-lint.sh` fully green:
-1. Replacing the `gate_damaged` value with `False`, so a misplaced or misspelt key no longer keeps E5 armed. It matters when the exact consent pair is filled in and a second, misspelt consent key sits beside it. Reproduced on the real code: `consent_recorded: true` + a sourced `consent_source` + `Consent_recorded: false` gives C1 **and** E5. With the mutation, only C1 remains and the leak goes unreported. No fixture combines a recorded, sourced consent with a near-miss key: `gate-key-consent` has no exact `consent_recorded`, so it reads false anyway.
-2. Dropping the recursion in `visit()`, so a gate key nested two levels deep is never seen. The YAML subset cannot express that depth, but JSON can: `{"counterparts":[{"meta":{"confidential_names":["Acme"]}}]}`.
+### WR-02: The G-02-4e unreadable-folder assertions skip silently under root, so CI coverage disappears without a failure
 
-This is the same gap iteration-2 WR-04 closed for the JSON duplicate branch.
-**Fix:** Add a `gate-key-beside-consent` fixture: exact `consent_recorded: true`, a sourced `consent_source`, `Consent_recorded: false`, and a leaking mail. Assert exit 1, `[C1]` naming `consent_recorded`, and `[E5]`. Also add `gate-json-deep`, with the JSON above, asserting `[C1]` naming `confidential_names`.
-
-### WR-03: An unreadable folder under `outbound/` (or an `outbound/**/.git/` folder) is still skipped in silence, exit 0
-
-**File:** `scripts/lint.py:1026` (`os.walk(root, topdown=True)` with no `onerror`), `scripts/lint.py:1034-1035` (`PRUNED_DIRS` applied inside the layout too)
-**Issue:** WR-02 of iteration 2 set the rule that "a leak check that did not run must not exit 0". Two routes still break it:
-- `os.walk` drops a directory it cannot list and calls no handler. Reproduced: `chmod 000 outbound/mails` with a leaking `2026-09-17_acme.md` gives `0 error(s), 0 warning(s)`, exit 0.
-- `.git` is pruned everywhere, including below `outbound/`. Reproduced: `outbound/mails/.git/2026-09-17_acme.md` holding "Acme" also exits 0.
-
-Both are rarer than the symlink case, but they are the same failure, and the folder is gone from every outbound check.
-**Fix:** Pass `onerror=lambda err: unreadable.append(err.filename)` to `os.walk`. Carry the list on `Tree`, and in `check_outbound_headers` report `ERROR [E1] folder cannot be read: none of its files is checked` for any entry under `outbound/`, with an info line elsewhere. Prune `.git` only outside `LAYOUT_DIRS`. Below `outbound/`, report it as E1 like a symlink.
-
-### WR-04: A name wrapped inside a quoted reply (`> `) is not found
-
-**File:** `scripts/lint.py:1272` (`\s+` between tokens), `scripts/lint.py:1344` (`_TEXT_FOLD_SEPARATOR`)
-**Issue:** Mail drafts under `outbound/mails/` routinely quote the previous message, hard-wrapped at about 72 columns with a `> ` prefix on every line. The exact pattern joins tokens only with `\s+`, and the folded separator is `[\s_'.\-]*`. Neither crosses the `> ` that starts the next line. Reproduced: `confidential_names: [ "Big Telco" ]` and a body of `> On Monday you wrote: we should meet Big` / `> Telco next week.` gives `0 error(s), 0 warning(s)`, exit 0. CR-03 of iteration 1 fixed exactly this for unquoted wrapping.
-**Fix:** Strip quote markers from the E5 haystack without touching newlines, before both passes: `norm = re.sub(r"(?m)^[ \t]*(?:>[ \t]?)+", "", norm)`. Line numbers are unchanged. Add a `> ` wrapped case to `e5-wrapped`.
+**File:** `tests/test-lint.sh:686-706`
+**Issue:** When `chmod 000` does not take effect (CI containers usually run as root), both `unreadable-*` cases only print `SKIP:` to stderr. `tests/run.sh` still reports `ok tests/test-lint.sh`. G-02-4e's only end-to-end coverage then vanishes from the summary, and a regression in `_onerror` or in the `tree.unreadable` E1 loop would pass CI unnoticed.
+**Fix:** Also cover the path without file modes. Add a Python-level test that calls `walk_tree()` with `os.scandir` patched to raise `PermissionError` for one path and asserts that `tree.unreadable` holds it. Alternatively, count skips and print them in the final `PASS n FAIL m` line, or fail when `CI=true` and a skip occurred.
 
 ## Info
 
-### IN-01: Rendered binaries under `outbound/` are never scanned for names (carried forward)
+### IN-01: Dead condition in the nested near-miss branch
 
-**File:** `scripts/lint.py:108-112`, `scripts/lint.py:1382-1384`
-**Issue:** `.docx`/`.odt`/`.pptx`/`.xlsx` fail to decode, so E5 checks only their filenames.
-**Fix:** Read the zip members' XML with `zipfile` and search the text with tags stripped (and `html.unescape`, see CR-03), or document the gap in the skill.
+**File:** `scripts/lint.py:862`
+**Issue:** `elif key not in GATE_KEYS:` is always true when reached. An exact gate key is `_fold_key`-equal to itself, so `_certain_gate_key_for()` has already returned it in the `if` branch. This dead check misleads a reader into thinking an exact nested gate key can fall through to the near-miss branch.
+**Fix:** Replace it with a plain `else:`.
 
-### IN-02: W1 matches inside HTML comments, W2 does not (carried forward)
+### IN-02: `LOCKED_DIRS` relies on unquoted word splitting
 
-**File:** `scripts/lint.py:1537` (`normalise(text).splitlines()`) vs `scripts/lint.py:1589` (`visible_lines`)
-**Fix:** Iterate `visible_lines(normalise(text))` in `check_relative_dates`.
-
-### IN-03: `.gitkeep` files are dropped from the walk before E5 (carried forward)
-
-**File:** `scripts/lint.py:1047`
-**Fix:** Keep `.gitkeep` in the walk for E5, and exempt it from E1-E4 and E9 the way `OS_METADATA_NAMES` is.
-
-### IN-04: The Python 3.8 target is still never executed (carried forward)
-
-**File:** `tests/lib.sh:123`
-**Fix:** `PYTHON=${PYTHON:-python3}` in `lib.sh`, and one run under a 3.8 interpreter.
-
-### IN-05: stderr messages print the raw path, unsanitised (carried forward)
-
-**File:** `scripts/lint.py:1673`, `scripts/lint.py:1677`, `scripts/lint.py:1682-1683`
-**Fix:** Wrap the interpolated paths in `sanitise_path()`.
-
-### IN-06: The fixture generator relies on `set -e` to stop on an empty `$parent` (carried forward)
-
-**File:** `tests/fixtures/make-lint-fixtures.sh:74`
-**Fix:** `parent="$(mktemp -d)" && [ -n "$parent" ] && [ -d "$parent" ] || usage "mktemp failed"`.
-
-### IN-07: CLAUDE.md does not say that exit 2 also covers an argparse usage error (carried forward)
-
-**File:** `CLAUDE.md:105-107`
-**Fix:** Append "(argparse usage errors also exit 2)", as the `--help` epilog already does.
-
-### IN-08: macOS AppleDouble `._*` files still raise E1 and E4 (carried forward)
-
-**File:** `scripts/lint.py:101`, `scripts/lint.py:1142`, `scripts/lint.py:1241`
-**Fix:** Also exempt basenames starting with `._` from E1-E4, and keep them visible to E5.
-
-### IN-09: Punctuation-only tokens collapse in the filename half, so `C++` matches any `-c-` slug (carried forward)
-
-**File:** `scripts/lint.py:1306-1318`
-**Issue:** The folded text pass now has a guard (`_TEXT_FOLDABLE_RE`), but `filename_pattern` does not: `C++` configured still flags `2026-09-17_plan-c.md`.
-**Fix:** Reuse the `_TEXT_FOLDABLE_RE` guard in `filename_pattern`, or require a token of two or more characters.
-
-### IN-10: A duplicated `confidential_names` keeps only the first list (carried forward, D-FIX-1)
-
-**File:** `scripts/lint.py:610-615`, `scripts/lint.py:908-917`
-**Issue:** The run exits 1 (C1), but `confidential_names: []` followed by `confidential_names: [ Acme ]` reports no E5 for an actual Acme leak.
-**Fix:** For `confidential_names` only, merge the occurrences instead of keeping the first.
-
-_Iteration-2 IN-11 (raw DEL/C1 controls from `yaml_quote`) is closed by the CR-02 fix and is not carried._
+**File:** `tests/test-lint.sh:34` (and the appends at the chmod sites)
+**Issue:** `for _d in $LOCKED_DIRS` splits on whitespace and globs. If `$TMPDIR` or the fixture parent contains a space, the unlock runs on fragments, the mode-000 folder stays locked, and the trap's `rm -rf` leaks it. This is the exact failure the variable exists to prevent.
+**Fix:** Use a newline-separated list read with `while IFS= read -r _d`, or unlock the two known paths explicitly in the trap. Bash 3.2 has arrays, so `LOCKED_DIRS+=("$dir")` with `"${LOCKED_DIRS[@]}"` also works.
 
 ---
 
-_Reviewed: 2026-09-24T22:45:00Z_
+_Reviewed: 2026-09-25T13:49:34Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
-_Iteration: 3_

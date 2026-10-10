@@ -27,7 +27,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Scaffold & Templates** - `dossier-init` scaffolds a full dossier repo from `dossier.yaml` and templates
-- [ ] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures
+- [x] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures (completed 2026-10-10)
 - [ ] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
 - [ ] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts
 - [ ] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
@@ -127,7 +127,8 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: 6/9 plans executed (3 gap-closure plans added after the 2026-09-25 UAT)
+**Plans**: 9/9 plans complete (3 gap-closure plans added after the 2026-09-25 UAT, executed
+and re-verified the same day on branch `feat/phase-02-gap-closure`; recette and sign-off 2026-10-10)
 
 Plans:
 **Wave 1**
@@ -161,19 +162,19 @@ Plans:
 
 **Wave 6** *(gap closure, UAT 2026-09-25: G-02-2, G-02-4d)*
 
-- [ ] 02-07-PLAN.md — tracer: extension keys beside the exact gate keys are ignored (D-22),
+- [x] 02-07-PLAN.md — tracer: extension keys beside the exact gate keys are ignored (D-22),
   certain misspellings stay C1 with E5 armed, the C1 message says "looks like a misspelling of";
   the two gate lines WR-02 found unpinned are pinned
 
 **Wave 7** *(gap closure: G-02-4a, G-02-4e; blocked on Wave 6 completion)*
 
-- [ ] 02-08-PLAN.md — tracer: a case variant of a layout folder (`Outbound/`, `outbound/Mails/`)
+- [x] 02-08-PLAN.md — tracer: a case variant of a layout folder (`Outbound/`, `outbound/Mails/`)
   fails closed with E1; unreadable folders and `.git` folders under `outbound/` are E1, never
   skipped in silence
 
 **Wave 8** *(gap closure: G-02-4f, G-02-4c, G-02-4b; blocked on Wave 7 completion)*
 
-- [ ] 02-09-PLAN.md — tracer: E5 searches line-preserving haystack variants, so quoted-reply
+- [x] 02-09-PLAN.md — tracer: E5 searches line-preserving haystack variants, so quoted-reply
   wraps, HTML character references and Unicode format characters hide no name; `init.py` never
   writes a format character
 
@@ -307,7 +308,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
-| 2. Linter & Test Harness | 6/6 | In Progress|  |
+| 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |

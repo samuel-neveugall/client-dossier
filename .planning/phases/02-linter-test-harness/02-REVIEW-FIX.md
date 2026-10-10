@@ -1,216 +1,260 @@
 ---
 phase: 02-linter-test-harness
-fixed_at: 2026-09-24T21:18:30Z
+fixed_at: 2026-09-25T14:10:16Z
 review_path: /Users/samuel/Documents/dev/client-dossier/.planning/phases/02-linter-test-harness/02-REVIEW.md
-iteration: 2
-findings_in_scope: 7
-fixed: 7
-skipped: 0
-status: all_fixed
+iteration: 3
+findings_in_scope: 5
+fixed: 5
+skipped: 2
+status: partial_by_mandate
+amended_at: 2026-09-25
+amended_status: cr02_closed_follow_up
+cr02_status: fixed
 ---
 
-# Phase 2: Code Review Fix Report
+# Phase 2: Code Review Fix Report (iteration 3)
 
-**Fixed at:** 2026-09-24T21:18:30Z
+**Fixed at:** 2026-09-25T14:10:16Z
 **Source review:** /Users/samuel/Documents/dev/client-dossier/.planning/phases/02-linter-test-harness/02-REVIEW.md
-**Iteration:** 2
+("iteration 4" by that report's own internal numbering of the review round;
+this file continues the fix-round numbering of 02-REVIEW-FIX.iter1.md /
+02-REVIEW-FIX.iter2.md)
 
 **Summary:**
-- Findings in scope: 7 (3 critical, 4 warnings). The 11 Info findings are out of scope for `critical_warning`.
-- Fixed: 7
-- Skipped: 0
+- Findings in scope of the mandate: 5 of the review's 7 (2 critical of 3,
+  both warnings, both info). CR-02 was explicitly out of scope -- gated by
+  Samuel's arbitrage. WR-01 was explicitly deferred as tracked debt, not a
+  mandate item.
+- Fixed: 5 (CR-01, CR-03, WR-02, IN-01, IN-02)
+- Skipped: 2 (CR-02 frozen, WR-01 deferred)
+- **Amended 2026-09-25 (follow-up mandate `fix-cr02`, after Samuel's arbitrage arrived):** CR-02
+  is now fixed too, commit b51b670. 6 of 7 findings closed; only WR-01 stays deferred. See its
+  entry under Fixed Issues (moved out of Skipped Issues) and the Review round 2 section below.
 
-**Where the work and verification ran:** in the main checkout, on branch `main`, as instructed. No worktree was created.
+**Where the work and verification ran:** in the main checkout, on branch
+`feat/phase-02-gap-closure`, as instructed. No worktree was created.
 
 **How each fix was tested:**
-- The regression fixture and its assertions went in first. `bash tests/test-lint.sh` was run to watch them fail, and only then was the code changed.
-- After each commit, `bash tests/run.sh` was green (6 files, 0 failed). The final `tests/test-lint.sh` run has 1290 assertions and 0 failures.
-- Fresh `init.py` scaffolds in `en` and `fr` still lint with `0 error(s), 0 warning(s)`.
-- Both Python files parse under `ast.parse(..., feature_version=(3, 8))`. Python 3.8 itself is still not installed here (IN-04).
-- Targeted mutations were run on the new lines. These were all caught by the suite: the YAML `gate_damaged`, the indicator rejection, the `: ` rejection, the misplaced-key scan, the symlink E1, the Đ entry and the foldable guard.
-- One mutation survived at first: dropping the `dj` alternate from the text pass. A follow-up test commit pins it.
+- `bash tests/test-lint.sh` was green after every commit (`PASS 1479 FAIL 0`
+  by the end, up from `PASS 1470 FAIL 0` before this round -- the review's
+  own reproductions became fixtures).
+- `bash tests/run.sh` was green after every commit (`TOTAL: 6 files,
+  0 failed`).
+- After CR-01 and CR-03, a fresh `init.py --language en` and `--language fr`
+  scaffold was linted directly (not through a fixture) and stayed
+  `0 error(s), 0 warning(s)`, confirming neither fix regresses the ordinary
+  scaffold path.
+- CR-01's and CR-03's review reproductions were re-run by hand against the
+  fixed `scripts/lint.py` / `init.py` before being turned into fixtures, to
+  confirm the fix actually closes what the review reported, not only what
+  the new fixture happens to assert.
 
-**How the commits were made:** with `git commit -F`, as in iteration 1, so each message could end with the two trailer lines. There is one commit per finding, plus one test-only follow-up for WR-03.
-
-## Iteration 1 recap
-
-Iteration 1 fixed 12 findings (3 critical, 9 warnings) in commits `0311379`..`5d45cb4`. Its main changes:
-- A gate line that could not be read became C1, and duplicate keys became first-wins (CR-01).
-- The parser split lines only on `\n` and `\r`. `init.py` stripped U+2028, U+2029 and U+0085 (CR-02).
-- E5 searched for multi-word names across whitespace, and in ASCII-folded slugs (CR-03).
-- `''` inside single quotes was read as an escape (WR-01).
-- A null or letterless `consent_source` counted as no source (WR-02).
-- The fixed-layout folders stopped being sub-dossier boundaries (WR-03).
-- The README exemption was limited to `outbound/README.md` (WR-04).
-- OS metadata files were exempted from E1-E4 but kept visible to E5 (WR-05).
-- stdout gained `backslashreplace`, so an unencodable character no longer crashes the run (WR-06).
-- The tests were hardened: a missing bait now fails (WR-07), an ancestor `dossier.yaml` is skipped (WR-08), and every gate parser branch is covered (WR-09).
-
-The iteration-2 review found that CR-01, CR-02 and CR-03 had only closed the reported inputs. Narrower variants were still open. This iteration closes those classes at the structural level.
+**How the commits were made:** with `git commit -F -` (a heredoc), one
+commit per finding except the mechanical rename, so each message could end
+with the two trailer lines the session's attribution reminder specifies.
 
 ## Fixed Issues
 
-### CR-01: An indented, unreadable line holding `confidential_names` is still a C0 warning (exit 0)
+### CR-01: A case-variant layout folder holding a `dossier.yaml` is pruned as a sub-dossier, so its leak exits 0 (G-02-4a bypass)
 
 **Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
-**Commit:** 5ef26c4
-**Status:** fixed: requires human verification (parser severity rule, D-FIX-8)
-**Applied fix:** the whole class is closed, not only the reported case.
-- **Every line the subset parser skips is now `ERROR [C1]`,** whatever key it seems to sit under. It also keeps E5 armed whatever the consent flag says.
-- **The C1 message names the line's own gate key** when it carries one. That is why an indented `confidential_names:` line under `counterparts` is reported as a names line.
-- **The only C0 left** is a well-formed repeat of a non-gate top-level key. Its key is exact and its value parses, so its meaning is certain.
-- **Fixtures:**
-  - `gate-misindent-block` and `gate-misindent-scalar` are the two reproductions.
-  - `gate-skip-armed`: a junk line beside a recorded, sourced consent still gives E5.
-  - `c1-counterpart-broken`
-  - `c0-dup`
-  - `c0-junk` is renamed `c1-junk` and now expects C1.
-
-### CR-02: `init.py` fuses the words of a name when it strips a line break or tab
-
-**Files modified:** `skills/dossier-init/scripts/init.py`, `tests/test-init-empty.sh`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
-**Commit:** d77d52e
+**Commit:** cca05d2
 **Status:** fixed
-**Applied fix:**
-- **What `yaml_quote()` does now:** it maps each of these characters to a space, never deletes it:
-  - every C0 control (tab and newline included)
-  - DEL
-  - every C1 control (NEL included)
-  - U+2028 and U+2029
+**Applied fix:** `walk_tree`'s layout-membership test (`in_layout`) and the
+root-level sub-dossier exemption both case-fold now, against a new
+`_LAYOUT_DIRS_FOLDED` set, instead of comparing case-sensitively against
+`LAYOUT_DIRS`. A folder like `Outbound/` is therefore always walked, never
+pruned as a D-03 sub-dossier boundary, whether or not it holds its own
+`dossier.yaml`. The existing case-variant E1 loop (untouched) then reports
+it exactly as it already reports `Outbound/` without a `dossier.yaml`.
+**Fixture:** `case-outbound-config` -- `Outbound/` with a leak under
+`Outbound/mails/` *and* its own `Outbound/dossier.yaml` copy -- asserting
+`Outbound:0: ERROR [E1]` and exit 1, plus a check that every existing clean
+fixture and both fresh scaffolds are unaffected.
 
-  It then collapses runs of whitespace to one space and trims the ends.
-- **The Phase 1 injection tests still hold.** A newline is still never written raw. Two expectations changed from the fused spelling to the spaced one: `"Jane injected: pwned"` and `"en injected: pwned"`.
-- **New fixture `linebreak-words`:** an `init.py` → `lint.py` round trip on five multi-word names. They are split by U+2028, a tab, a newline, NEL, and a `\t\r\n` run. Each name leaks in a body and in a conforming slug, which gives 10 `[E5]`. The test also asserts the spaced spelling in `dossier.yaml`.
+### CR-03: `init.py` maps every Cf character to a space, so the init round trip loses the deletion reading and a name holding `&`/`+` is never matched
 
-### CR-03: The E5 filename check misses names with letters that NFKD does not decompose
+**Files modified:** `skills/dossier-init/scripts/init.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
+**Commit:** a777086
+**Status:** fixed: applies the review's option A, a reversible arbitrage (see Decisions below)
+**Applied fix:** a new `_confidential_yaml_entries(name)` computes both the
+space reading and the deletion reading of a name's Unicode format
+characters (via a shared `_fold_format_chars(value, delete=...)` extracted
+out of `yaml_quote()`), and returns both as separate quoted list entries
+whenever they still differ once each side's whitespace is collapsed the
+same way -- one entry otherwise, byte-identical to what `yaml_quote()`
+already produced. `render_dossier_yaml()` calls it for `confidential_names`
+only; every other scalar field is untouched and keeps the single space
+reading. `yaml_quote()`'s docstring, which claimed the folded lint pass
+alone covers the deletion reading, is corrected: that is only true for
+names `_TEXT_FOLDABLE_RE` accepts, never for one holding `&`, `+`, or
+similar punctuation next to the format character.
+**Fixture:** `format-name-init` gains two names, `Pro<SHY>cter & Gamble`
+and `AT<SHY>&T`, found in a mail body via their deletion reading (the only
+reading they can ever match on, since `&` defeats the folded pass). The
+existing `Glo<SHY>bex` case, which used to pin the single lossy `"Glo bex"`
+line, now pins both `"Glo bex"` and `"Globex"` -- the new, correct output.
+The round trip's expected finding count moved from 10 to 14: five original
+names still give one filename + one body finding each, except
+`Glo<SHY>bex`, which fires twice on the filename and twice on the body line
+(both readings independently match the plain "Globex" text/slug, since
+deleting and spacing a soft hyphen strictly inside one contiguous word
+produce two different, both-matching spellings), plus the two new names'
+body findings.
 
-**Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
-**Commit:** 97e64f9
+### WR-02: The G-02-4e unreadable-folder assertions skip silently under root, so CI coverage disappears without a failure
+
+**Files modified:** `tests/lib.sh`, `tests/test-lint.sh`
+**Commit:** 66f9464
 **Status:** fixed
-**Applied fix:**
-- `_FOLD_TABLE` transliterates these letters, in both cases, before NFKD: Ł, Ø, Æ, Œ, Đ, Ð, Þ, ı, ß/ẞ, Ħ.
-- It applies to the needle and to the path alike.
-- Đ has a second customary spelling, `dj`. `filename_pattern()` tries both spellings as alternatives.
-- New fixture `e5-slug-translit` has 16 slugs, one per letter and case, including both `djordje-petrovic` and `dorde-petrovic`. Each slug gives one `[E5]`, and the fixture expects exactly 16. Before the fix, 14 of the 16 slugs were missed.
+**Applied fix:** a small shared `skip()` helper in `tests/lib.sh` prints
+`SKIP: ...` to stdout (not stderr) and counts it in a new `TESTS_SKIPPED`,
+kept fully separate from `TESTS_PASSED`/`TESTS_FAILED`. `finish()` names the
+skip count in its summary line only when at least one occurred, so every
+other test file's output is byte-identical to before. The two
+`unreadable-outbound`/`unreadable-knowledge` sites in `tests/test-lint.sh`
+call `skip()` instead of echoing to stderr directly. `tests/run.sh`'s
+pass/fail decision is untouched -- it still only reads the exit code.
 
-### WR-01: A near-miss gate key, or a shape the subset misreads, still turns E5 off silently
+### IN-01: Dead condition in the nested near-miss branch
 
-**Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
-**Commit:** cd45e00
-**Status:** fixed: requires human verification (the near-miss threshold is a judgement call, D-FIX-9 and D-FIX-10)
-**Applied fix:**
-- **Misspelt and misplaced gate keys.** `apply_schema()` now reports C1 for any key that spells a gate key without being it. It keeps E5 armed. This covers two kinds of key:
-  - a misspelt top-level key, matched after case-folding and turning `-` and spaces into `_`, or within a `difflib` ratio of 0.8
-  - a gate key nested anywhere below the top level, such as `counterparts[].confidential_names`
-
-  Both the YAML and the JSON branch are covered.
-- **Plain scalars that are not YAML.** `parse_scalar()` rejects a plain scalar that:
-  - starts with a YAML indicator (`- `, `? `, `: `), such as `- - Acme` read as the scalar `- Acme`
-  - contains `: `, which usually means two lines were joined
-- **Fixtures:** `gate-key-dash`, `gate-key-case`, `gate-key-typo`, `gate-key-space`, `gate-key-consent`, `gate-nested-seq`, `gate-in-counterpart`, `gate-joined`, `gate-json-key-case`, `gate-json-nested`.
-
-### WR-02: A symlinked `outbound/` (or subfolder) is skipped silently
-
-**Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
-**Commit:** 41462be
+**File modified:** `scripts/lint.py`
+**Commit:** 9019a26
 **Status:** fixed
-**Applied fix:**
-- The walk still does not follow directory symlinks (T-02-03). It now records them in `Tree.symlinks`.
-- A symlinked folder under `outbound/`, or `outbound/` itself, is `ERROR [E1]` on the folder. That fails closed.
-- Anywhere else, a symlinked folder gets an `info:` line.
-- **Why not follow the link:**
-  - It may point outside the dossier, so the linter would report on files that are not the dossier's, or loop back into it.
-  - An error tells the user exactly what to do: make it a real folder.
-  - E1 already covers a symlinked file ("cannot be read"), so no new identifier was added (D-05).
-- **Fixtures:** `symlink-outbound`, `symlink-outbound-sub`, `symlink-knowledge`.
+**Applied fix:** `elif key not in GATE_KEYS:` replaced with a plain
+`else:`, exactly the review's suggested fix. No behaviour change --
+verified by the full `tests/test-lint.sh` suite staying green, including
+every gate/near-miss fixture. CR-02's frozen presence rule in the same
+function (the `if near is not None and near not in raw:` branch a few lines
+below) was not touched.
 
-### WR-03: The E5 text check does not match spellings the filename check does
+### CR-02: The presence rule silently ignores a misspelt `confidential_names` that carries the names (regression against 8c2ed0f)
 
 **Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
-**Commits:** b83a7e3 (the fix), 0d21d4a (a follow-up test for the `dj` spelling)
-**Status:** fixed: requires human verification (matching logic, and it settles D-FIX-3 on the "match more" side)
-**Applied fix:**
-- **A second text pass.** `folded_text_pattern()` runs on the text as `fold_ascii()` spells it: accents dropped, CR-03 transliteration, both spellings of Đ.
-- **What may join the words of a name:** whitespace, `-`, `_`, `'`, `.`, or nothing. A comma or other sentence punctuation never does.
-- **A guard for punctuated names.** A name whose punctuation carries meaning (`C++`, `AT&T`) gets no folded pattern, because it would fold to a bare letter.
-- **Line numbers stay right.** Folding never adds or removes a `\n`. This was checked over every code point, so the line number is the same on both strings. There is one finding per (line, name) across both passes.
-- **Fixtures:**
-  - `e5-text-fold`: unaccented, hyphenated, joined, transliterated, apostrophe dropped, and the `dj` spelling. Each sits after lines whose length changes when folded.
-  - `e5-text-fold-boundary`: `Big, Telco`, and a lone `c` with `C++` configured. It must stay clean.
+**Commit:** b51b670
+**Status:** fixed (commit) -- option (a), arbitrage Samuel, relayed by the main session via
+SendMessage, 2026-09-25
+**Applied fix:** the presence exemption stays unconditional for `consent_recorded`/
+`consent_source` near-misses (a legitimate extension key such as `consent_scope` beside
+`consent_source` stays a different, known key, per D-22's original intent) but is now
+overridden for a `confidential_names` near-miss that scores as a probable typo: a new
+`_osa_distance()` (Optimal String Alignment -- Levenshtein plus one adjacent-transposition edit)
+and `_forces_c1_despite_presence()` helper, applied identically at both call sites in
+`_misplaced_gate_keys()` (the top-level loop and `visit()`'s nested branch). Plain Levenshtein
+was tried first and rejected: it cannot separate a typo (`confidentail_names`) from a genuinely
+different key (`confidential_notes`) sitting beside the exact one, since both land at edit
+distance 2. OSA scores the transposition in `confidentail_names` as one edit, not two, dropping
+it to distance 1 while `confidential_notes` (two straight substitutions) stays at distance 2.
+`CONFIDENTIAL_NAMES_TYPO_CUTOFF = 1` is the resulting threshold. Full rationale and the
+DP-verification of the Levenshtein/OSA distinction: `02-CONTEXT.md` § Gap closure decisions
+(2026-09-25).
+**Fixture:** `gate-key-beside-names-drop` (`confidential_name`, missing the trailing `s`) and
+`gate-key-beside-names-swap` (`confidentail_names`, the "ia"/"ai" transposition) -- both beside
+`confidential_names: []` -- assert `[C1]` with the "looks like a misspelling of
+confidential_names" message and exit 1. The existing `gate-key-extras` fixture (its top-level
+and counterpart-level `confidential_notes`, at OSA distance 2) needed no change and keeps
+asserting 0 findings / exit 0.
 
-### WR-04: The JSON duplicate-consent branch of the fail-closed gate is not pinned by any test
+### CR-02 bis: `CONFIDENTIAL_NAMES_TYPO_CUTOFF <= 1` still let a DOUBLE typo of `confidential_names` through unflagged beside the exact key
 
-**Files modified:** `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
-**Commit:** afeac18
-**Status:** fixed (test only)
-**Applied fix:**
-- New fixture `gate-json-consent-dup`: a JSON config with `consent_recorded` given `true` then `false`, a filled source, and a leak. It asserts exit 1, a `[C1]` naming `consent_recorded`, and the `[E5]`.
-- Checked against the review's M18 mutation (removing `gate_damaged = True` from the JSON branch): the `[E5]` assertion fails. It passes on the real code.
+**Files modified:** `scripts/lint.py`, `tests/fixtures/make-lint-fixtures.sh`, `tests/test-lint.sh`
+**Commit:** c1ed6bb
+**Status:** fixed (commit) -- option (2), arbitrage Samuel, relayed by the main session via
+SendMessage, 2026-09-25
+**Applied fix:** `_forces_c1_despite_presence()` gained a second clause. A `confidential_names`
+near-miss also forces C1 when its whole-key OSA distance is `<= CONFIDENTIAL_NAMES_TYPO_CUTOFF_
+WORD` (2) AND its last `_`-separated word is within `CONFIDENTIAL_NAMES_WORD_CUTOFF` (1) OSA
+edits of `"name"` **or** `"names"` -- checking both words, not `"names"` alone, because
+`confidential_nam`'s last word `nam` is OSA distance 2 from `"names"` but only 1 from `"name"`;
+`"names"` alone would have missed it. `confidential_name` and `confidential_nam` were previously
+missed because their whole-key OSA distance (2) is the same as the legitimate
+`confidential_notes` extension key's -- the two are told apart only by looking at the last word.
+Full rationale, the ground-truth table, and the residual limit (a double typo landing inside the
+last word itself is only caught when it happens to stay within the cutoff): `02-CONTEXT.md` §
+Gap closure decisions, round 3 -- CR-02 bis (2026-09-25).
+**Fixture:** `gate-key-beside-names-double` (`confidental_name`), `gate-key-beside-names-double2`
+(`confidential_nam`) and `gate-key-beside-names-nounderscore` (`confidentialnames`, already
+covered by the plain single-keystroke clause) -- each beside `confidential_names: []` -- assert
+`[C1]` with the "looks like a misspelling of confidential_names" message and exit 1. The existing
+`gate-key-extras` fixture keeps pinning `confidential_notes` beside the exact key at 0 findings /
+exit 0, unmodified; `02-CONTEXT.md` notes it rather than duplicating a fixture for it.
 
-## Decisions for Samuel
+### IN-02: `LOCKED_DIRS` relies on unquoted word splitting
 
-Each of these is a choice the spec and `02-CONTEXT.md` leave open. I took the option that keeps the confidentiality gate closed, and each one can be reversed in a few lines.
+**File modified:** `tests/test-lint.sh`
+**Commit:** 9b6cf7d
+**Status:** fixed
+**Applied fix:** `LOCKED_DIRS` is now newline-separated instead of
+space-separated. A new `unlock_locked_dirs()` function reads it back with
+`while IFS= read -r _d`, one path per line, and the EXIT trap calls that
+function instead of inlining an unquoted `for _d in $LOCKED_DIRS` loop.
+Chosen over a bash array (the review's alternative) because this script
+targets bash 3.2 and `"${LOCKED_DIRS[@]}"` on an empty array under `set -u`
+is unbound-variable-fatal on bash < 4.4; the newline/`read -r` form has no
+such edge case.
 
-**Carried from iteration 1, updated where this iteration changed them:**
+## Skipped Issues
 
-- **D-FIX-1 (CR-01): duplicate keys.**
-  - The first occurrence still wins, and the second is reported.
-  - The two name lists are still not merged. Names that appear only in a second `confidential_names` are not searched (IN-10), although the run exits 1 with C1.
-  - The owning-key attribution this entry described in iteration 1 is superseded by D-FIX-8. It now only chooses the wording of the message.
-- **D-FIX-2 (CR-03): filename matching allows an empty separator.** Unchanged. `Big Telco` matches `bigtelco`. A very short multi-token name could collide with an innocent slug. IN-09 (`C++` matching `-c-` in a slug) is still open for filenames.
-- **D-FIX-3 (CR-03, WR-03): folding in the text half. Decided on the "match more" side, and you can reverse it.** The text half now also matches the ASCII-folded spelling. False-positive risks you accept with this:
-  - A one-word name that is also a common unaccented word: `Élan` configured matches "elan".
-  - A dot between the words: `Big. Telco` matches, as does `jane.doe` for `Jane Doe` (arguably a real leak).
-  - The empty separator: `Acme Corp` matches `acmecorp`.
-  - A name with meaningful punctuation (`C++`) is excluded from the folded pass on purpose.
+### WR-01: `format_readings` covers category Cf only, so other invisible default-ignorable characters still hide a name
 
-  To reverse it, return `_NEVER_RE` from `folded_text_pattern()`. To narrow it, drop `.` from `_TEXT_FOLD_SEPARATOR`.
-- **D-FIX-4 (WR-02 of iteration 1): what counts as "no source".** Unchanged:
-  - Blank, an unquoted null or `~`, or letterless text counts as no source.
-  - `TODO` and `n/a` still count as a source.
-  - A quoted `"null"` is still a string.
-- **D-FIX-5: D-07 wording versus D-10.** Unchanged. E4 keeps D-10's `README.md` exemption in the three subfolders. E1-E3 exempt only `outbound/README.md`.
-- **D-FIX-6: a stray `dossier.yaml` inside the fixed layout.** Unchanged. It is not a boundary. Under `outbound/` it gets E1/E4. Elsewhere it is not reported as such.
-- **D-FIX-7: OS metadata files stay visible to E5.** Unchanged. AppleDouble `._*` files are still E1/E4 (IN-08).
+**Status:** deferred, tracked debt
+**Why:** not named in the mandate's "À CORRIGER" list; the mandate's file
+scope for this round is limited to `walk_tree`/layout membership (IN-01
+only), `init.py`, `make-lint-fixtures.sh`, `test-lint.sh`, and this report.
+Widening `format_readings`'/`yaml_quote()`'s Cf-only predicate to the full
+Default_Ignorable_Code_Point set (CGJ, variation selectors, Mongolian free
+variation selectors, the Hangul fillers) is a real, reproducible gap the
+review demonstrated, but it touches `scripts/lint.py`'s `format_readings()`
+and `_is_invisible()`-shaped logic beyond the CR-01/CR-03 lines this round
+is scoped to, and it was not flagged as frozen or in-scope either --
+raising it here for the next planning pass rather than folding it in
+silently.
 
-**New in iteration 2:**
+## Decisions
 
-- **D-FIX-8 (CR-01): D-22 narrowed. An unparseable `dossier.yaml` line is an error, no longer a warning.**
-  - D-22 (locked) said "unknown or unparseable lines are skipped with a warning". Unparseable lines are now `[C1]`, exit 1, and keep E5 armed.
-  - A hand-editing slip anywhere in `dossier.yaml`, `counterparts` included, now fails the run.
-  - Unknown well-formed keys are still ignored, as D-22 says (except near-misses, D-FIX-9).
-  - C0 is still an identifier. It now covers only a well-formed duplicate of a non-gate key.
-  - Fresh scaffolds are unaffected: they produce no skipped line.
-  - If you want the warning back for lines clearly under a non-gate key, that is the "certain attribution" rule. Every attempt at it across two iterations left a variant open, which is why I did not keep it.
-- **D-FIX-9 (WR-01): near-miss gate keys.**
-  - What counts as a near-miss: a key within a `difflib` ratio of 0.8 of a gate key, or equal to one after case-folding and turning `-` and spaces into `_`.
-  - Every other spec key scores under 0.5. `consent_note` (0.77) is not caught.
-  - A near-miss is reported. Its value is not read as the gate, so names written under `confidential-names` are not searched. The run still exits 1.
-  - Reading the misspelt key's names too would also report the leak. That is a small change if you want it.
-- **D-FIX-10 (WR-01): stricter plain scalars.**
-  - An unquoted value containing `: `, ending in `:`, or starting with `- `, `? ` or `: ` is now a C1. YAML rejects these too.
-  - One visible consequence: a hand-written unquoted `consent_source: mail 2026-09-16: Jane` is now a C1 and must be quoted. `init.py` always quotes it.
-- **D-FIX-11 (WR-02): a symlinked folder is reported, not followed.**
-  - Under `outbound/` it is E1. Elsewhere it gets an info line.
-  - A symlinked `dossier/` shows up as seven "living file is missing" E7 errors plus the info line.
-  - Following links safely would mean a realpath containment check. I rejected it as the riskier option.
-- **D-FIX-12 (CR-02): `yaml_quote()` normalises whitespace in every quoted field,** not only in names. Break and control characters become spaces, runs collapse, and the ends are trimmed. A no-break space becomes a regular space. Two Phase 1 expectations in `tests/test-init-empty.sh` were updated to match. This also closes IN-11 (raw DEL and C1 controls).
-- **D-FIX-13 (CR-03): the transliteration table is data.**
-  - Đ gets both `d` and `dj`.
-  - ð gets only `d` (not `dh`). Þ gets `th`. ı gets `i`.
-  - Extending the table is a one-line change and never changes the contract.
+- **D-FIX-13** (CR-03, reversible): for `confidential_names` only,
+  `init.py` now emits both the space and the deletion reading of a Unicode
+  format character as separate list entries when they differ after
+  whitespace normalisation, applying option A of the review's two
+  proposals. Reverting to the single space reading is the inverse edit to
+  `_confidential_yaml_entries()`/its call site in `render_dossier_yaml()`
+  alone -- no other file depends on the two-entry shape.
+- **CR-02 (option (a), arbitrage Samuel, relayed by the main session via SendMessage,
+  2026-09-25):** the presence exemption now has one carve-out, not two competing rules --
+  `confidential_names` near-misses are judged on OSA distance (typo vs. legitimate different
+  key), `consent_recorded`/`consent_source` near-misses keep the original unconditional
+  exemption. See `02-CONTEXT.md` § Gap closure decisions (2026-09-25) for the full rationale,
+  including why plain Levenshtein was rejected in favour of OSA distance.
+- **CR-02 bis (option (2), arbitrage Samuel, relayed by the main session via SendMessage,
+  2026-09-25):** replaces the literal wording of CR-02's first answer, which rested on a wrong
+  distance measurement. The carve-out gains a second, looser clause scoped to the near-miss's
+  last `_`-separated word (checked against both `"name"` and `"names"`), so a double typo that
+  still obviously says "the names" (`confidental_name`, `confidential_nam`) stays C1 beside the
+  exact key, while a genuinely different word (`confidential_notes`'s `"notes"`) keeps the
+  exemption. See `02-CONTEXT.md` § Gap closure decisions, round 3 -- CR-02 bis (2026-09-25) for
+  the full rationale, the ground-truth table, and the documented residual limit.
 
-## Out of scope (Info, not attempted)
+## Follow-up
 
-- IN-01 to IN-10 were not attempted.
-- IN-11 is closed as a side effect of CR-02: DEL and C1 controls now become spaces.
-- IN-09 is still open for filenames. The new folded text pass has its own guard against it.
-- IN-10 is still open, as recorded under D-FIX-1.
-- IN-04: the suite has still not been run under Python 3.8.
-- IN-07: `CLAUDE.md` still does not say that exit 2 also covers argparse usage errors.
+- WR-01 (the wider Default_Ignorable_Code_Point set) is open debt for the
+  next planning pass on this phase or a follow-up gap-closure round.
+
+## Review round 2 (vf-reviewer, HEAD 0bd363a)
+
+- **Verdict:** passed.
+- `git fsck --full --strict`: clean.
+- Range `8c2ed0f..0bd363a`: linear, 20 commits, every commit's trailers exact
+  (`Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` /
+  `Claude-Session: https://claude.ai/code/session_01GWGsAe34jLEPP8p4e45qD9`), no `.gsd/` path
+  committed anywhere in the range.
+- Lint assertions: 1479 PASS.
+- **Observation OBS-01** (minor, no-op): no runtime rejection of a `confidential_name` starting
+  with `>` -- same class as WR-04, already accepted. No action taken this round; tracked as open
+  debt alongside WR-01.
 
 ---
 
-_Fixed: 2026-09-24T21:18:30Z_
-_Fixer: Claude (gsd-code-fixer)_
-_Iteration: 2_
+_Fixed: 2026-09-25T14:10:16Z_
+_Fixer: Claude (vf-coder, targeted correction mandate)_
+_CR-02 closed: 2026-09-25, targeted correction mandate (fix-cr02)_
+_CR-02 bis closed: 2026-09-25, targeted correction mandate (fix-cr02-bis)_
