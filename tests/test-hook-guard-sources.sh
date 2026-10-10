@@ -350,7 +350,9 @@ echo '--- Bash: an unknown working directory still judges the operand (NF-5) ---
 bash_deny 'cd - then a root-relative rm' "cd - ; rm $S"
 bash_deny 'cd $X then a root-relative rm' "cd \$X; rm $S"
 bash_deny 'cd "$(pwd)" then a root-relative rm' "cd \"\$(pwd)\"; rm $S"
-bash_deny 'cd - back to the last known directory' \
+bash_deny 'cd - back to the directory the previous cd left (OLDPWD)' \
+  'cd sources/transcripts; cd /; cd -; rm 2026-10-01_kickoff.txt'
+bash_ok 'cd - back to the root, the relative file is not a source there' \
   'cd sources/transcripts; cd -; rm 2026-10-01_kickoff.txt'
 bash_deny 'cd $X after a known cd, relative to the last known one' \
   'cd sources/transcripts; cd $X; rm 2026-10-01_kickoff.txt'
@@ -360,6 +362,167 @@ bash_deny 'function keyword, no parentheses' "function f { rm $S; }"
 bash_deny 'function keyword with parentheses' "function f() { rm $S; }"
 bash_ok 'an unknown directory and a file that does not exist' 'cd "$(pwd)"; rm notes.txt'
 bash_ok 'an unknown directory, a NEW file copied in' 'cd $X; cp x sources/received/2026-10-10_new.txt'
+
+# --- Case 7: the last bounded round (F1 .. F7, D-17) ---
+ROOT_NAME="$(basename "$b")"
+
+echo '--- Bash: a backslash escapes the next character, ANSI-C quotes (F1) ---'
+bash_deny 'an escaped space does not open a comment' "echo a\\ #b; rm $S"
+bash_deny 'an escaped space, comment mark on the next word' "echo a\\ #b rm; rm $S"
+bash_deny 'ANSI-C quotes holding an escaped apostrophe' "echo \$'it\\'s'; rm $S"
+bash_deny 'ANSI-C quotes holding an escaped apostrophe and a hash' "echo \$'a\\' #'; rm $S"
+bash_ok 'rm inside an ANSI-C string is text' "echo \$'it\\'s: rm $S'"
+bash_ok 'a real comment after a word is still a comment' "echo a #c; rm $S"
+bash_ok 'an escaped hash is not a comment, nothing to delete' "echo a\\ #b; rm notes.txt"
+
+echo '--- Bash: a string spanning lines carries its state (F2) ---'
+bash_deny 'a <<EOF inside a double-quoted multi-line string' \
+  $'echo "\ncat <<EOF\n"\nrm '"$S"$'\nEOF'
+bash_deny 'a <<EOF inside a single-quoted multi-line string' \
+  $'echo \'\ncat <<EOF\n\'\nrm '"$S"$'\nEOF'
+bash_deny 'a <<EOF inside an ANSI-C multi-line string' \
+  $'echo $\'\\\'\ncat <<EOF\n\'\nrm '"$S"$'\nEOF'
+bash_ok 'a real heredoc after a multi-line string' \
+  $'echo "a\nb"\ncat <<EOF >/dev/null\nrm '"$S"$'\nEOF'
+bash_ok 'a stray apostrophe still leaves a later heredoc a heredoc' \
+  $'echo it\'s\ncat <<EOF >/dev/null\nrm '"$S"$'\nEOF'
+
+echo '--- Bash: cd -, pushd and popd are followed (F4) ---'
+bash_deny 'cd / ; cd - ; rm (OLDPWD is the dossier)' "cd /; cd -; rm $S"
+bash_deny 'cd sources, cd /, cd -, then the relative name' \
+  'cd sources/transcripts; cd /; cd -; rm 2026-10-01_kickoff.txt'
+bash_deny 'pushd into sources then a relative rm' \
+  'pushd sources/transcripts >/dev/null; rm 2026-10-01_kickoff.txt'
+bash_deny 'pushd, pushd, popd lands in sources again' \
+  'pushd sources/transcripts >/dev/null; pushd /tmp >/dev/null; popd >/dev/null; rm 2026-10-01_kickoff.txt'
+bash_ok 'pushd sources && popd, then a living file' 'pushd sources && popd; rm dossier/HISTORY.md'
+bash_ok 'pushd sources && popd, then a relative name that is not a source' \
+  'pushd sources/transcripts >/dev/null; popd >/dev/null; rm 2026-10-01_kickoff.txt'
+bash_ok 'cd sources; cd -; a living file' 'cd sources; cd -; rm dossier/HISTORY.md'
+bash_deny 'cd $X from dossier/ is judged against the root above' \
+  "cd \$X; rm $S" "$b/dossier"
+bash_deny 'cd "$(pwd)" from dossier/ is judged against the root above' \
+  "cd \"\$(pwd)\"; rm $S" "$b/dossier"
+bash_deny 'popd on an empty stack from dossier/ is judged against the root above' \
+  "popd; rm $S" "$b/dossier"
+bash_ok 'cd $X from dossier/, a living file' 'cd $X; rm HISTORY.md' "$b/dossier"
+bash_ok 'cd into a directory that is not there is not followed' 'cd nowhere && ls'
+bash_deny 'cd into a missing directory keeps the dossier root in view' "cd nowhere; rm $S"
+bash_deny 'a stray ANSI-C opener blinds nothing' "echo \$'oops; rm $S"
+ln -s "../$TRANSCRIPT_REL" "$b/dossier/link-to-source.txt"
+bash_deny 'sed -i through a symlink that leads to a source' \
+  'sed -i s/a/b/ dossier/link-to-source.txt'
+bash_ok 'sed -n through that symlink only reads' 'sed -n p dossier/link-to-source.txt'
+
+echo '--- Bash: bounds, a huge operand or a huge list is not resolved (F3) ---'
+LONG="$(python3 -c 'print("/".join(["a"] * 3000))')"
+bash_deny 'an operand beyond the bound that shows a sources component' "rm $LONG/sources/x" "$b" 'sources'
+
+bash_ok 'an operand beyond the bound that shows none' "rm $LONG/x"
+MANY="$(python3 -c 'print(" ".join("x%d" % i for i in range(1500)))')"
+bash_deny 'operands beyond the bound, a sources path among them' "rm $MANY $S" "$b" 'sources'
+
+bash_ok 'operands beyond the bound, none shows sources' "rm $MANY"
+SEGMENTS="$(python3 -c 'print("rm x; " * 5000, end="")')"
+bash_deny 'past the judged-paths budget, a visible sources path is still refused' "${SEGMENTS}rm $S" "$b" 'sources'
+bash_ok 'past the judged-paths budget, only what the text shows is read (accepted bound)' \
+  "${SEGMENTS}cd sources/transcripts; rm 2026-10-01_kickoff.txt"
+bash_ok 'a new file copied in after a long list of sources' "cp $MANY sources/received/2026-10-10_new.txt"
+
+echo '--- Bash: globs and braces on the sources component (F5) ---'
+bash_deny 'rm sour*/...' 'rm sour*/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'rm s?urces/...' 'rm s?urces/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'rm [s]ources/...' 'rm [s]ources/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'rm ./so*/...' 'rm ./so*/transcripts/2026-10-01_kickoff.txt'
+bash_deny 'rm */transcripts/...' 'rm */transcripts/2026-10-01_kickoff.txt'
+bash_deny 'rm {sources/...,x}' 'rm {sources/transcripts/2026-10-01_kickoff.txt,x}'
+bash_deny 'rm sources/{a,b}' 'rm sources/{transcripts/2026-10-01_kickoff.txt,nothing}'
+bash_deny 'rm sources/*' 'rm sources/transcripts/*.txt' "$b" 'sources/transcripts/'
+bash_deny 'mv s*/... out' 'mv s*/transcripts/2026-10-01_kickoff.txt /tmp/x'
+bash_deny 'sed -i on a glob' 'sed -i s/a/b/ sour*/transcripts/2026-10-01_kickoff.txt'
+bash_ok 'a glob that cannot match sources' 'rm dossier/*.md'
+bash_ok 'a glob on another name' 'rm s*.txt'
+nos=$(mktemp -d)
+cp "$b/dossier.yaml" "$nos/dossier.yaml"
+bash_ok 'a glob in a dossier that has no sources folder' 'rm sour*/x' "$nos"
+bash_ok 'a lone * in a dossier that has no sources folder' 'rm -rf *' "$nos"
+bash_ok 'a brace expansion on living files' 'rm dossier/{HISTORY,OPEN-QUESTIONS}.md'
+bash_ok 'reading through a glob' 'cat sour*/transcripts/*.txt'
+
+echo '--- Bash: removing or moving a parent that holds sources/ (F5) ---'
+bash_deny 'rm -rf . at the dossier root' 'rm -rf .' "$b" 'sources'
+bash_deny 'rm -rf * at the dossier root' 'rm -rf *' "$b" 'sources'
+bash_deny 'rm -rf ./* at the dossier root' 'rm -rf ./*' "$b" 'sources'
+bash_deny 'rm -rf .. from dossier/' 'rm -rf ..' "$b/dossier" 'sources'
+bash_deny 'rm -rf ../../NAME from dossier/' "rm -rf ../../$ROOT_NAME" "$b/dossier" 'sources'
+bash_deny 'rm -rf of the dossier by absolute path' "rm -rf $b" "$plain" 'sources'
+bash_deny 'rm -rf of a parent listing the dossier by glob' "rm -rf ${b%/*}/${ROOT_NAME%?}*" "$plain" 'sources'
+bash_deny 'mv . ../x at the dossier root' 'mv . ../x' "$b" 'sources'
+bash_deny 'mv the dossier by relative path' "mv ../../$ROOT_NAME /tmp/moved" "$b/dossier" 'sources'
+bash_deny 'git rm -r .' 'git rm -r .' "$b" 'sources'
+bash_ok 'rm -rf . inside dossier/' 'rm -rf .' "$b/dossier"
+bash_ok 'rm -rf * inside dossier/' 'rm -rf *' "$b/dossier"
+bash_ok 'rm -rf a plain folder' 'rm -rf build'
+bash_ok 'rm -rf . outside any dossier' 'rm -rf .' "$plain"
+bash_ok 'rm -rf * outside any dossier' 'rm -rf *' "$plain"
+bash_ok 'cp -r the dossier root' 'cp -r . /tmp/copy'
+bash_ok 'mv a living file' 'mv dossier/HISTORY.md dossier/OLD.md'
+
+echo '--- Bash: more editing verbs (F5) ---'
+bash_deny 'gsed -i' "gsed -i s/a/b/ $S"
+bash_deny 'patch FILE' "patch $S fix.diff"
+bash_deny 'patch -p0 FILE < diff' "patch -p0 $S < fix.diff"
+bash_deny 'patch -o FILE' "patch -o $S in.txt fix.diff"
+bash_deny 'awk -i inplace' "awk -i inplace '{print}' $S"
+bash_deny 'gawk -i inplace' "gawk -i inplace '{print}' $S"
+bash_deny 'gawk -iinplace' "gawk -iinplace '{print}' $S"
+bash_deny 'ed FILE' "ed $S"
+bash_deny 'ed -s FILE' "ed -s $S"
+bash_deny 'ex FILE' "ex $S"
+bash_deny 'ex -s FILE' "ex -s $S"
+bash_deny 'vim -es FILE' "vim -es $S"
+bash_deny 'vi -es FILE' "vi -es $S"
+bash_deny 'vim -E -s FILE' "vim -E -s $S"
+bash_deny 'sponge FILE' "echo x | sponge $S"
+bash_ok 'gsed -n on a source' "gsed -n p $S"
+bash_ok 'patch a living file' 'patch dossier/HISTORY.md fix.diff'
+bash_ok 'patch --dry-run on a source' "patch --dry-run $S fix.diff"
+bash_ok 'awk without inplace' "awk '{print}' $S"
+bash_ok 'gawk -i inplace on a living file' "gawk -i inplace '{print}' dossier/HISTORY.md"
+bash_ok 'ed a living file' 'ed dossier/HISTORY.md'
+bash_ok 'vim -es a living file' 'vim -es dossier/HISTORY.md'
+bash_ok 'vim a source to read it' "vim $S"
+bash_ok 'sponge a living file' 'sort dossier/HISTORY.md | sponge dossier/HISTORY.md'
+bash_ok 'sponge a new file in sources/received' 'echo x | sponge sources/received/2026-10-10_new.txt'
+
+echo '--- Bash: wrappers with options and numeric arguments (F5) ---'
+bash_deny 'timeout 5 rm' "timeout 5 rm $S"
+bash_deny 'timeout 1.5m rm' "timeout 1.5m rm $S"
+bash_deny 'timeout -s KILL 5 rm' "timeout -s KILL 5 rm $S"
+bash_deny 'timeout --signal=KILL 5 rm' "timeout --signal=KILL 5 rm $S"
+bash_deny 'nice rm' "nice rm $S"
+bash_deny 'nice -n 5 rm' "nice -n 5 rm $S"
+bash_deny 'nice -5 rm' "nice -5 rm $S"
+bash_deny 'ionice -c 3 rm' "ionice -c 3 rm $S"
+bash_deny 'ionice -c3 -n7 rm' "ionice -c3 -n7 rm $S"
+bash_deny 'stdbuf -oL rm' "stdbuf -oL rm $S"
+bash_deny 'stdbuf -o L rm' "stdbuf -o L rm $S"
+bash_deny 'caffeinate rm' "caffeinate rm $S"
+bash_deny 'caffeinate -i rm' "caffeinate -i rm $S"
+bash_deny 'caffeinate -t 60 rm' "caffeinate -t 60 rm $S"
+bash_deny 'sudo nice -n 5 timeout 10 rm' "sudo nice -n 5 timeout 10 rm $S"
+bash_deny 'timeout 5 sed -i' "timeout 5 sed -i s/a/b/ $S"
+bash_ok 'timeout 5 on a living file' 'timeout 5 rm dossier/HISTORY.md'
+bash_ok 'nice -n 5 reading a source' "nice -n 5 cat $S"
+bash_ok 'timeout 5 cp a new file' 'timeout 5 cp new.pdf sources/received/2026-10-10_new.pdf'
+
+echo '--- Bash: what the phase depends on stays allowed ---'
+bash_ok 'file_source.py to a new received file' \
+  'python3 "${CLAUDE_SKILL_DIR}/scripts/file_source.py" in.pdf sources/received/2026-10-10_in.pdf'
+bash_ok 'file_source.py behind a wrapper' \
+  'timeout 30 python3 /p/scripts/file_source.py in.pdf sources/received/2026-10-10_in.pdf'
+bash_ok 'pdftotext into a new source file' 'pdftotext in.pdf sources/received/2026-10-10_in.txt'
+bash_ok 'pdftotext reading a source' "pdftotext sources/received/x.pdf dossier/x.txt"
 
 echo '--- Bash: linear cost on pathological commands, never a timeout (NF-6) ---'
 PERF_OUT="$(python3 - "$(hooks_dir)/guard-sources.py" "$b" <<'PY'
@@ -379,6 +542,25 @@ shapes = [
     ("a million open parentheses", "(" * (MB // 2), False),
     ("a huge command that still ends in a deny", "echo a;" * (MB // 14) + "rm " + S, True),
     ("a deny first, then a huge tail", "rm " + S + "; " + "echo a;" * (MB // 7), True),
+    ("a million distinct operands", "rm " + " ".join("x%d" % i for i in range(MB // 7)), False),
+    ("distinct operands after an unknown cd", "cd $X; rm " + " ".join("a/b/f%d" % i for i in range(MB // 10)), False),
+    ("distinct redirections", " ".join(">x%d" % i for i in range(MB // 8)), False),
+    ("distinct tee operands", "tee " + " ".join("x%d" % i for i in range(MB // 7)), False),
+    ("distinct mv operands", "mv " + " ".join("x%d" % i for i in range(MB // 7)) + " dest", False),
+    ("sed -i over distinct operands", "sed -i s/a/b/ " + " ".join("x%d" % i for i in range(MB // 7)), False),
+    ("distinct segments after an unknown cd", "".join("cd $X; rm f%d; " % i for i in range(MB // 18)), False),
+    ("distinct redirection segments", "".join("echo >f%d;" % i for i in range(MB // 10)), False),
+    ("a chain of cd into absent directories", "".join("cd d%d && " % i for i in range(MB // 10)), False),
+    ("a chain of pushd", "pushd sources && " * (MB // 17), False),
+    ("a chain of cd .", "cd . && " * (MB // 8), False),
+    ("a 500 000 component path", "rm " + "/".join(["a"] * (MB // 2)), False),
+    ("a 32 000 component path, then a visible sources", "rm " + "/".join(["a"] * 32000) + "; rm " + S, True),
+    ("a huge operand holding a sources component", "rm " + "/".join(["a"] * 20000) + "/sources/x", True),
+    ("more operands than are judged, sources among them", "rm " + " ".join("x%d" % i for i in range(5000)) + " " + S, True),
+    ("a million glob and brace characters", "rm " + "{a,b}" * 4000 + " " + "*/" * 100000, False),
+    ("a million ANSI-C openers", "echo " + "$'" * (MB // 2), False),
+    ("escaped ANSI-C openers", "echo " + "$'\\'" * (MB // 4), False),
+    ("rm -rf * repeated", "rm -rf *; " * (MB // 10), True),
 ]
 bad = 0
 for name, command, want_deny in shapes:
@@ -405,6 +587,6 @@ assert_eq 0 "$PERF_STATUS" 'every 1 MB command is judged in under 4 s, exit 0'
 
 rm -rf "$b"
 
-rm -rf "$d" "$plain" "$e" "$outside"
+rm -rf "$d" "$plain" "$e" "$outside" "$nos"
 
 finish

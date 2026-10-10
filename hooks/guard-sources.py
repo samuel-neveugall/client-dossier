@@ -42,9 +42,15 @@ MESSAGE = "sources are immutable; file a correction in the dossier instead"
 
 WRITE_TOOLS = ("Write", "Edit", "MultiEdit", "NotebookEdit")
 # The hook is a one-shot process, so the filesystem answers are memoised: a
-# command repeating the same operand a hundred thousand times costs one lookup.
+# command repeating the same operand a hundred thousand times costs one lookup,
+# and a command naming a hundred thousand distinct files in one directory
+# costs one directory resolution plus one lstat each.
 TARGET_CACHE = {}
 FILE_CACHE = {}
+ROOT_CACHE = {}
+DIR_CACHE = {}
+BASE_CACHE = {}
+MOVE_CACHE = {}
 
 
 def find_root(start):
@@ -63,27 +69,48 @@ def find_root(start):
     return None
 
 
+def is_root(directory):
+    """True when `directory` holds a dossier.yaml (memoised)."""
+    if directory not in ROOT_CACHE:
+        ROOT_CACHE[directory] = os.path.isfile(os.path.join(directory, CONFIG_NAME))
+    return ROOT_CACHE[directory]
+
+
 def under_any_sources(candidate):
     """The path of `candidate` relative to an ancestor dossier root when it
     lies under that root's sources/ folder, else None.
 
-    EVERY ancestor holding a dossier.yaml is tried, not only the nearest: a
-    dossier.yaml planted or received under sources/ would otherwise turn that
-    subtree into a root and let its files through (A-F1). Nesting stays
-    legitimate outside sources/, since the inner root's own sources/ is under
-    the outer root's non-sources folder and is still denied by the inner root.
-    The first component is compared casefolded because a case-insensitive
-    filesystem keeps the spelling that was typed.
+    `candidate` is absolute and normalised. EVERY ancestor holding a
+    dossier.yaml is tried, not only the nearest: a dossier.yaml planted or
+    received under sources/ would otherwise turn that subtree into a root and
+    let its files through (A-F1). Nesting stays legitimate outside sources/,
+    since the inner root's own sources/ is under the outer root's non-sources
+    folder and is still denied by the inner root. The first component is
+    compared casefolded because a case-insensitive filesystem keeps the
+    spelling that was typed.
     """
-    here = os.path.dirname(candidate)
-    for ancestor in (here,) + tuple(Path(here).parents):
-        ancestor = str(ancestor)
-        if not os.path.isfile(os.path.join(ancestor, CONFIG_NAME)):
-            continue
-        parts = os.path.relpath(candidate, ancestor).split(os.sep)
-        if parts[0] not in (".", "..") and parts[0].casefold() == SOURCES_DIR:
-            return "/".join(parts)
-    return None
+    end = len(candidate)
+    while True:
+        cut = candidate.rfind("/", 0, end)
+        if cut < 0:
+            return None
+        if is_root(candidate[:cut] or "/"):
+            rest = candidate[cut + 1:]
+            if rest.split("/", 1)[0].casefold() == SOURCES_DIR:
+                return rest
+        end = cut
+
+
+def real_path(path):
+    """os.path.realpath with the directory part memoised: only the last
+    component is looked at (one lstat) when the directory was seen before."""
+    head, tail = os.path.split(path)
+    if not tail or not head:
+        return os.path.realpath(path)
+    if head not in DIR_CACHE:
+        DIR_CACHE[head] = os.path.realpath(head)
+    joined = os.path.join(DIR_CACHE[head], tail)
+    return os.path.realpath(joined) if os.path.islink(joined) else joined
 
 
 def sources_target(path, cwd):
@@ -98,7 +125,7 @@ def sources_target(path, cwd):
     """
     lexical = os.path.normpath(os.path.join(cwd, path))
     if lexical not in TARGET_CACHE:
-        TARGET_CACHE[lexical] = under_any_sources(os.path.realpath(lexical)) \
+        TARGET_CACHE[lexical] = under_any_sources(real_path(lexical)) \
             or under_any_sources(lexical)
     return TARGET_CACHE[lexical]
 
@@ -108,15 +135,18 @@ def sources_target(path, cwd):
 # ---------------------------------------------------------------------------
 #
 # The command is tokenized with shlex (heredoc bodies removed first, then
-# comments, line continuations and stray quotes by prepare(), a lenient
+# comments, line continuations, ANSI-C and stray quotes by prepare(), a lenient
 # per-line fallback on a parse error), never executed or evaluated. Its cost
-# is linear in its size. It is cut
-# into segments at the shell's separators, the effective working directory is
-# followed through `cd` (and kept inside a subshell), and the verbs that
-# visibly modify an EXISTING file under sources/ are looked for. A new file is
-# let in. Anything the tokens do not show (interpreters, xargs, find -exec,
-# editors, variables, command substitution) is allowed: the skill's rule is
-# the boundary, this only catches the likely shortcut.
+# is linear in its size and bounded (MAX_* below). It is cut into segments at
+# the shell's separators, the effective working directory is followed through
+# `cd`, `cd -`, `pushd` and `popd` (and kept inside a subshell), and the verbs
+# that visibly modify an EXISTING file under sources/ are looked for, as well
+# as the rm or mv of a dossier root and the globs and braces that can name a
+# sources/ folder. A new file is let in. Anything the tokens do not show
+# (eval, interpreters, xargs, find -exec, command substitution, variables,
+# loops over globs) is allowed: this is the accepted debt D-04 (restated by
+# D-17), the skill's rule is the boundary, and this only catches the likely
+# shortcut.
 
 PUNCT = "();<>|&\n"
 OPERATORS = ("&>>", "<<<", "&>", ">>", ">&", "<&", ">|", "<<", "&&", "||",
@@ -125,13 +155,23 @@ SEPARATORS = frozenset((";", ";;", "&&", "||", "|", "|&", "&", "\n"))
 OPENERS = frozenset(("(", "<(", ">("))
 WRITE_REDIRECTS = frozenset((">", ">>", ">|", "&>", "&>>"))
 OTHER_REDIRECTS = frozenset(("<", "<<", "<<<", "<&", ">&"))
-WRAPPERS = ("sudo", "command", "env", "nohup", "time", "exec", "builtin")
+WRAPPERS = ("sudo", "command", "env", "nohup", "time", "exec", "builtin",
+            "timeout", "nice", "ionice", "stdbuf", "caffeinate")
+# Wrappers that may carry a numeric word (a duration, a niceness) before the
+# real command.
+NUMERIC_WRAPPERS = ("timeout", "nice", "ionice", "stdbuf", "caffeinate")
 # Shell reserved words that can open a segment: the real command follows.
 RESERVED = frozenset(("if", "then", "else", "elif", "fi", "do", "done", "while",
                       "until", "for", "case", "esac", "{", "}", "!", "function"))
 WRAPPER_ARG_OPTIONS = {"sudo": ("-u", "-g", "-h", "-p", "-C", "-D", "-r",
                                 "-t", "-T", "-U", "-R"),
-                       "env": ("-u", "-C", "-S")}
+                       "env": ("-u", "-C", "-S"),
+                       "timeout": ("-s", "--signal", "-k", "--kill-after"),
+                       "nice": ("-n", "--adjustment"),
+                       "ionice": ("-c", "--class", "-n", "--classdata", "-p", "--pid",
+                                  "-P", "--pgid", "-u", "--uid"),
+                       "stdbuf": ("-i", "--input", "-o", "--output", "-e", "--error"),
+                       "caffeinate": ("-t", "-w")}
 SHELLS = ("bash", "sh", "zsh", "dash", "ksh")
 # Commands that run their stdin as shell text: a heredoc body they read is code.
 SHELL_READERS = SHELLS + ("source", ".")
@@ -145,6 +185,19 @@ MAX_TOKEN = 65536
 MAX_STRIP = 524288
 MAX_PUNCT = 4096
 MAX_OPERATORS = 64
+# Bounds that keep the cost low on a deliberately huge command (F3): an
+# operand longer than MAX_OPERAND is not a path, the operands judged in one
+# segment and in the whole command are capped, and so are the expansions of a
+# brace or a glob. Past a bound the guard stops resolving and only refuses what
+# shows a `sources` path component in the text: a pathological command is
+# let through unless it names sources/ in plain sight.
+MAX_OPERAND = 4096
+MAX_OPERANDS = 512
+MAX_JUDGED = 4096
+MAX_EXPANSION = 64
+MAX_LISTING = 50000
+MAX_PILE = 64
+JUDGED = [0]
 
 
 def is_assignment(word):
@@ -164,15 +217,23 @@ def has_in_place_flag(arg):
     return False
 
 
+def is_number(word):
+    """True for a count or a duration: 10, 1.5, 5s, 2m, 1h, 1d."""
+    digits = word[:-1] if word[-1:] in ("s", "m", "h", "d") else word
+    return digits.replace(".", "", 1).isdigit()
+
+
 def is_fd_operand(word):
     """True for the operand of `>&` that duplicates a descriptor: N, N- or -."""
     return word == "-" or word.rstrip("-").isdigit()
 
 
-def heredoc_operators(line):
-    """[(start, dash, word, quoted, end)] for each `<<WORD`, `<<-WORD`,
-    `<<'WORD'`, `<<"WORD"` or `<<\\WORD` of `line` that bash would read as a
-    heredoc (a here-string `<<<` is not one).
+def heredoc_operators(line, quote=""):
+    """([(start, dash, word, quoted, end)], quote) for each `<<WORD`,
+    `<<-WORD`, `<<'WORD'`, `<<"WORD"` or `<<\\WORD` of `line` that bash would
+    read as a heredoc (a here-string `<<<` is not one), and the quote still
+    open at the end of the line. `quote` is the one open at its start: a
+    string that spans lines carries its state to the next one (F2).
 
     The line is walked once with the state that decides it: inside quotes, a
     `<<` is text; so it is inside `$((...))` / `((...))` (a shift), inside
@@ -183,16 +244,15 @@ def heredoc_operators(line):
     found = []
     size = len(line)
     index = 0
-    quote = ""
     arith = brackets = 0
     prev = " "
     while index < size:
         char = line[index]
         if quote:
-            if char == "\\" and quote == '"':
+            if char == "\\" and quote != "'":
                 index += 2
                 continue
-            if char == quote:
+            if char == quote[-1]:
                 quote = ""
             index += 1
             continue
@@ -201,7 +261,7 @@ def heredoc_operators(line):
             prev = "x"
             continue
         if char in "'\"":
-            quote = char
+            quote = "$'" if char == "'" and prev == "$" else char
         elif char == "#" and prev in " \t;&|()":
             break
         elif line.startswith("((", index):
@@ -256,7 +316,7 @@ def heredoc_operators(line):
             continue
         prev = char
         index += 1
-    return found
+    return found, quote
 
 
 def command_verb(text):
@@ -310,8 +370,9 @@ def substitutions(body):
             index = close + 1
 
 
-def strip_heredocs(command):
-    """The command without its heredoc bodies and terminator lines.
+def strip_heredocs(command, carry=True):
+    """(the command without its heredoc bodies and terminator lines, True when
+    a quote is still open at its end).
 
     A body is text, not commands: tokenising it gave a false positive (a
     `rm sources/x` quoted in the body) and a bypass (an apostrophe in the body
@@ -324,7 +385,10 @@ def strip_heredocs(command):
 
     One pass: the lines that could be a terminator are indexed once and each
     word keeps a cursor, so the cost stays linear in the size of the command
-    (NF-6).
+    (NF-6). With `carry`, the quote state is carried from line to line: a
+    string spanning lines that holds `<<EOF` does not open a heredoc (F2). The
+    caller reruns without it when a quote stays open to the end, which is the
+    stray apostrophe of `echo it's`.
     """
     lines = command.split("\n")
     plain = {}
@@ -338,13 +402,15 @@ def strip_heredocs(command):
     cursors = {}
     kept = []
     index = 0
+    quote = ""
     while index < len(lines):
         line = lines[index]
         kept.append(line)
         index += 1
-        if "<<" not in line:
+        if not quote and "<<" not in line and "'" not in line and '"' not in line:
             continue
-        for start, dash, word, quoted, end in heredoc_operators(line)[:MAX_OPERATORS]:
+        operators, quote = heredoc_operators(line, quote if carry else "")
+        for start, dash, word, quoted, end in operators[:MAX_OPERATORS]:
             positions = (dashed if dash else plain).get(word)
             if not positions:
                 continue
@@ -360,7 +426,7 @@ def strip_heredocs(command):
             elif not quoted:
                 kept.extend(substitutions("\n".join(body)))
             index = positions[cursor] + 1
-    return "\n".join(kept)
+    return "\n".join(kept), bool(quote)
 
 
 def prepare(text):
@@ -390,10 +456,30 @@ def prepare(text):
         if char == "\\":
             follow = text[index + 1:index + 2]
             index += 2
-            if follow and follow != "\n" and run < MAX_TOKEN:
-                out.append(char + follow)
-                run += 2
-                prev = follow
+            if follow and follow != "\n":
+                # What follows a backslash is text, never the start of a
+                # comment: `echo a\ #b` has no comment (F1).
+                prev = "x"
+                if run < MAX_TOKEN:
+                    out.append(char + follow)
+                    run += 2
+        elif char == "'" and out and out[-1] == "$":
+            # ANSI-C quotes $'...': a backslash escapes, `\'` does not close.
+            cursor = index + 1
+            while cursor < size and text[cursor] != "'":
+                cursor += 2 if text[cursor] == "\\" else 1
+            if cursor >= size:
+                out.append(" ")
+                index += 1
+                run = 0
+                prev = " "
+            else:
+                out.pop()
+                body = text[index + 1:cursor].replace("'", "_")
+                out.append("'" + body[:max(MAX_TOKEN - run, 0)] + "'")
+                run += cursor - index + 1
+                index = cursor + 1
+                prev = "'"
         elif char == "'":
             close = text.find("'", index + 1)
             if close == -1:
@@ -506,15 +592,18 @@ def tokenize(command):
     shlex, then the lenient fallback."""
     text = command
     if len(text) <= MAX_STRIP and "<<" in text:
-        text = strip_heredocs(text)
+        text, open_quote = strip_heredocs(text)
+        if open_quote:
+            text, _ = strip_heredocs(command, False)
     text = prepare(text)
     flat = lex(text)
     return flat if flat is not None else lenient_lex(text)
 
 
 class GuessedCwd(str):
-    """A working directory that is no longer known (after `cd -`, `cd $X`,
-    `cd "$(...)"`, `popd`): the string is the last one that was. A relative
+    """A working directory that is no longer known (after `cd -` with no
+    OLDPWD, `cd $X`, `cd "$(...)"`, `cd` to a directory that is not there,
+    `popd` on an empty stack): the string is the last one that was. A relative
     operand is then judged against that directory AND against the root of
     every dossier above it, so the guard errs toward a false positive instead
     of letting the command through (NF-5)."""
@@ -528,28 +617,161 @@ def base_dirs(cwd):
     """The directories a relative operand may be relative to."""
     if cwd is None:
         return []
-    dirs = [str(cwd)]
-    if isinstance(cwd, GuessedCwd):
-        for ancestor in (Path(cwd),) + tuple(Path(cwd).parents):
-            if os.path.isfile(os.path.join(str(ancestor), CONFIG_NAME)):
-                dirs.append(str(ancestor))
-    return dirs
+    key = (str(cwd), isinstance(cwd, GuessedCwd))
+    if key not in BASE_CACHE:
+        dirs = [str(cwd)]
+        if key[1]:
+            for ancestor in (Path(cwd),) + tuple(Path(cwd).parents):
+                if is_root(str(ancestor)):
+                    dirs.append(str(ancestor))
+        BASE_CACHE[key] = dirs
+    return BASE_CACHE[key]
+
+
+def glob_match(pattern, name):
+    """fnmatch.fnmatchcase without the import: `*`, `?`, `[set]`, `[!set]`,
+    with ranges. Case is the caller's business."""
+    p = n = 0
+    star = mark = -1
+    while n < len(name):
+        step = 0
+        if p < len(pattern):
+            char = pattern[p]
+            if char == "*":
+                star, mark = p, n
+                p += 1
+                continue
+            if char == "?":
+                step = 1
+            elif char == "[" and pattern.find("]", p + 2) != -1:
+                close = pattern.find("]", p + 2)
+                members = pattern[p + 1:close]
+                negate = members[:1] in ("!", "^")
+                members = members[1:] if negate else members
+                found = False
+                at = 0
+                while at < len(members):
+                    if at + 2 < len(members) and members[at + 1] == "-":
+                        found = found or members[at] <= name[n] <= members[at + 2]
+                        at += 3
+                    else:
+                        found = found or members[at] == name[n]
+                        at += 1
+                if found != negate:
+                    p, n = close + 1, n + 1
+                    continue
+            elif char == name[n]:
+                step = 1
+            if step:
+                p += 1
+                n += 1
+                continue
+        if star < 0:
+            return False
+        mark += 1
+        p, n = star + 1, mark
+    while p < len(pattern) and pattern[p] == "*":
+        p += 1
+    return p == len(pattern)
+
+
+def brace_group(item):
+    """(start, commas, end) of the first `{a,b}` group of `item`, else None.
+    Only the first few opening braces are tried: a brace with no comma
+    (`{x}`, `{1..3}`) is literal."""
+    start = -1
+    for _ in range(8):
+        start = item.find("{", start + 1)
+        if start == -1:
+            return None
+        depth = 0
+        commas = []
+        for at in range(start, len(item)):
+            char = item[at]
+            if char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    if commas:
+                        return start, commas, at
+                    break
+            elif char == "," and depth == 1:
+                commas.append(at)
+    return None
+
+
+def brace_expand(word):
+    """The words a `{a,b}` brace expansion of `word` gives, at most
+    MAX_EXPANSION of them."""
+    results = []
+    pending = [word]
+    while pending and len(results) + len(pending) <= MAX_EXPANSION:
+        item = pending.pop(0)
+        group = brace_group(item)
+        if group is None:
+            results.append(item)
+            continue
+        start, commas, end = group
+        edges = [start] + commas + [end]
+        for left, right in zip(edges, edges[1:]):
+            pending.append(item[:start] + item[left + 1:right] + item[end + 1:])
+    return results + pending
+
+
+def spare(operand):
+    """True when `operand` is not to be resolved: too long to be a path, or
+    the budget of operands judged in this command is spent (F3)."""
+    JUDGED[0] += 1
+    return len(operand) > MAX_OPERAND or JUDGED[0] > MAX_JUDGED
+
+
+def visible_sources(text):
+    """The hit for an operand the guard gave up resolving: `sources` when one
+    of its path components is `sources`, else None (the pathological command
+    is let through unless it names sources/ in plain sight)."""
+    for part in text.split("/"):
+        if part.casefold() == SOURCES_DIR:
+            return SOURCES_DIR
+    return None
+
+
+def glob_candidate(word, base):
+    """The absolute path a word names from BASE. A glob component that can
+    match an existing `sources` folder (`sour*`, `s?urces`, `[s]ources`, `*`)
+    is read as `sources`: the shell would expand it to that folder."""
+    parts = word.split("/")
+    for at, part in enumerate(parts):
+        if any(char in part for char in "*?[") and glob_match(part.casefold(), SOURCES_DIR):
+            prefix = "/".join(parts[:at])
+            folder = prefix if os.path.isabs(prefix) or not base else os.path.join(base, prefix)
+            if os.path.isdir(os.path.join(folder or "/", SOURCES_DIR)):
+                parts[at] = SOURCES_DIR
+                break
+    word = "/".join(parts)
+    return word if os.path.isabs(word) else os.path.join(base, word)
 
 
 def operand_paths(operand, cwd):
     """The absolute paths an operand may name: none when it cannot be known
-    (empty, a variable or a substitution), several after an unknown `cd`."""
+    (empty, a variable or a substitution), several after an unknown `cd`, a
+    brace expansion or a glob that can name a sources/ folder."""
     if not operand or "$" in operand or "`" in operand:
         return []
-    if operand.startswith("~"):
-        operand = os.path.expanduser(operand)
-    if os.path.isabs(operand):
-        return [operand]
-    return [os.path.join(base, operand) for base in base_dirs(cwd)]
+    words = brace_expand(operand) if "{" in operand else [operand]
+    paths = []
+    for word in words:
+        if word.startswith("~"):
+            word = os.path.expanduser(word)
+        for base in ([""] if os.path.isabs(word) else base_dirs(cwd)):
+            paths.append(glob_candidate(word, base))
+    return paths
 
 
 def under_sources(operand, cwd):
     """The root-relative path when the operand lies under sources/."""
+    if spare(operand):
+        return visible_sources(operand)
     for path in operand_paths(operand, cwd):
         hit = sources_target(path, "/")
         if hit:
@@ -560,9 +782,11 @@ def under_sources(operand, cwd):
 def existing_source_file(operand, cwd):
     """The root-relative path when the operand is an existing FILE under
     sources/ (a new file is not a modification)."""
+    if spare(operand):
+        return visible_sources(operand)
     for path in operand_paths(operand, cwd):
         if path not in FILE_CACHE:
-            FILE_CACHE[path] = os.path.isfile(os.path.realpath(path))
+            FILE_CACHE[path] = os.path.isfile(real_path(path))
         if FILE_CACHE[path]:
             hit = sources_target(path, "/")
             if hit:
@@ -570,15 +794,61 @@ def existing_source_file(operand, cwd):
     return None
 
 
+def holds_sources(path):
+    """True when `path` is a dossier root that has a sources/ folder."""
+    real = os.path.realpath(path)
+    return is_root(real) and os.path.isdir(os.path.join(real, SOURCES_DIR))
+
+
+def parent_hit(operand, cwd):
+    """`sources` when removing or moving the operand takes a whole dossier
+    with it: the operand is a dossier root (`.`, `../d`), or a glob that
+    names one (`*`, `./*`). Only the directories typed or listed are looked
+    at, not the ones below them."""
+    if not operand or "$" in operand or "`" in operand or spare(operand):
+        return None
+    words = brace_expand(operand) if "{" in operand else [operand]
+    for word in words:
+        if word.startswith("~"):
+            word = os.path.expanduser(word)
+        for base in ([""] if os.path.isabs(word) else base_dirs(cwd)):
+            full = os.path.normpath(os.path.join(base, word))
+            head, tail = os.path.split(full)
+            if any(char in tail for char in "*?["):
+                try:
+                    names = os.listdir(head)
+                except OSError:
+                    continue
+                matched = 0
+                for name in names[:MAX_LISTING]:
+                    if glob_match(tail.casefold(), name.casefold()):
+                        matched += 1
+                        if matched > MAX_EXPANSION:
+                            break
+                        if holds_sources(os.path.join(head, name)):
+                            return SOURCES_DIR
+            elif holds_sources(full):
+                return SOURCES_DIR
+    return None
+
+
+def removal_hit(operand, cwd):
+    """An operand that rm or mv would take out of sources/: a file under it, or
+    a dossier root holding it."""
+    return under_sources(operand, cwd) or parent_hit(operand, cwd)
+
+
 def destination_hit(dest, sources, cwd):
     """A copy or move onto an existing source file: DEST is that file, or an
     existing directory already holding a file named like one of SOURCES.
     DEST is judged as typed AND resolved (NF-4): through a sources/ symlink
     the resolved path has left the dossier, the typed one has not."""
+    if spare(dest):
+        return visible_sources(dest)
     for path in operand_paths(dest, cwd):
         for spelling in (path, os.path.realpath(path)):
             if os.path.isdir(spelling):
-                for source in sources:
+                for source in sources[:MAX_OPERANDS]:
                     base = os.path.basename(source.rstrip("/"))
                     if base and "$" not in base and "`" not in base:
                         hit = existing_source_file(os.path.join(spelling, base), "/")
@@ -614,7 +884,16 @@ def split_args(args, arg_options=()):
 
 
 def first_hit(operands, cwd, finder=under_sources):
-    for operand in operands:
+    """The first hit among the operands. Only the first MAX_OPERANDS are
+    resolved; past them the guard only refuses a visible `sources` component
+    (F3)."""
+    for number, operand in enumerate(operands):
+        if number >= MAX_OPERANDS:
+            for rest in operands[number:]:
+                hit = visible_sources(rest)
+                if hit:
+                    return hit
+            return None
         hit = finder(operand, cwd)
         if hit:
             return hit
@@ -697,7 +976,7 @@ def hit_move(args, cwd, arg_options):
         sources, dest = operands[:-1], operands[-1]
     else:
         return None
-    return first_hit(sources, cwd) or destination_hit(dest, sources, cwd)
+    return first_hit(sources, cwd, removal_hit) or destination_hit(dest, sources, cwd)
 
 
 def hit_copy(args, cwd, arg_options):
@@ -752,9 +1031,9 @@ def hit_git(args, cwd):
         return None
     operands, _ = split_args(args[index + 1:])
     if args[index] == "rm":
-        return first_hit(operands, cwd)
+        return first_hit(operands, cwd, removal_hit)
     if args[index] == "mv":
-        return first_hit(operands[:-1], cwd)
+        return first_hit(operands[:-1], cwd, removal_hit)
     return None
 
 
@@ -777,13 +1056,65 @@ def hit_shell(args, cwd, depth):
     return None
 
 
+def hit_patch(args, cwd):
+    """patch: the file it edits (the first operand) or writes with -o. The
+    files a diff names are not visible in the command."""
+    if "--dry-run" in args or "-C" in args or "--check" in args:
+        return None
+    operands, values = split_args(args, (
+        "-i", "--input", "-o", "--output", "-p", "--strip", "-d", "--directory",
+        "-r", "--reject-file", "-D", "--ifdef", "-F", "--fuzz", "-B", "--prefix",
+        "-Y", "--basename-prefix", "-z", "--suffix", "-V", "--version-control"))
+    directory = values.get("-d") or values.get("--directory")
+    if directory:
+        cwd = resolve_dir(directory, cwd)
+    outputs = [values[key] for key in ("-o", "--output") if key in values]
+    return first_hit(operands[:1] + outputs, cwd, existing_source_file)
+
+
+def hit_awk(args, cwd):
+    """awk and gawk with the inplace extension (`-i inplace`)."""
+    in_place = False
+    for number, arg in enumerate(args):
+        following = args[number + 1] if number + 1 < len(args) else ""
+        if arg in ("-i", "--include") and following.startswith("inplace"):
+            in_place = True
+        elif arg.startswith(("-iinplace", "--include=inplace")) or \
+                ("@include" in arg and "inplace" in arg):
+            in_place = True
+    if not in_place:
+        return None
+    operands = [arg for arg in args if not arg.startswith("-")]
+    return first_hit(operands, cwd, existing_source_file)
+
+
+def hit_editor(verb, args, cwd):
+    """ed and ex (scripted line editors), vi and vim in their silent ex mode
+    (`-es`): the file they are given is the one they write."""
+    if verb in ("vi", "vim", "nvim"):
+        flags = set("".join(a[1:] for a in args if a.startswith("-") and not a.startswith("--")))
+        if "s" not in flags or not ("e" in flags or "E" in flags):
+            return None
+    return first_hit(split_args(args)[0], cwd, existing_source_file)
+
+
 def hit_verb(verb, args, cwd, depth):
-    if verb == "sed":
+    if verb in ("sed", "gsed"):
         return hit_sed(args, cwd)
     if verb in ("perl", "ruby"):
         return hit_perl(args, cwd)
-    if verb in ("rm", "unlink"):
+    if verb == "rm":
+        return first_hit(split_args(args)[0], cwd, removal_hit)
+    if verb == "unlink":
         return first_hit(split_args(args)[0], cwd)
+    if verb == "patch":
+        return hit_patch(args, cwd)
+    if verb in ("awk", "gawk"):
+        return hit_awk(args, cwd)
+    if verb in ("ed", "ex", "vi", "vim", "nvim"):
+        return hit_editor(verb, args, cwd)
+    if verb == "sponge":
+        return first_hit(split_args(args)[0], cwd, existing_source_file)
     if verb == "shred":
         return first_hit(split_args(args, ("-n", "--iterations", "-s", "--size"))[0], cwd)
     if verb == "truncate":
@@ -831,6 +1162,8 @@ def strip_prefix(words):
             while index < len(words) and words[index].startswith("-") and words[index] != "--":
                 takes_value = words[index] in WRAPPER_ARG_OPTIONS.get(base, ())
                 index += 2 if takes_value else 1
+            if base in NUMERIC_WRAPPERS and index < len(words) and is_number(words[index]):
+                index += 1  # timeout's duration, caffeinate's seconds
         else:
             break
     return words[index:]
@@ -838,39 +1171,57 @@ def strip_prefix(words):
 
 def resolve_dir(target, cwd):
     """The working directory after moving to TARGET from CWD: resolved when
-    it can be known, else the last known one marked as guessed."""
+    it can be known, else the last known one marked as guessed. A directory
+    that is not there is not followed (the shell would not go there either):
+    no realpath is spent on it, which keeps a chain of `cd` linear (F3)."""
     if cwd is None:
         return None
-    if target == "-" or not target or "$" in target or "`" in target:
+    if target == "-" or not target or "$" in target or "`" in target \
+            or len(target) > MAX_OPERAND or any(char in target for char in "*?[{"):
         return guessed(cwd)
     absolute = target.startswith("~") or os.path.isabs(target)
     if not absolute and isinstance(cwd, GuessedCwd):
         return cwd
-    paths = operand_paths(target, cwd)
-    return os.path.realpath(paths[0]) if paths else guessed(cwd)
+    key = (str(cwd), target)
+    if key not in MOVE_CACHE:
+        path = os.path.join(str(cwd), os.path.expanduser(target) if target[0] == "~" else target)
+        MOVE_CACHE[key] = os.path.realpath(path) if os.path.isdir(path) else None
+    return MOVE_CACHE[key] or guessed(cwd)
 
 
-def change_dir(args, cwd):
-    """The working directory after `cd ARGS`."""
+def move(verb, args, where):
+    """The (working directory, OLDPWD, directory stack) after `cd`, `pushd` or
+    `popd` ARGS: `cd -` returns to OLDPWD, `pushd` stacks the directory it
+    leaves and `popd` returns to it (F4)."""
+    cwd, old, pile = where
     operands = [a for a in args if a == "-" or not a.startswith("-")]
-    return resolve_dir(operands[0] if operands else "~", cwd)
+    target = operands[0] if operands else None
+    if verb == "popd":
+        if pile and not operands:
+            return pile[0], cwd, pile[1:]
+        return guessed(cwd), cwd, pile
+    if verb == "pushd" and (target is None or target[0] == "+"):
+        return guessed(cwd), cwd, pile
+    if target == "-":
+        new = old if old is not None else guessed(cwd)
+    else:
+        new = resolve_dir(target or "~", cwd)
+    return new, cwd, (((cwd,) + pile)[:MAX_PILE] if verb == "pushd" else pile)
 
 
-def run_segment(words, targets, cwd, depth):
-    """(hit, working directory after the segment) for one simple command."""
-    for target in targets:
-        hit = existing_source_file(target, cwd)
-        if hit:
-            return hit, cwd
+def run_segment(words, targets, where, depth):
+    """(hit, where) for one simple command; `where` is the (working
+    directory, OLDPWD, directory stack) triple."""
+    hit = first_hit(targets, where[0], existing_source_file)
+    if hit:
+        return hit, where
     command = strip_prefix(words)
     if not command:
-        return None, cwd
+        return None, where
     verb = os.path.basename(command[0])
-    if verb in ("cd", "pushd"):
-        return None, change_dir(command[1:], cwd)
-    if verb == "popd":
-        return None, guessed(cwd)
-    return hit_verb(verb, command[1:], cwd, depth), cwd
+    if verb in ("cd", "pushd", "popd"):
+        return None, move(verb, command[1:], where)
+    return hit_verb(verb, command[1:], where[0], depth), where
 
 
 def scan(command, cwd, depth):
@@ -880,6 +1231,7 @@ def scan(command, cwd, depth):
     stack = []
     words = []
     targets = []
+    where = (cwd, None, ())
     index = 0
     while index <= len(flat):
         token = flat[index] if index < len(flat) else "\n"
@@ -894,15 +1246,15 @@ def scan(command, cwd, depth):
                 index += 1
         elif token in SEPARATORS or token in OPENERS or token == ")":
             if words or targets:
-                hit, cwd = run_segment(words, targets, cwd, depth)
+                hit, where = run_segment(words, targets, where, depth)
                 words = []
                 targets = []
                 if hit:
                     return hit
             if token in OPENERS:
-                stack.append(cwd)
+                stack.append(where)
             elif token == ")" and stack:
-                cwd = stack.pop()
+                where = stack.pop()
         else:
             words.append(token)
     return None
