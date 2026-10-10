@@ -35,14 +35,13 @@ doctrine check.
 
 ### Validated
 
-(None yet — no code written, nothing shipped.)
+- ✓ Scaffold: `dossier-init` skill, folder layout, `dossier.yaml`, living-file templates — Phase 1
+- ✓ Linter: `scripts/lint.py` (stdlib-only), generated fixtures, bash test runner — Phase 2
 
 ### Active
 
 v1 scope, drawn from the design spec (full detail and IDs in REQUIREMENTS.md):
 
-- [ ] Scaffold: `dossier-init` skill, folder layout, `dossier.yaml`, seven living-file templates
-- [ ] Linter: `scripts/lint.py` (stdlib-only, 8 checks), fixtures, bash test runner
 - [ ] Protocol: `dossier` skill (always-first, layout + protocol + fact/status formats) and
       the three hooks (SessionStart, PreToolUse guard, Stop warning)
 - [ ] Ingest: `dossier-ingest` skill, `fact-extractor` agent, `extract-text.sh`
@@ -143,4 +142,4 @@ surfaced at review, are settled and listed in Key Decisions below.
 | Local development via `claude --plugin-dir .` with a minimal manifest from Phase 1 | Skills and hooks must be exercisable long before the marketplace files of Phase 7 | Settled 2026-09-16 |
 
 ---
-*Last updated: 2026-09-16 after the spec review*
+*Last updated: 2026-10-10 after Phase 2*

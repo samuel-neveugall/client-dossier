@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 02
-current_phase_name: Linter & Test Harness
-status: verifying
-stopped_at: Phase 2 gap closure (02-07..02-09) executed, reviewed and re-verified (13/13); awaiting human recette
-last_updated: "2026-09-25T18:00:00.000Z"
-last_activity: 2026-09-25
-last_activity_desc: Phase 02 gap closure — 3 plans + 4 review-fix rounds on feat/phase-02-gap-closure, re-verification human_needed
-state_head: c2a7f29bdde402dcfee9a6a26863691503d6e95f
+current_phase: 3
+current_phase_name: Protocol Skill & Hooks
+status: planning
+stopped_at: Phase 02 complete, ready to plan Phase 3
+last_updated: "2026-10-10T11:20:49.121Z"
+last_activity: 2026-10-10
+last_activity_desc: Phase 02 complete, transitioned to Phase 3
+state_head: 762e57415cd0e60846fa4120563f62e07dcabcf6
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 15
   completed_plans: 15
-  percent: 14
+  percent: 29
 ---
 
 # Project State
@@ -25,31 +25,28 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 02 — Linter & Test Harness
+**Current focus:** Phase 3 — Protocol Skill & Hooks
 
 ## Current Position
 
-Phase: 02 (Linter & Test Harness) — GAP CLOSURE EXECUTED, RE-VERIFIED, AWAITING HUMAN RECETTE
-Plan: 9 of 9 complete (02-01 … 02-06, then gap-closure plans 02-07 … 02-09)
-Status: the 2026-09-25 recette (`02-UAT.md`) diagnosed seven gaps (G-02-2, G-02-4a..4f); the
-three gap-closure plans landed on branch `feat/phase-02-gap-closure` (not merged into `main`).
-The code review of the new diff found three critical regressions of the confidentiality gate
-(CR-01 case-variant layout folder holding its own `dossier.yaml`, CR-02 misspelt
-`confidential_names` beside the exact key, CR-03 format characters in `init.py`); all fixed,
-CR-02 twice by Samuel's arbitration. Two further review rounds passed. `02-VERIFICATION.md`
-re-verification (2026-09-25, on `df7f9ea`): `human_needed`, 13/13 automated truths
-(4 ROADMAP criteria, 2 Phase 1 debts, 7 gap truths); `bash tests/run.sh`: 6 files, 0 failed;
-`tests/test-lint.sh`: 1494 assertions. The phase is NOT marked complete: Samuel re-runs UAT
-items 2 and 4 on the corrected code (`/gsd-verify-work 02`).
-Last activity: 2026-09-25 — gap-closure mission (`.planning/missions/2026-09-25-phase-2-gap-closure.md`).
+Phase: 3 — Protocol Skill & Hooks
+Plan: Not started
+Status: Ready to plan
+Phase 2 closed 2026-10-10: recette delegated by Samuel to the agent and run green (`02-UAT.md`
+complete, items 2 and 4 re-tested, 7 gaps resolved by 02-07..02-09); WR-01 (default-ignorable
+characters outside Cf hid a confidential name) fixed by `ce42a6a` on Samuel's call before
+sign-off; `02-VERIFICATION.md` passed 14/14 on `ce42a6a`; `tests/test-lint.sh` 1551 assertions,
+`bash tests/run.sh` 6 files, 0 failed. Branch `feat/phase-02-gap-closure` is NOT merged into
+`main` yet — merge awaits Samuel's go.
+Last activity: 2026-10-10 — Phase 02 complete, transitioned to Phase 3
 
-Progress: [█░░░░░░░░░] 14%
+Progress: [███░░░░░░░] 29%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6 (Phase 1, waves 1-5)
+- Total plans completed: 9 (Phase 1, waves 1-5)
 - Average duration: -
 - Total execution time: -
 
@@ -58,6 +55,7 @@ Progress: [█░░░░░░░░░] 14%
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 1 | 6/6 | - | - |
+| 02 | 9 | - | - |
 
 **Recent Trend:**
 
@@ -174,10 +172,10 @@ mission, now validated by the phase's own delivery:
 | Debt (Phase 1 → Phase 2) | (a) YAML 1.1 reserved words: `init.py`'s `_SAFE_PLAIN_SCALAR_RE` lets `yes/no/on/off/true/false/null/y/n` through unquoted; `--language no` writes `language: no`, read back as boolean `False` by a strict YAML parser. Not a vulnerability (no key injection; `consent_recorded` unreachable) — a typing-fidelity gap. Fix when writing `lint.py`'s YAML-subset parser, aligning producer and consumer in one move. | Resolved — 02-03 (`bd2ecd2`): `_YAML_RESERVED_SCALARS` routes reserved spellings to `yaml_quote()`; pinned by `tests/test-init-empty.sh` d14. Round-trip through the lint parser still due in 02-06 | 2026-09-16 (Phase 1 review, round 3) | v1 |
 | Debt (Phase 1 → Phase 2) | (b) Regex anchoring: same regex's `$` also matches just before a trailing `\n` (vs. `\Z`/`re.fullmatch`); a value ending in a newline passes the allowlist and leaves a blank line. No key injection — cosmetic guard bypass. One-line fix, bundle with (a). | Resolved — 02-03 (`bd2ecd2`): `emit_scalar` uses `fullmatch`; pinned by `tests/test-init-empty.sh` d15 | 2026-09-16 (Phase 1 review, round 3) | v1 |
 | Debt (Phase 2 review, iteration 3) | Three reproduced fail-open paths of the confidentiality gate (E5), each letting a confidential name under `outbound/` pass with exit 0; none introduced by the fix rounds: CR-01 `Outbound/` on a case-insensitive filesystem escapes every outbound check; CR-02 zero-width/BOM/soft-hyphen characters in a name survive `init.py` and defeat the text match; CR-03 HTML entities in an outbound `.html` hide names. Plus WR-01 (near-miss rule rejects legitimate extra keys like `consent_scope`), WR-02 (two untested lines), WR-03 (unreadable dir or `.git/` under `outbound/` skipped silently), WR-04 (name wrapped across `> ` quoted lines). Details: `02-REVIEW.md`. | Resolved — gap closure 2026-09-25 (02-07..02-09 + review-fix rounds, branch `feat/phase-02-gap-closure`); Samuel ordered the fix round in UAT item 4 | 2026-09-24 (Phase 2 review, iteration 3) | v1 |
-| Debt (Phase 2 gap-closure review) | WR-01: E5 is blind only to Unicode category Cf, not the wider default-ignorable set (CGJ, variation selectors, Hangul fillers). OBS-01: no runtime rejection of a confidential name starting with `>`. CR-02 bis residual: a double typo landing inside the last word of a `confidential_names` misspelling beside the exact key stays ignored. Minor: `_osa_distance` has no internal length guard (safe only through its call sites). Details: `02-REVIEW-FIX.md`, `02-VERIFICATION.md`. | Open — Samuel confirms at the recette (item 3 of `02-VERIFICATION.md` human_verification) | 2026-09-25 (gap-closure review) | v1 |
+| Debt (Phase 2 gap-closure review) | WR-01: E5 is blind only to Unicode category Cf, not the wider default-ignorable set (CGJ, variation selectors, Hangul fillers). OBS-01: no runtime rejection of a confidential name starting with `>`. CR-02 bis residual: a double typo landing inside the last word of a `confidential_names` misspelling beside the exact key stays ignored. Minor: `_osa_distance` has no internal length guard (safe only through its call sites). Details: `02-REVIEW-FIX.md`, `02-VERIFICATION.md`. | WR-01 resolved — `ce42a6a` (2026-10-10, every Default_Ignorable_Code_Point treated like Cf in `lint.py` and `init.py`). OBS-01, the CR-02 bis residual and the `_osa_distance` guard stay open as accepted v1 debt | 2026-09-25 (gap-closure review) | v1 |
 
 ## Session Continuity
 
-Last session: 2026-09-25
-Stopped at: Phase 2 gap closure re-verified (human_needed); recette pending on branch feat/phase-02-gap-closure
-Resume file: .planning/phases/02-linter-test-harness/02-VERIFICATION.md
+Last session: 2026-10-10
+Stopped at: Phase 02 complete, ready to plan Phase 3
+Resume file: None

@@ -27,7 +27,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 1: Scaffold & Templates** - `dossier-init` scaffolds a full dossier repo from `dossier.yaml` and templates
-- [ ] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures
+- [x] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures (completed 2026-10-10)
 - [ ] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
 - [ ] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts
 - [ ] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
@@ -127,7 +127,7 @@ producer and consumer are aligned in one move):
      `Last updated:` label.
   4. A bash test runner in `tests/` runs every fixture and asserts `lint.py`'s exit codes
      and messages, and passes end to end.
-**Plans**: 9/9 plans executed (3 gap-closure plans added after the 2026-09-25 UAT, executed
+**Plans**: 9/9 plans complete (3 gap-closure plans added after the 2026-09-25 UAT, executed
 and re-verified the same day on branch `feat/phase-02-gap-closure`; awaiting Samuel's recette)
 
 Plans:
@@ -308,7 +308,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
-| 2. Linter & Test Harness | 9/9 | Executed, re-verified — awaiting human recette |  |
+| 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
 | 3. Protocol Skill & Hooks | 0/TBD | Not started | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
