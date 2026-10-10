@@ -212,7 +212,7 @@ ships in v1 and blocks once.
      invoked outside any dossier, the `dossier` entry skill says so in one line and
      steps aside, and every task skill stops with a message (verified with each task skill
      as it lands in Phases 4-6).
-**Plans**: 1/6 plans executed
+**Plans**: 2/6 plans executed
 
 Plans:
 **Wave 1**
@@ -222,7 +222,7 @@ Plans:
   the config test
 - [ ] 03-02-PLAN.md — the headless scenario harness proven against a fake claude, the provisional
   AGENTS.md removal (P-01), and the RED baseline recorded without the plugin, before the skill
-- [ ] 03-03-PLAN.md — spec, PROJECT, ROADMAP and REQUIREMENTS amendments for D-01, D-03, D-04,
+- [x] 03-03-PLAN.md — spec, PROJECT, ROADMAP and REQUIREMENTS amendments for D-01, D-03, D-04,
   D-07, D-09; `.gsd/` ignored
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -339,7 +339,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 |-------|----------------|--------|-----------|
 | 1. Scaffold & Templates | 6/6 | Complete — human recette passed | 2026-09-17 |
 | 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
-| 3. Protocol Skill & Hooks | 1/6 | In Progress | - |
+| 3. Protocol Skill & Hooks | 2/6 | In Progress | - |
 | 4. Ingest & Fact Extraction | 0/TBD | Not started | - |
 | 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
 | 6. Calls & Status | 0/TBD | Not started | - |

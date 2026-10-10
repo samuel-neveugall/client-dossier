@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: Protocol Skill & Hooks
 status: executing
-stopped_at: 03-02 blocked at baseline gate (Tasks 1-2 done, Task 3 RED 0/3)
-last_updated: "2026-10-10T13:04:23.336Z"
+stopped_at: Completed 03-03-PLAN.md (03-02 still blocked at baseline gate, RED 0/3)
+last_updated: "2026-10-10T13:06:59.025Z"
 last_activity: 2026-10-10
 last_activity_desc: Phase 03 execution started
-state_head: 525280573dbeca5edcb2901da8146ae266aeea67
+state_head: d8986a406a5d01603078bc4c70b0395897845dac
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 21
-  completed_plans: 16
+  completed_plans: 17
   percent: 29
 ---
 
@@ -30,7 +30,7 @@ human and a doctrine check.
 ## Current Position
 
 Phase: 03 (Protocol Skill & Hooks) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Phase 2 closed 2026-10-10: recette delegated by Samuel to the agent and run green (`02-UAT.md`
 complete, items 2 and 4 re-tested, 7 gaps resolved by 02-07..02-09); WR-01 (default-ignorable
@@ -75,6 +75,7 @@ Progress: [███░░░░░░░] 29%
 | Phase 02 P05 | 6min | 3 tasks | 25 files |
 | Phase 02 P06 | 8min | 3 tasks | 3 files |
 | Phase 03 P01 | 25 min | 2 tasks | 5 files |
+| Phase 03 P03 | 2 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,7 @@ mission, now validated by the phase's own delivery:
 - [Phase 02]: gap closure (2026-09-25): D-FIX-13 (manager arbitration, reversible): `init.py` writes both readings (space, deletion) of a Unicode format character in a confidential name as two list entries when they differ
 - [Phase 02]: gap closure (2026-09-25): the iteration-3 review and the iteration-2 fix report were preserved as `02-REVIEW.iter3.md` / `02-REVIEW-FIX.iter2.md` before being superseded
 - [Phase 03]: 03-01: Bash guard also scans command-substitution bodies visible to shlex; opaque constructs stay allowed (D-04 heuristic)
+- [Phase 03]: Stop hook ships in v1 and blocks once (stop_hook_active lets the second stop through) — In Claude Code a non-blocking Stop hook only reaches the human; updating the dossier before handing back is the agent's behaviour (D-01)
 
 ### Pending Todos
 
@@ -172,6 +174,6 @@ mission, now validated by the phase's own delivery:
 
 ## Session Continuity
 
-Last session: 2026-10-10T13:04:23.305Z
-Stopped at: 03-02 blocked at baseline gate (Tasks 1-2 done, Task 3 RED 0/3)
+Last session: 2026-10-10T13:06:58.993Z
+Stopped at: Completed 03-03-PLAN.md (03-02 still blocked at baseline gate, RED 0/3)
 Resume file: .planning/phases/03-protocol-skill-hooks/03-02-SUMMARY.md
