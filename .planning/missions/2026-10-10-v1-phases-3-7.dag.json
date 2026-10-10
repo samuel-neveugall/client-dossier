@@ -104,7 +104,7 @@
         "uat-3"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-4",
@@ -115,7 +115,7 @@
         "uat-3"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-4",
@@ -154,7 +154,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-5",
@@ -445,6 +445,16 @@
         "docs/"
       ],
       "status": "done"
+    },
+    {
+      "id": "audit-4",
+      "step": "security audit phase 4 (URL download, filing)",
+      "stage": "",
+      "deps": [
+        "exec-4"
+      ],
+      "scope": [],
+      "status": "blocked"
     }
   ]
 }
