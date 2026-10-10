@@ -181,7 +181,9 @@ is not applied; name it in the report.
   which ends with `(corrects a line dated <date>)`. Never add a second line beside the old one.
 - **Tables** (`OPEN-QUESTIONS.md`, `Numbers` in `RELATIONSHIP.md`) get a table row, not a bullet.
 - **`Last updated:`** in every living file you changed becomes
-  `Last updated: <YYYY-MM-DD>, after <event with its absolute date>`. Never write a relative
+  `Last updated: <YYYY-MM-DD>, after <event with its absolute date>`. The first date is the day
+  you make the edit (`date +%F` gives it), never the date of the source, which usually is
+  older: `Last updated: 2026-03-06, after the price list of 2026-03-04`. Never write a relative
   date word.
 - **Uncertain** items are reported, never written.
 
@@ -190,7 +192,7 @@ A correction, with invented people and amounts:
 ```text
 existing: - Rosa Silva (Orion Logistics) set the pilot budget at 9,500 euros (mail 2026-02-10 from Rosa Silva).
 replaced: - Rosa Silva (Orion Logistics) raised the pilot budget to 11,200 euros on 2026-03-04 (call 2026-03-04 @14:20) (corrects a line dated 2026-02-10).
-Last updated: 2026-03-04, after the call of 2026-03-04
+Last updated: 2026-03-05, after the call of 2026-03-04
 ```
 
 ## Check and report
