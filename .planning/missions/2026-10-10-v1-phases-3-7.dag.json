@@ -215,7 +215,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-6",
@@ -276,7 +276,7 @@
       "stage": "",
       "deps": [],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "plan-7",
@@ -459,6 +459,18 @@
     {
       "id": "fix-4a",
       "step": "fix round: review R4 + audit A4 + dispatch rewording + paid re-runs",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/",
+        "agents/",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-4b",
+      "step": "re-review round 2 phase 4 (review + audit closures)",
       "stage": "",
       "deps": [],
       "scope": [
