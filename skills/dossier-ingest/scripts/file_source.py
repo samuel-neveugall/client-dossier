@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# vibeflow:allow-large-file -- one file on purpose: a bare-skills copy runs it
+# by path, so a second importable module would turn sys.path into a
+# distribution concern (DIST-03). Filing, dedup, containment and the safe URL
+# fetch are one cohesive pass. Tracked in 04-01-SUMMARY.md.
 """File one source into a client-dossier repository's sources/ folder.
 
 Mechanics tier only (spec principle: "skills carry the judgement, scripts
@@ -27,6 +31,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import sys
 import tempfile
 import unicodedata
@@ -48,6 +53,8 @@ KIND_DIRS = {
 }
 
 CHUNK = 1 << 16
+# GitHub refuses a file above 100 MiB; the result carries a warning above this.
+LARGE_FILE_WARNING_BYTES = 100 * 1024 * 1024
 SLUG_MAX = 60
 EXT_MAX = 10
 _DIGITS = "0123456789"
@@ -163,9 +170,12 @@ def sha256_of(path):
             digest.update(chunk)
 
 
-def run_file(argv):
-    args = build_parser().parse_args(argv)
-    date = resolve_date(args.date)
+def inside(child, parent):
+    """True when the real path CHILD is PARENT or lies below it."""
+    return child == parent or child.startswith(parent.rstrip(os.sep) + os.sep)
+
+
+def require_root():
     root = find_root(os.getcwd())
     if root is None:
         raise Refusal(
@@ -173,30 +183,149 @@ def run_file(argv):
             "no dossier.yaml in the current directory or above it",
             status=EXIT_NO_DOSSIER,
         )
+    return root
+
+
+def make_stage(root):
+    """A fresh staging directory that must resolve outside the dossier."""
+    stage = tempfile.mkdtemp(prefix="client-dossier-file-")
+    if inside(os.path.realpath(stage), os.path.realpath(root)):
+        shutil.rmtree(stage, ignore_errors=True)
+        raise Refusal(
+            "staging_inside_dossier",
+            "the temporary directory resolves inside the dossier; "
+            "point TMPDIR outside it and re-run",
+        )
+    return stage
+
+
+def find_duplicate(sources, digest, size):
+    """The root-relative path of a regular file under SOURCES with these bytes.
+
+    D-06: stateless. Symlinks, non-regular files and .gitkeep are skipped;
+    only files of the same size are hashed.
+    """
+    for dirpath, dirnames, filenames in os.walk(sources, followlinks=False):
+        dirnames.sort()
+        for fname in sorted(filenames):
+            if fname == GITKEEP:
+                continue
+            path = os.path.join(dirpath, fname)
+            try:
+                info = os.lstat(path)
+            except OSError:
+                continue
+            if not stat.S_ISREG(info.st_mode) or info.st_size != size:
+                continue
+            if sha256_of(path) == digest:
+                rel = os.path.relpath(path, sources).replace(os.sep, "/")
+                return "sources/" + rel
+    return None
+
+
+def transcript_exists(folder, stem):
+    """True when FOLDER holds a regular file named STEM.<ext>."""
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return False
+    for entry in names:
+        if entry.startswith(stem + ".") and os.path.isfile(os.path.join(folder, entry)):
+            return True
+    return False
+
+
+def run_file(argv):
+    args = build_parser().parse_args(argv)
+    date = resolve_date(args.date)
+    if "://" in args.path:
+        raise Refusal(
+            "url_argument",
+            "the filing form takes a local file, not a URL; "
+            "run file_source.py fetch URL first, then file the staged path it prints",
+        )
+    root = require_root()
+    real_root = os.path.realpath(root)
+
     incoming = os.path.realpath(args.path)
+    if not os.path.exists(incoming):
+        raise Refusal("missing", "no such file: {}".format(args.path))
+    if not os.path.isfile(incoming):
+        raise Refusal("not_a_regular_file", "not a regular file: {}".format(args.path))
+    if os.path.getsize(incoming) == 0:
+        raise Refusal("empty", "the file is empty: {}".format(args.path))
+
     given = os.path.basename(args.path.rstrip("/")) or args.path
     slug = slugify(args.slug if args.slug is not None else os.path.splitext(given)[0])
-    name = "{}_{}{}".format(date, slug, extension_of(given))
+    stem = "{}_{}".format(date, slug)
+    name = stem + extension_of(given)
 
-    stage = tempfile.mkdtemp(prefix="client-dossier-file-")
+    sources = os.path.realpath(os.path.join(real_root, "sources"))
+    if not inside(sources, real_root):
+        raise Refusal(
+            "sources_outside_dossier",
+            "sources/ resolves outside the dossier; refusing to file there",
+        )
+    kind_dir = KIND_DIRS[args.kind]
+    folder = os.path.realpath(os.path.join(real_root, kind_dir))
+    if not inside(folder, sources):
+        raise Refusal(
+            "sources_outside_dossier",
+            "{}/ resolves outside sources/; refusing to file there".format(kind_dir),
+        )
+
+    stage = make_stage(real_root)
     try:
         staged = os.path.join(stage, "incoming")
         with open(incoming, "rb") as fin, open(staged, "xb") as fout:
             shutil.copyfileobj(fin, fout, CHUNK)
-        digest = sha256_of(staged)
         size = os.path.getsize(staged)
+        if size == 0:
+            raise Refusal("empty", "the file is empty: {}".format(args.path))
+        digest = sha256_of(staged)
 
-        folder = os.path.join(root, KIND_DIRS[args.kind])
+        existing = find_duplicate(sources, digest, size)
+        if existing is not None:
+            return (
+                {"status": "already_filed", "path": existing, "sha256": digest},
+                EXIT_OK,
+            )
+
+        rel = kind_dir + "/" + name
         os.makedirs(folder, exist_ok=True)
         target = os.path.join(folder, name)
-        with open(staged, "rb") as fin, open(target, "xb") as fout:
-            shutil.copyfileobj(fin, fout, CHUNK)
+        try:
+            fout = open(target, "xb")
+        except FileExistsError:
+            raise Refusal(
+                "name_taken",
+                "{} already exists; choose another --slug".format(rel),
+            )
+        try:
+            with fout, open(staged, "rb") as fin:
+                shutil.copyfileobj(fin, fout, CHUNK)
+        except BaseException:
+            try:
+                os.remove(target)
+            except OSError:
+                pass
+            raise
     finally:
         shutil.rmtree(stage, ignore_errors=True)
 
-    rel = KIND_DIRS[args.kind] + "/" + name
+    warnings = []
+    if args.kind == "raw" and not transcript_exists(os.path.join(sources, "transcripts"), stem):
+        warnings.append(
+            "no transcript named {}.* under sources/transcripts/ yet; "
+            "file the transcript with the same --date and --slug".format(stem)
+        )
+    if size > LARGE_FILE_WARNING_BYTES:
+        warnings.append(
+            "the file is larger than 100 MB; GitHub refuses files over that "
+            "size, so track it with Git LFS before pushing"
+        )
     return (
-        {"status": "filed", "path": rel, "sha256": digest, "bytes": size, "warnings": []},
+        {"status": "filed", "path": rel, "sha256": digest, "bytes": size, "warnings": warnings},
         EXIT_OK,
     )
 
