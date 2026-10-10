@@ -33,7 +33,7 @@
         "CLAUDE.md",
         ".planning/"
       ],
-      "status": "running"
+      "status": "done"
     },
     {
       "id": "revue-3",
@@ -47,7 +47,7 @@
         "hooks/",
         "tests/"
       ],
-      "status": "blocked",
+      "status": "ready",
       "review_regime": "full"
     },
     {
@@ -60,7 +60,7 @@
       "scope": [
         "hooks/"
       ],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "verify-3",
@@ -395,7 +395,43 @@
         "hooks/",
         "tests/"
       ],
-      "status": "blocked"
+      "status": "done"
+    },
+    {
+      "id": "revue-3c",
+      "step": "review dossier skill + doc amendments",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier/",
+        "docs/",
+        "CLAUDE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-3c",
+      "step": "fix skill + stale docs (revue-3c)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier/",
+        "docs/",
+        "CLAUDE.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-3d",
+      "step": "re-review round 3: fix-3b + fix-3c",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "skills/dossier/",
+        "tests/"
+      ],
+      "status": "ready"
     }
   ]
 }
