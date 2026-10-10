@@ -145,6 +145,82 @@ expect_silent 'read-only Bash call' \
 expect_silent 'unknown tool' \
   "$(hook_json PreToolUse "$d" Read file_path "$d/$TRANSCRIPT_REL")"
 
+# --- Case 5: the heuristic Bash guard (D-04) ---
+# A fresh dossier, so the fixtures of the cases above (symlink, nested
+# dossier) cannot influence the Bash resolution. The guard is a heuristic:
+# it catches the visible routes onto an EXISTING source file and lets every
+# new file in, which is what ingest and extract-text.sh do.
+b=$(scratch_repo)
+build_dossier "$b"
+
+# bash_deny LABEL CMD [CWD] [REL] — denied, naming REL, saying where it comes from.
+bash_deny() {
+  local label="$1" cmd="$2" cwd="${3:-$b}" rel="${4:-$TRANSCRIPT_REL}"
+  expect_deny "$label" "$(hook_json PreToolUse "$cwd" Bash command "$cmd")" "$rel"
+  case "$(hook_field hookSpecificOutput.permissionDecisionReason)" in
+    *'heuristic guard'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+    *)
+      echo "FAIL: $label (reason does not say it comes from the heuristic guard)" >&2
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+      ;;
+  esac
+}
+
+# bash_ok LABEL CMD [CWD] — no output at all.
+bash_ok() {
+  local label="$1" cmd="$2" cwd="${3:-$b}"
+  expect_silent "$label" "$(hook_json PreToolUse "$cwd" Bash command "$cmd")"
+}
+
+echo '--- Bash: in-place edits are denied ---'
+bash_deny 'sed -i with a BSD empty suffix' "sed -i '' 's/reprot/report/' sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'sed -i.bak' "sed -i.bak s/a/b/ sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'sed --in-place=.b' "sed --in-place=.b s/a/b/ sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'sed -Ei' "sed -Ei s/a/b/ sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'leading NAME=value' "FOO=1 sed -i s/a/b/ sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'perl -pi' "perl -pi -e 's/a/b/' sources/transcripts/2026-10-01_kickoff.txt"
+
+echo '--- Bash: the directory changes before the edit ---'
+bash_deny 'cd sources/transcripts && sed -i' \
+  'cd sources/transcripts && sed -i s/a/b/ 2026-10-01_kickoff.txt'
+bash_deny 'stdin cwd already under sources/' \
+  'sed -i s/a/b/ 2026-10-01_kickoff.txt' "$b/sources/transcripts"
+bash_deny 'cd on one line, sed -i on the next' \
+  $'cd sources/transcripts\nsed -i s/a/b/ 2026-10-01_kickoff.txt'
+bash_deny 'inside a subshell' \
+  '(cd sources && rm transcripts/2026-10-01_kickoff.txt)'
+
+echo '--- Bash: delete, move out, overwrite, truncate ---'
+bash_deny 'rm a source' "rm sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'rm -rf sources' 'rm -rf sources' "$b" 'sources'
+bash_deny 'mv out of sources/' "mv sources/transcripts/2026-10-01_kickoff.txt /tmp/x.txt"
+bash_deny 'redirection >' "echo hi > sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'redirection >>' "echo hi >> sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'tee -a' "echo hi | tee -a sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'truncate' "truncate -s 0 sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'cp onto an existing source' "cp other.txt sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'git rm' "git rm sources/transcripts/2026-10-01_kickoff.txt"
+bash_deny 'bash -c' "bash -c \"sed -i s/a/b/ sources/transcripts/2026-10-01_kickoff.txt\""
+
+echo '--- Bash: new files in, reads, and everything the guard cannot judge ---'
+bash_ok 'cp a new file into sources/received' 'cp new.pdf sources/received/2026-10-10_brochure.pdf'
+bash_ok 'cp into the received directory' 'cp new.pdf sources/received/'
+bash_ok 'mv into the received directory' 'mv new.pdf sources/received/'
+bash_ok 'redirect to a new file' 'echo x > sources/received/2026-10-10_note.txt'
+bash_ok 'cat a source' "cat sources/transcripts/2026-10-01_kickoff.txt"
+bash_ok 'grep a source' "grep reprot sources/transcripts/2026-10-01_kickoff.txt"
+bash_ok 'mkdir under sources' 'mkdir -p sources/received/2026'
+bash_ok 'sed -i on a living file after cd sources' "cd sources && sed -i 's/x/y/' ../dossier/HISTORY.md"
+bash_ok 'sed -i on a living file' 'sed -i s/a/b/ dossier/HISTORY.md'
+bash_ok 'a subshell cd does not leak' '(cd sources && ls); rm notes.txt'
+bash_ok 'a variable operand' 'sed -i s/a/b/ $F'
+bash_ok 'an interpreter one-liner' "python3 -c \"open('sources/x','w')\""
+bash_ok 'a shlex error' "echo 'unbalanced"
+mkdir -p "$plain/sources"
+bash_ok 'rm -rf sources outside any dossier' 'rm -rf sources' "$plain"
+
+rm -rf "$b"
+
 rm -rf "$d" "$plain"
 
 finish
