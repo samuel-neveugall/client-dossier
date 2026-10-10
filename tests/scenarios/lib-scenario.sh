@@ -77,6 +77,36 @@ build_dossier() {
   echo "$d"
 }
 
+# --- P-01 (PROVISIONAL) -----------------------------------------------------
+# strip_agents_pointer DIR
+#
+# PROVISIONAL (P-01, .planning/phases/03-protocol-skill-hooks/03-CONTEXT.md,
+# awaiting Samuel).
+#
+# What it does: deletes the AGENTS.md that init.py wrote into the scratch
+# dossier, so the plugin is the only variable between the baseline and plugin
+# variants.
+#
+# Why: with the protocol pointer present, the no-plugin baseline refused to edit
+# the transcript without filing anything -- neither RED nor GREEN -- so D-10's
+# "RED at least once" could not be met (RESEARCH Pitfall 1).
+#
+# Reversion: drop the call in fix-typo.sh, the harness note it prints and the
+# P-01 block of selftest.sh, then rerun the scenario and re-record the evidence.
+#
+# It dies (harness error) when DIR/AGENTS.md is absent -- the scaffold contract
+# changed -- or when DIR/CLAUDE.md exists, and otherwise removes DIR/AGENTS.md
+# only.
+strip_agents_pointer() {
+  local dir="$1"
+  [ -f "$dir/AGENTS.md" ] \
+    || scenario_die "$dir has no AGENTS.md: the init.py scaffold contract changed (P-01)"
+  [ ! -e "$dir/CLAUDE.md" ] \
+    || scenario_die "$dir holds a CLAUDE.md: removing only AGENTS.md would not remove the pointer (P-01)"
+  rm -f "$dir/AGENTS.md"
+}
+# --- end P-01 (PROVISIONAL) --------------------------------------------------
+
 # commit_baseline DIR — commits everything, echoes the commit id the run is
 # later diffed against.
 commit_baseline() {

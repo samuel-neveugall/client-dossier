@@ -83,6 +83,11 @@ SUMMARY="$OUTDIR/summary.tsv"
 
 echo "outdir: $OUTDIR"
 scenario_preflight
+case " $VARIANTS " in
+  *" baseline "* | *" plugin "*)
+    echo "note: AGENTS.md removed from the scratch dossier in the baseline and plugin variants (P-01, provisional); pointer-only keeps it and is informational"
+    ;;
+esac
 
 printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
   variant run verdict agents_md sha_before sha_after filed_lines skill_loaded \
@@ -139,6 +144,12 @@ run_one() {
   R_DOSSIER="$dir"
   mkdir -p "$dir/sources/transcripts"
   write_transcript "$dir/$TRANSCRIPT_REL"
+  # P-01 (PROVISIONAL, awaiting Samuel): baseline and plugin run without the
+  # AGENTS.md pointer, removed before the baseline commit so it never shows as a
+  # change of the run. Reversion: see lib-scenario.sh.
+  case "$R_VARIANT" in
+    baseline | plugin) strip_agents_pointer "$dir" ;;
+  esac
   if [ -f "$dir/AGENTS.md" ]; then R_AGENTS=yes; else R_AGENTS=no; fi
   base="$(commit_baseline "$dir")" || exit 2
   R_SHA_BEFORE="$(file_sha "$dir/$TRANSCRIPT_REL")"

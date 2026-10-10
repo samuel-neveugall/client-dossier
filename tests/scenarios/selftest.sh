@@ -213,6 +213,51 @@ else
   TESTS_PASSED=$((TESTS_PASSED + 1))
 fi
 
+# --- P-01 (PROVISIONAL): AGENTS.md pointer ---
+# Pending with Samuel (03-CONTEXT.md P-01). The baseline and plugin variants run
+# without the AGENTS.md pointer init.py writes; pointer-only keeps it. To revert
+# P-01, drop this block together with the pointer-removal call and the note
+# in fix-typo.sh, then rerun the scenario and re-record the evidence.
+run_case baseline FAKE_MODE=edit
+assert_eq no "$(col 4)" 'P-01: baseline row has agents_md no'
+assert_grep 'P-01, provisional' "$OUT.stdout"
+run_case plugin FAKE_MODE=file
+assert_eq no "$(col 4)" 'P-01: plugin row has agents_md no'
+run_case pointer-only FAKE_MODE=refuse
+assert_eq yes "$(col 4)" 'P-01: pointer-only row keeps AGENTS.md'
+assert_not_grep 'P-01, provisional' "$OUT.stdout"
+# The note is printed once per invocation, not once per run.
+OUT="$(mktemp -d "$WORK/out.XXXXXX")"
+env SCENARIO_CLAUDE="$FAKE" FAKE_MODE=edit \
+  bash "$SCEN_DIR/fix-typo.sh" --variant baseline --runs 2 "$OUT" >"$OUT.stdout" 2>"$OUT.stderr" || true
+assert_eq 1 "$(grep -c 'P-01, provisional' "$OUT.stdout")" 'P-01: the note is printed once per invocation'
+for old in $(awk -F'\t' 'NR>1 {print $14}' "$OUT/summary.tsv"); do
+  case "$old" in /*) rm -rf "$old" ;; esac
+done
+# The pointer-removal function is a harness error where the scaffold contract
+# changed. It is located by its strip_ prefix rather than named: the plan keeps
+# its name in lib-scenario.sh and fix-typo.sh only (P-01 isolation).
+STRIP_FN="$(sed -n 's/^\(strip_[a-z_]*\)().*/\1/p' "$SCEN_DIR/lib-scenario.sh")"
+assert_eq 1 "$(printf '%s\n' "$STRIP_FN" | grep -c .)" 'P-01: exactly one strip_* function in lib-scenario.sh'
+EMPTY="$(mktemp -d "$WORK/empty.XXXXXX")"
+status=0
+(. "$SCEN_DIR/lib-scenario.sh" && "$STRIP_FN" "$EMPTY") >/dev/null 2>"$WORK/strip.err" || status=$?
+assert_eq 2 "$status" 'P-01: the pointer-removal function on a dossier without AGENTS.md exits 2'
+assert_grep '^HARNESS ERROR:' "$WORK/strip.err"
+touch "$EMPTY/AGENTS.md" "$EMPTY/CLAUDE.md"
+status=0
+(. "$SCEN_DIR/lib-scenario.sh" && "$STRIP_FN" "$EMPTY") >/dev/null 2>/dev/null || status=$?
+assert_eq 2 "$status" 'P-01: the pointer-removal function on a dossier holding CLAUDE.md exits 2'
+rm -f "$EMPTY/CLAUDE.md"
+status=0
+(. "$SCEN_DIR/lib-scenario.sh" && "$STRIP_FN" "$EMPTY") >/dev/null 2>/dev/null || status=$?
+assert_eq 0 "$status" 'P-01: the pointer-removal function removes AGENTS.md'
+[ ! -e "$EMPTY/AGENTS.md" ] && TESTS_PASSED=$((TESTS_PASSED + 1)) || {
+  echo "FAIL: P-01: AGENTS.md still present after the pointer-removal function" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+}
+# --- end P-01 (PROVISIONAL) ---
+
 # --- Case 11: tests/run.sh never globs the scenarios ---
 assert_eq 0 "$(ls "$SCEN_DIR" | grep -c '^test-')" 'no file under tests/scenarios is named test-*.sh'
 
