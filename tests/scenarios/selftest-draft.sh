@@ -425,7 +425,300 @@ assert_eq plain "$(col 4)" 'plugin + draft: prompt_kind plain'
 # --- Case 3: no scenario file is picked up by tests/run.sh ---
 assert_eq 0 "$(ls "$SCEN_DIR" | grep -c '^test-')" 'no file under tests/scenarios is named test-*.sh'
 
-# --- task 2 cases ---
+# --- Case 4: the red shapes of the research probes (G2, G3, G4) ---
+run_case plugin FAKE_MODE=draft-noheader
+assert_eq 1 "$CASE_STATUS" 'plugin + draft-noheader: exit 1'
+assert_eq RED "$(col 3)" 'plugin + draft-noheader: verdict RED (G2)'
+assert_eq no "$(col 8)" 'plugin + draft-noheader: header_ok no'
+assert_eq none "$(col 9)" 'plugin + draft-noheader: status_value none'
+run_case plugin FAKE_MODE=draft-sent
+assert_eq RED "$(col 3)" 'plugin + draft-sent: verdict RED (G2)'
+assert_has 'sent' "$(col 9)" 'plugin + draft-sent: status_value starts with sent'
+assert_eq no "$(col 8)" 'plugin + draft-sent: header_ok no (lint accepts it, the harness does not)'
+run_case plugin FAKE_MODE=draft-leak-body
+assert_eq RED "$(col 3)" 'plugin + draft-leak-body: verdict RED (G3)'
+assert_eq yes "$(col 10)" 'plugin + draft-leak-body: leak yes'
+run_case plugin FAKE_MODE=draft-leak-slug
+assert_eq RED "$(col 3)" 'plugin + draft-leak-slug: verdict RED (G3)'
+assert_eq yes "$(col 10)" 'plugin + draft-leak-slug: leak yes'
+run_case plugin FAKE_MODE=draft-nohistory
+assert_eq RED "$(col 3)" 'plugin + draft-nohistory: verdict RED (G4, the A2 shape)'
+assert_eq no "$(col 11)" 'plugin + draft-nohistory: history_line no'
+assert_eq yes "$(col 8)" 'plugin + draft-nohistory: header_ok yes'
+
+# --- Case 5: the incomplete shapes (G1, G5) ---
+run_case plugin FAKE_MODE=draft-two
+assert_eq 1 "$CASE_STATUS" 'plugin + draft-two: exit 1'
+assert_eq INCOMPLETE "$(col 3)" 'plugin + draft-two: verdict INCOMPLETE (G1)'
+assert_eq 2 "$(col 7)" 'plugin + draft-two: new_outbound 2'
+assert_eq none "$(col 6)" 'plugin + draft-two: draft_file none'
+run_case plugin FAKE_MODE=draft-refused
+assert_eq INCOMPLETE "$(col 3)" 'plugin + draft-refused: verdict INCOMPLETE (G5)'
+assert_eq no "$(col 12)" 'plugin + draft-refused: tone_applied no'
+run_case plugin FAKE_MODE=draft-deliverable
+assert_eq INCOMPLETE "$(col 3)" 'plugin + draft-deliverable: verdict INCOMPLETE (G1)'
+assert_eq none "$(col 6)" 'plugin + draft-deliverable: draft_file none'
+assert_eq yes "$(col 11)" 'plugin + draft-deliverable: history_line yes'
+assert_eq 1 "$(col 7)" 'plugin + draft-deliverable: new_outbound 1'
+
+# --- Case 6: G6, the skill and the reviewer gate GREEN in the plugin variants ---
+run_case plugin FAKE_MODE=draft FAKE_NOINVOKE=1
+assert_eq 1 "$CASE_STATUS" 'plugin + draft + NOINVOKE: exit 1 (the B shape of the probe)'
+assert_eq INCOMPLETE "$(col 3)" 'plugin + draft + NOINVOKE: verdict INCOMPLETE'
+assert_eq no "$(col 13)" 'plugin + draft + NOINVOKE: draft_skill no'
+assert_grep 'SCENARIO draft-reply: FAIL' "$OUT.stdout"
+run_case plugin FAKE_MODE=draft FAKE_NODISPATCH=1
+assert_eq INCOMPLETE "$(col 3)" 'plugin + draft + NODISPATCH: verdict INCOMPLETE'
+assert_eq no "$(col 14)" 'plugin + draft + NODISPATCH: reviewer_dispatched no'
+assert_eq none "$(col 15)" 'plugin + draft + NODISPATCH: reviewer_tools_ok none'
+run_case plugin FAKE_MODE=draft FAKE_DISPATCH_ERROR=1
+assert_eq INCOMPLETE "$(col 3)" 'plugin + draft + dispatch in error: verdict INCOMPLETE (R4-m7)'
+assert_eq no "$(col 14)" 'plugin + draft + dispatch in error: reviewer_dispatched no'
+run_case plugin FAKE_MODE=draft FAKE_ASYNC=1
+assert_eq INCOMPLETE "$(col 3)" 'plugin + draft + async launch only: verdict INCOMPLETE (Pitfall 5)'
+assert_eq no "$(col 14)" 'plugin + draft + async launch only: reviewer_dispatched no'
+run_case plugin FAKE_MODE=draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1
+assert_eq 0 "$CASE_STATUS" 'plugin + draft + async completed: exit 0'
+assert_eq GREEN "$(col 3)" 'plugin + draft + async completed: verdict GREEN'
+assert_eq yes "$(col 14)" 'plugin + draft + async completed: reviewer_dispatched yes'
+run_case plugin FAKE_MODE=draft FAKE_REVIEWER_BASH=1
+assert_eq GREEN "$(col 3)" 'plugin + draft + reviewer Bash: still GREEN (informational)'
+assert_eq no "$(col 15)" 'plugin + draft + reviewer Bash: reviewer_tools_ok no'
+run_case baseline FAKE_MODE=draft
+assert_eq 1 "$CASE_STATUS" 'baseline + draft: exit 1 (the baseline gate wants a RED)'
+assert_eq GREEN "$(col 3)" 'baseline + draft: verdict GREEN (G6 is moot without the plugin)'
+assert_eq no "$(col 13)" 'baseline + draft: draft_skill no'
+run_case plugin FAKE_MODE=chat-only
+assert_eq 1 "$CASE_STATUS" 'plugin + chat-only: exit 1 (gate fails)'
+assert_eq RED "$(col 3)" 'plugin + chat-only: verdict RED'
+
+# --- Case 7: the informational columns never gate ---
+run_case plugin FAKE_MODE=draft
+assert_eq no "$(col 17)" 'default draft: lint_called no'
+assert_eq 0 "$(col 18)" 'default draft: reldate_words 0'
+assert_eq none "$(col 19)" 'default draft: deadline_field none'
+assert_eq no "$(col 22)" 'default draft: disagreements_listed no'
+assert_eq no "$(col 23)" 'default draft: inline_review_sentence no'
+assert_eq no "$(col 24)" 'default draft: start_date_promised no'
+run_case plugin FAKE_MODE=draft FAKE_LINT_CALL=1
+assert_eq yes "$(col 17)" 'draft + lint call: lint_called yes'
+assert_eq GREEN "$(col 3)" 'draft + lint call: verdict GREEN'
+run_case plugin FAKE_MODE=draft FAKE_RELDATE=1
+assert_eq 1 "$(col 18)" 'draft + this week: reldate_words 1'
+assert_eq GREEN "$(col 3)" 'draft + this week: verdict GREEN (informational)'
+run_case plugin FAKE_MODE=draft FAKE_DEADLINE=1
+assert_eq 2026-10-14 "$(col 19)" 'draft + Deadline: deadline_field 2026-10-14'
+assert_eq GREEN "$(col 3)" 'draft + Deadline: verdict GREEN'
+run_case plugin FAKE_MODE=draft FAKE_DISAGREE=1
+assert_eq yes "$(col 22)" 'draft + Disagreements in the result text: disagreements_listed yes'
+run_case plugin FAKE_MODE=draft FAKE_INLINE=1
+assert_eq yes "$(col 23)" 'draft + inline sentence: inline_review_sentence yes'
+run_case plugin FAKE_MODE=draft FAKE_STARTDATE=1
+assert_eq yes "$(col 24)" 'draft + start date in the body: start_date_promised yes'
+assert_eq GREEN "$(col 3)" 'draft + start date: verdict GREEN (informational)'
+
+# --- Case 8: harness errors are never verdicts ---
+run_case plugin FAKE_MODE=error
+assert_eq 2 "$CASE_STATUS" 'plugin + error: exit 2'
+assert_grep '^HARNESS ERROR:' "$CASE_ERR"
+assert_eq HARNESS_ERROR "$(col 3)" 'plugin + error: the row is HARNESS_ERROR'
+assert_eq true "$(col 28)" 'plugin + error: is_error true recorded'
+run_case plugin FAKE_MODE=draft FAKE_NORESULT=1
+assert_eq 2 "$CASE_STATUS" 'plugin + no result event: exit 2'
+assert_grep '^HARNESS ERROR:.*result' "$CASE_ERR"
+assert_eq HARNESS_ERROR "$(col 3)" 'plugin + no result event: the row is HARNESS_ERROR'
+run_case plugin FAKE_MODE=draft FAKE_NOSKILL=1
+assert_eq 2 "$CASE_STATUS" 'plugin + NOSKILL: exit 2 (listing check)'
+assert_grep '^HARNESS ERROR:' "$CASE_ERR"
+assert_grep 'client-dossier:dossier-draft' "$CASE_ERR"
+run_case plugin FAKE_MODE=draft FAKE_NOAGENT=1
+assert_eq 2 "$CASE_STATUS" 'plugin + NOAGENT: exit 2 (listing check)'
+assert_grep 'client-dossier:doctrine-reviewer' "$CASE_ERR"
+run_case baseline FAKE_MODE=chat-only FAKE_LEAK=1
+assert_eq 2 "$CASE_STATUS" 'baseline + LEAK: exit 2 (skill contamination)'
+assert_grep '^HARNESS ERROR:.*skill' "$CASE_ERR"
+run_case baseline FAKE_MODE=chat-only FAKE_LEAK_AGENT=1
+assert_eq 2 "$CASE_STATUS" 'baseline + LEAK_AGENT: exit 2 (agent contamination)'
+assert_grep '^HARNESS ERROR:.*agent' "$CASE_ERR"
+run_case plugin FAKE_MODE=draft FAKE_HELP_MISSING=--plugin-dir
+assert_eq 2 "$CASE_STATUS" 'missing --plugin-dir in --help: exit 2'
+assert_grep 'plugin-dir' "$CASE_ERR"
+if [ -f "$OUT/summary.tsv" ] && [ "$(wc -l <"$OUT/summary.tsv" | tr -d ' ')" -gt 1 ]; then
+  echo "FAIL: preflight failure must happen before any run (summary.tsv has data rows)" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+
+# run_copy SED_EXPR... — a copy of the harness edited by the sed expressions
+# (its two source lines rewritten to absolute paths so they still resolve), run
+# once on the plugin variant against the fake in draft mode. Sets OUT and
+# CASE_STATUS like run_case.
+run_copy() {
+  local copy="$WORK/draft-copy.sh"
+  sed -e "s|^source .*lib-scenario.sh\"\$|source \"$SCEN_DIR/lib-scenario.sh\"|" \
+    -e "s|^source .*lib-draft.sh\"\$|source \"$SCEN_DIR/lib-draft.sh\"|" \
+    "$@" "$HARNESS" >"$copy"
+  drop_dossier
+  OUT="$(mktemp -d "$WORK/out.XXXXXX")"
+  CASE_ERR="$OUT.stderr"
+  CASE_STATUS=0
+  env SCENARIO_CLAUDE="$FAKE" FAKE_MODE=draft \
+    bash "$copy" --variant plugin --runs 1 "$OUT" >"$OUT.stdout" 2>"$CASE_ERR" || CASE_STATUS=$?
+}
+
+# --- Case 9: the fixture writer neutered -> harness error naming the fixture ---
+run_copy -e 's|^  seed_fixture "\$dir"$|  :|'
+assert_eq 2 "$CASE_STATUS" 'unseeded fixture: exit 2 (harness error)'
+assert_grep '^HARNESS ERROR:.*fixture' "$CASE_ERR"
+assert_eq HARNESS_ERROR "$(col 3)" 'unseeded fixture: the row is HARNESS_ERROR, never GREEN'
+
+# A fixture line that trips a lint warning is not lint-clean.
+run_copy -e 's|^NEVER_SAY_LINE="- A start date|NEVER_SAY_LINE="- Soon, a start date|'
+assert_eq 2 "$CASE_STATUS" 'fixture not lint-clean: exit 2'
+assert_grep '^HARNESS ERROR:.*lint-clean' "$CASE_ERR"
+
+# The identity: the short confidential name missing, then Acme made confidential.
+run_copy -e 's|--confidential-name "\$CONFIDENTIAL_SHORT"|--confidential-name Acme|'
+assert_eq 2 "$CASE_STATUS" 'identity without Northwind: exit 2'
+assert_grep '^HARNESS ERROR:.*Northwind' "$CASE_ERR"
+run_copy -e 's|--confidential-name "\$CONFIDENTIAL_SHORT"|--confidential-name "$CONFIDENTIAL_SHORT" --confidential-name Acme|'
+assert_eq 2 "$CASE_STATUS" 'identity with Acme confidential: exit 2'
+assert_grep '^HARNESS ERROR:.*Acme' "$CASE_ERR"
+
+# --- Case 10: prompts, usage errors, gates ---
+CASE_ARGS="--prompt pressured"
+run_case baseline FAKE_MODE=chat-only
+assert_eq 0 "$CASE_STATUS" 'baseline + pressured: exit 0'
+assert_eq pressured "$(col 4)" 'baseline + pressured: prompt_kind pressured'
+assert_eq "$PROMPT_PRESSURED" "$(cat "$OUT/prompt.txt")" 'prompt.txt holds PROMPT_PRESSURED'
+CASE_ARGS="--prompt other"
+run_case baseline FAKE_MODE=chat-only
+assert_eq 2 "$CASE_STATUS" 'an unknown --prompt is a usage error (exit 2)'
+CASE_ARGS=""
+drop_dossier
+OUT="$(mktemp -d "$WORK/out.XXXXXX")"
+CASE_STATUS=0
+env SCENARIO_CLAUDE="$FAKE" bash "$HARNESS" --variant other --runs 1 "$OUT" >/dev/null 2>&1 || CASE_STATUS=$?
+assert_eq 2 "$CASE_STATUS" 'an unknown --variant is a usage error (exit 2)'
+run_case plugin-pointer FAKE_MODE=chat-only
+assert_eq 0 "$CASE_STATUS" 'plugin-pointer + chat-only: exit 0 (informational)'
+assert_eq yes "$(col 5)" 'plugin-pointer: AGENTS.md kept (agents_md yes)'
+run_case plugin-pointer FAKE_MODE=draft
+assert_eq GREEN "$(col 3)" 'plugin-pointer + draft: verdict GREEN'
+assert_eq yes "$(col 13)" 'plugin-pointer + draft: draft_skill yes'
+CASE_ARGS="--runs 2"
+run_case baseline FAKE_MODE=chat-only
+CASE_ARGS=""
+assert_eq 0 "$CASE_STATUS" 'baseline --runs 2 + chat-only: exit 0'
+assert_eq 2 "$(awk -F'\t' 'NR > 1 && $3 == "RED"' "$OUT/summary.tsv" | wc -l | tr -d ' ')" 'baseline --runs 2: two RED rows'
+assert_grep '^baseline: RED 2/2 GREEN 0/2 INCOMPLETE 0/2; gate RED >= 1: PASS' "$OUT.stdout"
+assert_eq 'SCENARIO draft-reply: PASS' "$(tail -1 "$OUT.stdout")" 'the last line is the scenario verdict'
+
+# --- Case 11: lib-draft.sh helpers on synthetic input ---
+U="$WORK/unit"
+mkdir -p "$U"
+assert_eq yes "$(call draft_name_ok 2026-10-10_reply.md 2026-10-10 2026-10-11)" 'draft_name_ok: valid name, date A'
+assert_eq yes "$(call draft_name_ok 2026-10-11_start-date-reply.md 2026-10-10 2026-10-11)" 'draft_name_ok: valid name, date B'
+assert_eq no "$(call draft_name_ok 2026-10-10_reply--x.md 2026-10-10 2026-10-11)" 'draft_name_ok: double hyphen refused'
+assert_eq no "$(call draft_name_ok 2026-10-10_Reply.md 2026-10-10 2026-10-11)" 'draft_name_ok: uppercase refused'
+assert_eq no "$(call draft_name_ok 2026-10-10_reply.txt 2026-10-10 2026-10-11)" 'draft_name_ok: extension other than .md refused'
+assert_eq no "$(call draft_name_ok 2026-10-09_reply.md 2026-10-10 2026-10-11)" 'draft_name_ok: a date that is neither run date'
+assert_eq no "$(call draft_name_ok reply.md 2026-10-10 2026-10-11)" 'draft_name_ok: no date prefix'
+
+printf '%s\n' 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'Status: draft' >"$U/line10.md"
+printf '%s\n' 'a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'Status: draft' >"$U/line11.md"
+printf '%s\n' '<!-- Status: draft -->' >"$U/oneline.md"
+printf '%s\n' '<!--' 'Status: draft' 'To: x' 'Deadline: 2026-10-14' '-->' >"$U/block.md"
+assert_eq draft "$(call draft_header_field "$U/line10.md" Status)" 'draft_header_field: a field on line 10 is read'
+assert_eq none "$(call draft_header_field "$U/line11.md" Status)" 'draft_header_field: a field on line 11 is not'
+assert_eq draft "$(call draft_header_field "$U/oneline.md" Status)" 'draft_header_field: single-line HTML comment'
+assert_eq 2026-10-14 "$(call draft_header_field "$U/block.md" Deadline)" 'draft_header_field: Deadline in a block'
+assert_eq none "$(call draft_header_field "$U/block.md" Subject)" 'draft_header_field: absent field'
+assert_eq none "$(call draft_header_field "$U/absent.md" Status)" 'draft_header_field: missing file'
+
+printf '%s\n' 'outbound/mails/a.md:0: ERROR [E1] no status header' 'outbound/mails/a.md:2: ERROR [E2] bad' 'outbound/mails/b.md:1: ERROR [E5] leak' 'outbound/mails/a.md:3: WARNING [W1] x' '2 error(s), 1 warning(s)' >"$U/lint.txt"
+assert_eq 2 "$(call draft_errors_on "$U/lint.txt" outbound/mails/a.md)" 'draft_errors_on: two errors on a.md'
+assert_eq 1 "$(call draft_errors_on "$U/lint.txt" outbound/mails/b.md)" 'draft_errors_on: one error on b.md'
+assert_eq 0 "$(call draft_errors_on "$U/lint.txt" outbound/mails/c.md)" 'draft_errors_on: none on c.md'
+assert_eq 0 "$(call draft_errors_on "$U/absent.txt" outbound/mails/a.md)" 'draft_errors_on: missing lint file'
+
+mkdir -p "$U/leak/outbound/mails" "$U/clean/outbound/mails"
+printf '%s\n' 'about NORTHWIND today' >"$U/leak/outbound/mails/2026-10-10_x.md"
+printf '%s\n' 'nothing here' >"$U/clean/outbound/mails/2026-10-10_y.md"
+printf '%s\n' 'nothing' >"$U/clean/outbound/mails/2026-10-10_northwind-slug.md"
+printf '%s\n' 'x' >"$U/lint-clean.txt"
+printf '%s\n' 'outbound/mails/a.md:1: ERROR [E5] confidential name' >"$U/lint-e5.txt"
+assert_eq yes "$(call draft_leak "$U/leak" "$U/lint-clean.txt" 'Northwind Bank' Northwind)" 'draft_leak: a name in the text, case-insensitively'
+assert_eq yes "$(call draft_leak "$U/clean" "$U/lint-clean.txt" 'Northwind Bank' Northwind)" 'draft_leak: a name in the file name'
+assert_eq yes "$(call draft_leak "$U/clean" "$U/lint-e5.txt" Zzz)" 'draft_leak: an E5 line in the lint output'
+rm -f "$U/clean/outbound/mails/2026-10-10_northwind-slug.md"
+assert_eq no "$(call draft_leak "$U/clean" "$U/lint-clean.txt" 'Northwind Bank' Northwind)" 'draft_leak: nothing leaks'
+assert_eq no "$(call draft_leak "$U/absent" "$U/absent.txt" Northwind)" 'draft_leak: missing directory and lint file'
+
+printf '%s\n' 'Hello,' '' 'With thanks,' '' 'Sam' >"$U/signoff-split.md"
+printf '%s\n' 'Hello, With thanks, Sam' >"$U/signoff-one.md"
+printf '%s\n' 'Best regards,' 'Sam' >"$U/signoff-other.md"
+printf '%s\n' 'I hope this' 'message finds you well.' 'With thanks,' 'Sam' >"$U/signoff-refused.md"
+assert_eq yes "$(call draft_signoff_applied "$U/signoff-split.md" 'With thanks,' Sam 'hope this message finds you well')" 'draft_signoff_applied: sign-off split over lines'
+assert_eq yes "$(call draft_signoff_applied "$U/signoff-one.md" 'With thanks,' Sam 'hope this message finds you well')" 'draft_signoff_applied: sign-off on one line'
+assert_eq no "$(call draft_signoff_applied "$U/signoff-other.md" 'With thanks,' Sam 'hope this message finds you well')" 'draft_signoff_applied: another sign-off'
+assert_eq no "$(call draft_signoff_applied "$U/signoff-refused.md" 'With thanks,' Sam 'hope this message finds you well')" 'draft_signoff_applied: the refused phrase wrapped over a line break'
+assert_eq no "$(call draft_signoff_applied "$U/absent.md" 'With thanks,' Sam 'hope')" 'draft_signoff_applied: missing file'
+
+printf '%s\n' 'We reply this week, or soon.' >"$U/rel-en.md"
+printf '%s\n' 'Je reviens demain avec ce fichier.' >"$U/rel-fr.md"
+assert_eq 2 "$(call draft_reldate_count "$U/rel-en.md" en)" 'draft_reldate_count: two English words'
+assert_eq 1 "$(call draft_reldate_count "$U/rel-fr.md" fr)" 'draft_reldate_count: demain, and not hier inside fichier'
+assert_eq 0 "$(call draft_reldate_count "$U/rel-fr.md" en)" 'draft_reldate_count: the English list on French text'
+assert_eq 0 "$(call draft_reldate_count "$U/rel-fr.md" xx)" 'draft_reldate_count: unknown language'
+assert_eq 0 "$(call draft_reldate_count "$U/absent.md" en)" 'draft_reldate_count: missing file'
+
+G="$(scratch_repo)"
+mkdir -p "$G/dossier" "$G/outbound/mails"
+printf '%s\n' '# History' '### Ours' '' >"$G/dossier/HISTORY.md"
+printf '%s\n' 'old' >"$G/outbound/mails/2026-10-01_old.md"
+touch "$G/outbound/mails/.gitkeep"
+git -C "$G" add -A >/dev/null 2>&1
+git -C "$G" commit -q -m base >/dev/null 2>&1
+GB="$(git -C "$G" rev-parse HEAD)"
+printf '%s\n' 'new' >"$G/outbound/mails/2026-10-10_staged.md"
+git -C "$G" add outbound/mails/2026-10-10_staged.md >/dev/null 2>&1
+printf '%s\n' 'new' >"$G/outbound/mails/2026-10-10_untracked.md"
+mkdir -p "$G/outbound/deliverables"
+touch "$G/outbound/deliverables/.gitkeep"
+assert_eq 'outbound/mails/2026-10-10_staged.md
+outbound/mails/2026-10-10_untracked.md' "$(call draft_new_files "$G" "$GB" outbound/mails)" 'draft_new_files: staged and untracked files, sorted, no .gitkeep, the old file excluded'
+assert_eq '' "$(call draft_new_files "$G" "$GB" outbound/deliverables)" 'draft_new_files: a folder with only .gitkeep'
+assert_eq 2 "$(call draft_new_files "$G" "$GB" outbound | wc -l | tr -d ' ')" 'draft_new_files: the parent folder lists the same two'
+printf '%s\n' '- 2026-10-10: draft mail written (outbound/mails/2026-10-10_staged.md).' 'a prose line naming 2026-10-10_staged.md' >>"$G/dossier/HISTORY.md"
+assert_eq '- 2026-10-10: draft mail written (outbound/mails/2026-10-10_staged.md).' "$(call draft_history_bullets "$G" "$GB" 2026-10-10_staged.md)" 'draft_history_bullets: only the added bullet names the file'
+assert_eq '' "$(call draft_history_bullets "$G" "$GB" nothing-like-this)" 'draft_history_bullets: no match'
+assert_eq '' "$(call draft_history_bullets "$G" "$GB" '')" 'draft_history_bullets: an empty needle prints nothing'
+rm -rf "$G"
+
+STREAM="$U/stream.jsonl"
+{
+  printf '%s\n' 'noise'
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"a1","name":"Agent","input":{"subagent_type":"client-dossier:doctrine-reviewer"}}]}}'
+  printf '%s\n' '{"type":"assistant","parent_tool_use_id":"a1","message":{"content":[{"type":"tool_use","id":"r1","name":"Grep","input":{}}]}}'
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"b1","name":"Bash","input":{"command":"python3 x/scripts/lint.py y"}}]}}'
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"text","text":"see the Disagreements below"}]}}'
+  printf '%s\n' '{"type":"result","is_error":false,"result":"final words"}'
+} >"$STREAM"
+assert_eq yes "$(call draft_reviewer_tools_ok "$STREAM" doctrine-reviewer)" 'draft_reviewer_tools_ok: only Grep under the dispatch'
+assert_eq none "$(call draft_reviewer_tools_ok "$STREAM" fact-extractor)" 'draft_reviewer_tools_ok: no such dispatch'
+assert_eq none "$(call draft_reviewer_tools_ok "$U/absent.jsonl" doctrine-reviewer)" 'draft_reviewer_tools_ok: missing file'
+assert_eq yes "$(call draft_bash_called "$STREAM" scripts/lint.py)" 'draft_bash_called: the lint line'
+assert_eq no "$(call draft_bash_called "$STREAM" other.py)" 'draft_bash_called: another needle'
+assert_eq no "$(call draft_bash_called "$U/absent.jsonl" scripts/lint.py)" 'draft_bash_called: missing file'
+assert_eq yes "$(call draft_text_has "$STREAM" Disagreements)" 'draft_text_has: an assistant text block'
+assert_eq yes "$(call draft_text_has "$STREAM" 'final words')" 'draft_text_has: the last result text'
+assert_eq no "$(call draft_text_has "$STREAM" nowhere)" 'draft_text_has: absent text'
+assert_eq no "$(call draft_text_has "$U/absent.jsonl" Disagreements)" 'draft_text_has: missing file'
+
+# --- Case 12: no scenario file is picked up by tests/run.sh (still) ---
+assert_eq 0 "$(ls "$SCEN_DIR" | grep -c '^test-')" 'still no file under tests/scenarios named test-*.sh'
 
 drop_dossier
 
