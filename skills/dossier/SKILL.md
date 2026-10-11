@@ -145,3 +145,6 @@ bare-skills install has no scripts), say so and apply the rules above by reading
 `dossier-init` starts a dossier in this repository or completes a scaffold that already exists.
 `dossier-ingest` files a source that arrived (a transcript, mail, brochure, PDF or link) under
 `sources/` and turns it into dated, sourced lines in the living files.
+`dossier-draft` writes every draft addressed to the counterpart (a mail, a message, a deliverable or a
+note) under `outbound/`, has it reviewed by `doctrine-reviewer` and records the commitment in
+history; every draft goes through it.
