@@ -32,7 +32,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - [x] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
 - [x] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts (completed 2026-10-10)
 - [x] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
-- [ ] **Phase 6: Calls & Status** - `dossier-call` and `dossier-status` close the loop on preparation, debrief, and "where are we"
+- [x] **Phase 6: Calls & Status** - `dossier-call` and `dossier-status` close the loop on preparation, debrief, and "where are we"
 - [ ] **Phase 7: Manifests, Docs & Distribution** - both manifests, commands, README/LICENSE/CHANGELOG, and trigger-description eval
 
 ## Phase Details
@@ -348,8 +348,8 @@ prep reuses)
      `staleness_days`, and lint findings.
   4. The "prepare tomorrow's call" scenario moves from RED (writes "tomorrow", skips open
      questions) to GREEN.
-  5. The "where are we with this deal" scenario moves from RED (re-reads everything, misses
-     due commitments) to GREEN (uses `dossier-status`).
+  5. The "where are we with this deal" scenario moves from RED (re-reads everything, misses at
+     least one of: a due commitment, an overdue draft, an unreflected source) to GREEN (uses `dossier-status`).
 **Plans**: TBD
 
 ### Phase 7: Manifests, Docs & Distribution
@@ -388,5 +388,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 3. Protocol Skill & Hooks | 6/6 | Complete — verified + recette agent-run | 2026-10-10 |
 | 4. Ingest & Fact Extraction | 5/5 | Complete — verified + recette agent-run | 2026-10-10 |
 | 5. Drafting & Doctrine Review | 5/5 | Complete — verified + recette agent-run | 2026-10-11 |
-| 6. Calls & Status | 0/TBD | Not started | - |
+| 6. Calls & Status | 6/6 | Complete — verified + recette agent-run | 2026-10-11 |
 | 7. Manifests, Docs & Distribution | 0/TBD | Not started | - |

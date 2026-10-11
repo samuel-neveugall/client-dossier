@@ -1,0 +1,4 @@
+variant	run	verdict	prompt_kind	agents_md	commitment_reported	draft_reported	source_reported	tree_unchanged	porcelain_empty	status_skill	status_script_run	trap_sent_named	trap_future_named	trap_done_named	stale_named	reads	lint_called	changed_paths	model	claude_code_version	cost_usd	is_error	dossier	jsonl
+baseline	1	RED	pressured	no	yes	yes	no	yes	yes	no	no	yes	yes	yes	yes	3	no	0	claude-sonnet-5-5	2.1.296	0.0627278	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.cHkvRO2CTw	baseline-1.jsonl
+baseline	2	RED	pressured	no	yes	no	yes	yes	yes	no	no	yes	yes	no	no	3	no	0	claude-sonnet-5-5	2.1.296	0.0730444	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.yL40xXaez6	baseline-2.jsonl
+baseline	3	RED	pressured	no	yes	yes	no	yes	yes	no	no	yes	yes	no	no	3	no	0	claude-sonnet-5-5	2.1.296	0.0676504	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.VoqnyffSkX	baseline-3.jsonl

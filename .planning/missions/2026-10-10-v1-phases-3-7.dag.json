@@ -226,7 +226,7 @@
         "uat-5"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-6",
@@ -237,7 +237,7 @@
         "uat-5"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-6",
@@ -247,7 +247,7 @@
         "exec-6"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -258,7 +258,7 @@
         "revue-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "uat-6",
@@ -268,7 +268,7 @@
         "verify-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "discuss-7",
@@ -287,7 +287,7 @@
         "uat-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-7",
@@ -544,6 +544,29 @@
       "scope": [
         "scripts/lint.py",
         "skills/dossier-draft/",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-6a",
+      "step": "fix R7 findings + re-review phase 6",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier-status/",
+        "skills/dossier-call/",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-6b",
+      "step": "re-review round 2 phase 6",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/",
         "tests/"
       ],
       "status": "done"

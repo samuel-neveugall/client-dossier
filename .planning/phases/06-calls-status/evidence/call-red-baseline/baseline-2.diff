@@ -1,0 +1,48 @@
+=== untracked: outbound/calls/2026-10-12_prep.md
+<!--
+Status: draft
+To: the ordering party's project lead
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+# Call with the ordering party, 2026-10-12
+
+## Context
+
+Second call with Jane Doe (Acme Consulting), following the kickoff of 2026-10-01. Video call, 30 minutes (call 2026-10-01 @21:40). The pilot starts with one site (call 2026-10-01 @21:40). We owe a quote by 2026-10-16 (call 2026-10-01 @25:10).
+
+## Agenda (30 minutes)
+
+- 0:00-0:03 Opening, confirm camera and recording etiquette
+- 0:03-0:10 Who signs the order on their side
+- 0:10-0:20 Pilot: which site, go-live date, who joins
+- 0:20-0:27 Next steps and the quote timeline
+- 0:27-0:30 Recap of who does what by when
+
+## Open questions, in order of priority
+
+1. Who signs the order on the ordering party's side? Decides who we commit to in writing. Ask first thing.
+2. Is the go-live date of the pilot firm? Sets the final week of the pilot. Needed before the quote is sent.
+3. Do the end client's field teams join the pilot? Changes the training effort we quote. Likely premature until the pilot site list arrives; ask whether a date exists for it.
+4. Which site is the first one? She wants a single site, but no site has been named in our records.
+
+## Boundaries
+
+- Give no price. A price before the pilot scope is signed is off-limits (decision 2026-09-21 by Sam). If she asks, commit only to the quote by 2026-10-16.
+- Do not name the end client in anything written or sent after the call.
+- Consent to record is not recorded in this repository (`dossier.yaml`). Ask before any recording starts.
+
+## Commitments to restate
+
+- Ours: the quote for the pilot by 2026-10-16.
+- Theirs: none recorded yet. Try to leave with at least one (the site list, the go-live date, the signatory).
+
+## After the call
+
+- Add the minutes below.
+- Update `dossier/HISTORY.md`, `dossier/OPEN-QUESTIONS.md`, `dossier/ACTORS.md`, and `dossier/LEARNINGS.md`. These are still mostly empty, and `dossier/ACTORS.md` has no entry for Jane Doe.
+
+## Minutes
+
+

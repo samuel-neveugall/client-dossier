@@ -1,0 +1,65 @@
+diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
+index ca18d63..32326c4 100644
+--- a/dossier/HISTORY.md
++++ b/dossier/HISTORY.md
+@@ -1,6 +1,6 @@
+ # History
+ 
+-Last updated: 2026-10-01
++Last updated: 2026-10-11, after preparing the call of 2026-10-12
+ 
+ <!-- Updated when: after every call, mail or document sent. -->
+ 
+@@ -24,3 +24,5 @@ Last updated: 2026-10-01
+ ### Theirs
+ 
+ ## Upcoming
++
++- Call with the ordering party on 2026-10-12 (outbound/calls/2026-10-12_pilot-follow-up.md).
+=== untracked: outbound/calls/2026-10-12_pilot-follow-up.md
+<!--
+Status: draft
+To: the ordering party's project lead
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+# Call of 2026-10-12: pilot follow-up and quote
+
+## Context
+
+- Call with Jane Doe (Acme Consulting), the ordering party's project lead, on 2026-10-12, 30 minutes on video (call 2026-10-01 @21:40).
+- The kickoff took place on 2026-10-01; Jane wants the pilot to start with one site, and we promised the quote by 2026-10-16 (call 2026-10-01 @25:10).
+- No status line is filed yet in `dossier/RELATIONSHIP.md`; see `dossier/HISTORY.md` for the chronology.
+
+## What we want to obtain
+
+- Know who signs the order on the ordering party's side (`dossier/OPEN-QUESTIONS.md`).
+- Confirm whether the go-live date of the pilot is firm, so the quote can go out by 2026-10-16 (`dossier/HISTORY.md`, commitments in progress).
+- Get a date for the list of pilot sites, and learn whether the end client's field teams join the pilot.
+
+## Agenda
+
+- 0:00-0:05 Greetings and recap of the kickoff
+- 0:05-0:10 Who signs the order on their side
+- 0:10-0:20 Pilot site (one site to start) and go-live date
+- 0:20-0:25 Scope questions that shape the quote: field teams, site list
+- 0:25-0:30 Next steps: quote by 2026-10-16, who does what, next call
+
+## What we do not do in this call
+
+- We give no price before the pilot scope is signed (`knowledge/DOCTRINE.md`, decision 2026-09-21).
+- We make no commitment beyond the quote already promised by 2026-10-16.
+- We do not name the end client; we say "the end client".
+- We do not state the pilot scope boundaries agreed internally; they are in `knowledge/decisions/` and `dossier/HISTORY.md`.
+
+## Open questions
+
+| Question | Why it matters | When to ask |
+| --- | --- | --- |
+| Who signs the order on the ordering party's side? | Decides who we commit to in writing. | next call, first thing |
+| Is the go-live date of the pilot firm? | Sets the final week of the pilot. | before the quote is sent |
+| Do the end client's field teams join the pilot? | Changes the training effort we quote. | after the pilot site list arrives |
+
+## Minutes
+

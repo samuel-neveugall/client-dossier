@@ -274,6 +274,19 @@ case "$(hook_field reason)" in
     ;;
   *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
 esac
+
+# 03 D-14: with the real plugin root (this repository, which now holds
+# skills/dossier-status/SKILL.md) the sentence appears on its own.
+CLAUDE_PLUGIN_ROOT="$REPO_ROOT" run_hook stop-check.py "$STATUS_JSON"
+check_common 'D-14, real plugin root'
+assert_eq block "$(hook_field decision)" 'D-14, real plugin root: decision is block'
+case "$(hook_field reason)" in
+  *dossier-status*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *)
+    echo "FAIL: D-14, real plugin root (the reason does not name dossier-status: '$(hook_field reason)')" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    ;;
+esac
 rm -rf "$D" "$WITH_STATUS" "$WITHOUT_STATUS"
 # --- end P-02 (PROVISIONAL) ---
 

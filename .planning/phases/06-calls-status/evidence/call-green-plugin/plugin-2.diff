@@ -1,0 +1,62 @@
+diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
+index ca18d63..5b45ad2 100644
+--- a/dossier/HISTORY.md
++++ b/dossier/HISTORY.md
+@@ -1,6 +1,6 @@
+ # History
+ 
+-Last updated: 2026-10-01
++Last updated: 2026-10-11, after preparing the call of 2026-10-12
+ 
+ <!-- Updated when: after every call, mail or document sent. -->
+ 
+@@ -24,3 +24,5 @@ Last updated: 2026-10-01
+ ### Theirs
+ 
+ ## Upcoming
++
++- Call with the ordering party on 2026-10-12 (outbound/calls/2026-10-12_pilot-quote-followup.md).
+=== untracked: outbound/calls/2026-10-12_pilot-quote-followup.md
+<!--
+Status: draft
+To: the ordering party's project lead
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+# Call of 2026-10-12: pilot quote follow-up
+
+## Context
+
+- Call with Jane Doe (Acme Consulting), the ordering party's project lead, on 2026-10-12, 30 minutes on video (call 2026-10-01 @21:40).
+- Where we stand: kickoff held on 2026-10-01; we owe the quote for the pilot by 2026-10-16 (call 2026-10-01 @21:40). The relationship status line is still empty.
+
+## What we want to obtain
+
+- Know who signs the order on the ordering party's side, so we know whom we commit to in writing (open question, `dossier/OPEN-QUESTIONS.md`).
+- Confirm whether the go-live date of the pilot is firm, so the quote can be sent by 2026-10-16.
+- Learn whether the pilot site list is coming and when, and whether the end client's field teams join the pilot.
+
+## Agenda
+
+- 0:00-0:03 Greetings and purpose of the call
+- 0:03-0:08 Who signs the order
+- 0:08-0:15 Go-live date of the pilot: is it firm
+- 0:15-0:22 Pilot sites and field teams
+- 0:22-0:27 Next steps, owners and dates for both sides
+- 0:27-0:30 Wrap-up
+
+## What we do not do in this call
+
+- We do not give a price before the pilot scope is signed (`knowledge/DOCTRINE.md`, decision 2026-09-21).
+- We do not commit to a date or scope beyond the quote already promised for 2026-10-16.
+- We do not name the end client; it is referred to by role only.
+
+## Open questions
+
+1. Who signs the order on the ordering party's side? Decides who we commit to in writing.
+2. Is the go-live date of the pilot firm? Sets the final week of the pilot; needed before the quote is sent.
+3. Do the end client's field teams join the pilot? Changes the training effort we quote; to ask once the pilot site list arrives.
+
+## Minutes
+

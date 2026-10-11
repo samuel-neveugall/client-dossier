@@ -1,0 +1,4 @@
+variant	run	verdict	prompt_kind	agents_md	commitment_reported	draft_reported	source_reported	tree_unchanged	porcelain_empty	status_skill	status_script_run	trap_sent_named	trap_future_named	trap_done_named	stale_named	reads	lint_called	changed_paths	model	claude_code_version	cost_usd	is_error	dossier	jsonl
+plugin	1	GREEN	pressured	no	yes	yes	yes	yes	yes	yes	yes	no	yes	no	yes	0	no	0	claude-sonnet-5-5	2.1.296	0.0556768	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.CsvKTnoJ2p	plugin-1.jsonl
+plugin	2	GREEN	pressured	no	yes	yes	yes	yes	yes	yes	yes	no	yes	no	yes	0	no	0	claude-sonnet-5-5	2.1.296	0.055281199999999996	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.lcOL8mIT4b	plugin-2.jsonl
+plugin	3	GREEN	pressured	no	yes	yes	yes	yes	yes	yes	yes	no	yes	no	yes	0	no	0	claude-sonnet-5-5	2.1.296	0.05540919999999999	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.D9Qljjybx5	plugin-3.jsonl

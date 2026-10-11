@@ -141,18 +141,18 @@ else
 fi
 
 # --- The command lines of the skill (fixed by the plan; test-ingest-guard.sh runs them) ---
-has_line 'test -x ${CLAUDE_SKILL_DIR}/scripts/file_source.py' 'command line 1: existence check of the filing script'
-has_line "\${CLAUDE_SKILL_DIR}/scripts/file_source.py fetch '<url>'" 'command line 2: fetch, single-quoted'
-has_line "\${CLAUDE_SKILL_DIR}/scripts/file_source.py --kind '<kind>' --date '<YYYY-MM-DD>' --slug '<slug>' '<path>'" 'command line 3: file, every value single-quoted (M2)'
-has_line 'test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh' 'command line 4: existence check of the extraction script'
-has_line "\${CLAUDE_SKILL_DIR}/scripts/extract-text.sh '<abs_path>'" 'command line 5: extract, on the absolute path'
+has_line 'test -x "${CLAUDE_SKILL_DIR}/scripts/file_source.py"' 'command line 1: existence check of the filing script'
+has_line "\"\${CLAUDE_SKILL_DIR}/scripts/file_source.py\" fetch '<url>'" 'command line 2: fetch, single-quoted'
+has_line "\"\${CLAUDE_SKILL_DIR}/scripts/file_source.py\" --kind '<kind>' --date '<YYYY-MM-DD>' --slug '<slug>' '<path>'" 'command line 3: file, every value single-quoted (M2)'
+has_line 'test -x "${CLAUDE_SKILL_DIR}/scripts/extract-text.sh"' 'command line 4: existence check of the extraction script'
+has_line "\"\${CLAUDE_SKILL_DIR}/scripts/extract-text.sh\" '<abs_path>'" 'command line 5: extract, on the absolute path'
 has_line "rm -r '<stage>'" 'command line 8: purge of the fetch staging folder (R4-m10)'
 has_line "grep -n '^#' '<root>'/dossier/*.md" 'command line 6: headings, from the absolute root'
 has_line "python3 \"\${CLAUDE_PLUGIN_ROOT}/scripts/lint.py\" '<root>'" 'command line 7: lint, on the root'
 
 # A4-F1: no placeholder sits inside double quotes, in any bash block (the no-scripts section included).
 BLOCK_LINES="$(awk '$0 == "```bash" { on = 1; next } $0 == "```" { on = 0; next } on { print }' "$SKILL_MD")"
-assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
+assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed -e 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' -e 's/"${CLAUDE_SKILL_DIR}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
 UNQUOTED="$(printf '%s\n' "$BLOCK_LINES" | sed "s/'[^']*'//g" | grep -E '<[A-Za-z][^<>]*>' || true)"
 assert_eq '' "$UNQUOTED" 'every placeholder in a bash block is inside single quotes (M2: kind and date included)'
 
@@ -164,10 +164,10 @@ line_of() { grep -nxF -- "$1" "$SKILL_MD" 2>/dev/null | head -1 | cut -d: -f1; }
 first_run_of() { # PREFIX — the first line that STARTS with the prefix (a command line, not prose)
   awk -v p="$1" 'index($0, p) == 1 { print NR; exit }' "$SKILL_MD" 2>/dev/null
 }
-T_EXTRACT="$(line_of 'test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh')"
-R_EXTRACT="$(first_run_of "\${CLAUDE_SKILL_DIR}/scripts/extract-text.sh '")"
-T_FILE="$(line_of 'test -x ${CLAUDE_SKILL_DIR}/scripts/file_source.py')"
-R_FILE="$(first_run_of '${CLAUDE_SKILL_DIR}/scripts/file_source.py ')"
+T_EXTRACT="$(line_of 'test -x "${CLAUDE_SKILL_DIR}/scripts/extract-text.sh"')"
+R_EXTRACT="$(first_run_of "\"\${CLAUDE_SKILL_DIR}/scripts/extract-text.sh\" '")"
+T_FILE="$(line_of 'test -x "${CLAUDE_SKILL_DIR}/scripts/file_source.py"')"
+R_FILE="$(first_run_of '"${CLAUDE_SKILL_DIR}/scripts/file_source.py" ')"
 if [ -n "$T_EXTRACT" ] && [ -n "$R_EXTRACT" ] && [ "$T_EXTRACT" -lt "$R_EXTRACT" ]; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
 else
@@ -279,8 +279,9 @@ if [ -n "$OLD_AMOUNT" ]; then has_not "$OLD_AMOUNT" 'the scenario fixture old am
 if [ -n "$NEW_AMOUNT" ]; then has_not "$NEW_AMOUNT" 'the scenario fixture new amount'; fi
 if [ -n "$NEW_PERSON" ]; then has_not "$NEW_PERSON" 'the scenario fixture new person'; fi
 
-# --- D-11: the dossier skill points here, and still names none of the later-phase skills
-# (dossier-draft is Phase 5: its pointer is pinned by tests/test-skill-draft.sh) ---
+# --- D-11: the dossier skill points here. It now names every task skill (dossier-draft is
+# pinned by tests/test-skill-draft.sh, dossier-call by tests/test-skill-call.sh, dossier-status by
+# tests/test-skill-status.sh); tests/test-skills-task.sh pins the final five (D-15) ---
 DOSSIER_MD="$REPO_ROOT/skills/dossier/SKILL.md"
 if grep -qF 'dossier-ingest' "$DOSSIER_MD" 2>/dev/null; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -288,14 +289,6 @@ else
   echo "FAIL: skills/dossier/SKILL.md does not name dossier-ingest (D-11)" >&2
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
-for later in dossier-call dossier-status; do
-  if grep -qF "$later" "$DOSSIER_MD" 2>/dev/null; then
-    echo "FAIL: skills/dossier/SKILL.md names a later-phase skill: $later" >&2
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-  else
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-  fi
-done
 
 # --- Extraction order and linter gate (R5-M1 mirrored, A5-F1) ---
 has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the extractor runs in the foreground'

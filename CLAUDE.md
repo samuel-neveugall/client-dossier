@@ -14,7 +14,9 @@ PreToolUse guard, Stop check) and the pressure scenarios under `tests/scenarios/
 two private scripts, `file_source.py` and `extract-text.sh`, and the read-only `fact-extractor`
 agent (`agents/fact-extractor.md`). Phase 5 (drafting and doctrine review) adds the `dossier-draft`
 skill (`skills/dossier-draft/SKILL.md`, no private scripts) and the read-only `doctrine-reviewer`
-agent (`agents/doctrine-reviewer.md`). Read the spec before any work; when this file and the spec
+agent (`agents/doctrine-reviewer.md`). Phase 6 (calls and status) adds the `dossier-call` skill
+(`skills/dossier-call/SKILL.md`, no private scripts; prepare and debrief) and the `dossier-status`
+skill with its private, read-only `scripts/status.py`. Read the spec before any work; when this file and the spec
 disagree, the spec wins and this file must be updated. Planning lives in `.planning/` (GSD):
 ROADMAP, REQUIREMENTS, STATE.
 
@@ -83,7 +85,10 @@ Division of responsibility, which decides where any new behaviour goes:
   `mail 2026-09-16 from Jane`, `brochure p. 4`). Correct a contradicted line instead of adding one.
 - Every outbound file opens with a status header; a `sent` status needs a date and a sender;
   an optional `Deadline:` (absolute date) is what `dossier-status` reads for overdue drafts.
-  The agent never marks a draft as sent.
+  A call file under `outbound/calls/` never carries `Deadline:` (Phase 6 D-11: the call date is
+  in its name). The agent never marks a draft as sent.
+- A commitment that is done is corrected in place with the English marker `done <YYYY-MM-DD>`
+  and its source; `dossier-status` stops reporting it (Phase 6 D-13).
 - Confidential names from `dossier.yaml` never appear under `outbound/` unless
   `consent_recorded: true` **and** `consent_source` is filled in (true without a source is a
   lint error).
@@ -157,6 +162,23 @@ status → manifests and distribution.
 - `bash tests/scenarios/draft-deadline-fr.sh [--runs N] [OUTDIR]` — the French deadline draft of
   ROADMAP criterion 1: a paid headless run with the plugin, run by the agent, never part of
   `tests/run.sh`. Same exit codes.
+- `python3 skills/dossier-status/scripts/status.py [--json] [--today YYYY-MM-DD] [--lint PATH] [PATH]`
+  — the read-only status of the dossier holding `PATH`. Exit 0 report printed, 2 no `dossier.yaml`
+  upward or a usage error, 3 internal error.
+- `bash tests/test-status-script.sh` — `status.py` on scratch git dossiers.
+- `bash tests/test-skill-status.sh` — the `dossier-status` skill checklist and the
+  scenario-fixture parity.
+- `bash tests/test-skill-call.sh` — the `dossier-call` skill checklist, its call file and history
+  lines through the real linter and `status.py`.
+- `bash tests/test-skills-task.sh` — PROTO-02 pointers and PROTO-08 stop over every skill.
+- `bash tests/scenarios/selftest-call.sh` — free self-test of the two call and status scenario
+  harnesses.
+- `bash tests/scenarios/call-prepare.sh [--variant baseline|plugin|plugin-pointer]... [--runs N] [--prompt plain|pressured] [OUTDIR]`
+  — the CALL-04 pressure scenario: paid headless `claude -p` runs, run by the agent, never part
+  of `tests/run.sh`. Exit 0 pass, 1 gate not met, 2 harness error.
+- `bash tests/scenarios/deal-status.sh [--variant baseline|plugin|plugin-pointer]... [--runs N] [--prompt plain|pressured] [OUTDIR]`
+  — the CALL-05 pressure scenario (pressured prompt by default, D-16): paid headless `claude -p`
+  runs, run by the agent, never part of `tests/run.sh`. Same exit codes.
 - `claude --plugin-dir .` — load the plugin from the working copy during development.
 
 Add more here as they are created.
