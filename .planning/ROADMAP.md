@@ -387,6 +387,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
 | 3. Protocol Skill & Hooks | 6/6 | Complete — verified + recette agent-run | 2026-10-10 |
 | 4. Ingest & Fact Extraction | 5/5 | Complete — verified + recette agent-run | 2026-10-10 |
-| 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
+| 5. Drafting & Doctrine Review | 5/5 | Complete — verified + recette agent-run | 2026-10-11 |
 | 6. Calls & Status | 0/TBD | Not started | - |
 | 7. Manifests, Docs & Distribution | 0/TBD | Not started | - |

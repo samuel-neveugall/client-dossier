@@ -219,7 +219,7 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | LINT-02 | Phase 2 | Complete |
 | LINT-03 | Phase 2 | Complete |
 | PROTO-01 | Phase 3 | Complete (closed 2026-10-10) |
-| PROTO-02 | Phase 3 (pointers completed incrementally as each task skill lands in Phases 4-6, verified in full at Phase 6; D-07) | Partial — Phase 3 part done 2026-10-10 (only `dossier-init` pointer exists) |
+| PROTO-02 | Phase 3 (pointers completed incrementally as each task skill lands in Phases 4-6, verified in full at Phase 6; D-07) | Partial — Phase 3 part done 2026-10-10; pointers to `dossier-init`, `dossier-ingest` (Phase 4) and `dossier-draft` (Phase 5, 2026-10-11) exist; `dossier-call` and `dossier-status` pointers due in Phase 6 |
 | PROTO-03 | Phase 3 | Complete (closed 2026-10-10) |
 | PROTO-04 | Phase 3 | Complete (closed 2026-10-10) |
 | PROTO-05 | Phase 3 | Complete (closed 2026-10-10) — Bash guard class D-04 accepted as documented v1 debt (D-17) |
