@@ -307,12 +307,13 @@ def _cited_header(root, token, notes, where):
     return read_status_header(text)
 
 
-def _due_date(root, text, notes, where):
+def _due_date(root, text, notes, where, dated_fallback=False):
     """The date a history bullet is due, or None when it is done or undated.
 
     D-13: a `done YYYY-MM-DD` marker before the source skips the line. D-12: a
     line whose source cites an outbound/ file takes that file's Deadline: and
-    is skipped once that file is `sent`; any other line is due on the LAST
+    is skipped once that file is `sent` (an Upcoming bullet whose cited file has no
+    Deadline: falls back to its last date); any other line is due on the LAST
     absolute date outside its trailing source.
     """
     match = _TRAILING_SOURCE_RE.search(text)
@@ -331,7 +332,10 @@ def _due_date(root, text, notes, where):
             deadline = header.get("Deadline")
             if deadline is not None and is_absolute_date(deadline[1]):
                 return _to_date(deadline[1])
-            return None
+            if not dated_fallback:
+                return None
+            # An Upcoming bullet may cite a call-prep file, which carries no
+            # Deadline: by design (D-11): its own date is the one that counts.
     dates = _dates_in(before)
     return dates[-1] if dates else None
 
@@ -387,7 +391,7 @@ def commitments_and_upcoming(root, today, notes):
                                 "heading": heading, "date": due.isoformat(),
                                 "state": state, "text": bullet})
         elif h2 == 3:
-            due = _due_date(root, bullet, notes, where)
+            due = _due_date(root, bullet, notes, where, dated_fallback=True)
             if due is None:
                 continue
             if 0 <= (due - today).days <= SOON_DAYS:

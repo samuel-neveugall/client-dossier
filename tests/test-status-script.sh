@@ -426,6 +426,12 @@ assert_eq 0 "$ST_STATUS" 'upcoming: exit 0'
 assert_eq '2026-10-11,2026-10-12' "$(st_json '",".join(i["date"] for i in d["upcoming"])')" 'upcoming: only 0..7 days, sorted'
 assert_eq '[]' "$(st_json 'd["commitments"]')" 'upcoming: never in commitments, never overdue'
 assert_eq dossier/HISTORY.md "$(st_json 'd["upcoming"][0]["file"]')" 'upcoming: file recorded'
+mkdir -p "$D2/outbound/calls"
+printf 'Status: draft\nTo: the counterpart\nWritten by: Sam\n\n# Call\n' >"$D2/outbound/calls/2026-10-12_pilot.md"
+write_history "$D2" '' '' '- 2026-10-12: call with Jane (outbound/calls/2026-10-12_pilot.md).'
+run_st "$D2" --json --today "$TODAY" "$D2"
+assert_eq '2026-10-12' "$(st_json '",".join(i["date"] for i in d["upcoming"])')" 'upcoming: a cited call file without Deadline: falls back to the line date'
+rm -rf "$D2/outbound/calls"
 
 echo '--- A French dossier: same positions, no word list ---'
 
