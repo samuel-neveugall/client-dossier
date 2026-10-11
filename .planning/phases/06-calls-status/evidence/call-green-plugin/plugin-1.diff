@@ -1,0 +1,64 @@
+diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
+index ca18d63..958c49e 100644
+--- a/dossier/HISTORY.md
++++ b/dossier/HISTORY.md
+@@ -1,6 +1,6 @@
+ # History
+ 
+-Last updated: 2026-10-01
++Last updated: 2026-10-11, after preparing the call of 2026-10-12
+ 
+ <!-- Updated when: after every call, mail or document sent. -->
+ 
+@@ -24,3 +24,5 @@ Last updated: 2026-10-01
+ ### Theirs
+ 
+ ## Upcoming
++
++- Call with the ordering party's project lead on 2026-10-12 (outbound/calls/2026-10-12_follow-up.md).
+=== untracked: outbound/calls/2026-10-12_follow-up.md
+<!--
+Status: draft
+To: the ordering party's project lead
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+# Call of 2026-10-12: follow-up with the ordering party
+
+## Context
+
+- Call with Jane Doe (Acme Consulting), the ordering party's project lead, on 2026-10-12, 30 minutes on video (dossier/CHANNELS.md).
+- The kickoff took place on 2026-10-01; the ordering party wants the pilot to start with one site (outbound/calls/2026-10-01_kickoff.md).
+- We owe the ordering party the pilot quote by 2026-10-16 (dossier/HISTORY.md). Nothing is due from them yet.
+
+## What we want to obtain
+
+- The name of the person who signs the order on the ordering party's side (dossier/OPEN-QUESTIONS.md, first question).
+- Confirmation of whether the pilot go-live date is firm, so the quote can be sent by 2026-10-16.
+- A date for the pilot site list, and whether the end client's field teams join the pilot.
+
+## Agenda
+
+- 0:00-0:03 Greetings and purpose of the call
+- 0:03-0:08 Who signs the order on their side
+- 0:08-0:15 Is the go-live date of the pilot firm
+- 0:15-0:22 Pilot sites and the end client's field teams
+- 0:22-0:27 Next steps: what we send, what they send, with dates
+- 0:27-0:30 Recap of commitments
+
+## What we do not do in this call
+
+- We do not state or hint at a price before the pilot scope is signed (knowledge/DOCTRINE.md, "What we never say"). The quote due on 2026-10-16 is discussed only as to its timing and content, not its amounts.
+- We do not commit to a date or a scope that is not already in dossier/HISTORY.md without checking it first.
+- We do not name the end client; we speak of "the end client".
+- We do not write or promise anything on behalf of someone who has not been named as signatory.
+
+## Open questions
+
+1. Who signs the order on the ordering party's side? Decides who we commit to in writing. (Asked: next call, first thing.)
+2. Is the go-live date of the pilot firm? Sets the final week of the pilot. (Asked: before the quote is sent.)
+3. Do the end client's field teams join the pilot? Changes the training effort we quote. (Ask once the pilot site list arrives; if it has not, ask for its date.)
+
+## Minutes
+
