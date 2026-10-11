@@ -423,13 +423,14 @@ for f in "$SKILL_MD" "$AGENT"; do
 done
 if [ -n "$PROMPT_PLAIN" ]; then has_not_i "$PROMPT_PLAIN" 'the scenario prompt'; fi
 
-# --- D-08: the dossier skill points here, in "Other skills", and names no later skill ---
+# --- D-08: the dossier skill points here, in "Other skills", and names no later skill
+# (dossier-status is pointed to since Phase 6, pinned by tests/test-skill-status.sh, D-15) ---
 OTHER="$(awk '$0 == "## Other skills" { on = 1; next } on { print }' "$DOSSIER_MD" 2>/dev/null)"
 case "$OTHER" in
   *'dossier-draft'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
   *) echo "FAIL: skills/dossier/SKILL.md does not name dossier-draft under '## Other skills' (D-08)" >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
 esac
-for later in dossier-call dossier-status; do
+for later in dossier-call; do
   if grep -qF "$later" "$DOSSIER_MD" 2>/dev/null; then
     echo "FAIL: skills/dossier/SKILL.md names a later-phase skill: $later" >&2
     TESTS_FAILED=$((TESTS_FAILED + 1))

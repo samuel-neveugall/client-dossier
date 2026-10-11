@@ -280,7 +280,8 @@ if [ -n "$NEW_AMOUNT" ]; then has_not "$NEW_AMOUNT" 'the scenario fixture new am
 if [ -n "$NEW_PERSON" ]; then has_not "$NEW_PERSON" 'the scenario fixture new person'; fi
 
 # --- D-11: the dossier skill points here, and still names none of the later-phase skills
-# (dossier-draft is Phase 5: its pointer is pinned by tests/test-skill-draft.sh) ---
+# (dossier-draft is Phase 5: its pointer is pinned by tests/test-skill-draft.sh; dossier-status
+# is pointed to since Phase 6, pinned by tests/test-skill-status.sh, D-15) ---
 DOSSIER_MD="$REPO_ROOT/skills/dossier/SKILL.md"
 if grep -qF 'dossier-ingest' "$DOSSIER_MD" 2>/dev/null; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -288,7 +289,7 @@ else
   echo "FAIL: skills/dossier/SKILL.md does not name dossier-ingest (D-11)" >&2
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
-for later in dossier-call dossier-status; do
+for later in dossier-call; do
   if grep -qF "$later" "$DOSSIER_MD" 2>/dev/null; then
     echo "FAIL: skills/dossier/SKILL.md names a later-phase skill: $later" >&2
     TESTS_FAILED=$((TESTS_FAILED + 1))
