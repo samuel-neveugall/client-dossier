@@ -12,7 +12,9 @@ and a bash test suite under `tests/`. Phase 3 (protocol skill and hooks) is deli
 PreToolUse guard, Stop check) and the pressure scenarios under `tests/scenarios/`. Phase 4
 (ingest and fact extraction) adds the `dossier-ingest` skill (`skills/dossier-ingest/`) with its
 two private scripts, `file_source.py` and `extract-text.sh`, and the read-only `fact-extractor`
-agent (`agents/fact-extractor.md`). Read the spec before any work; when this file and the spec
+agent (`agents/fact-extractor.md`). Phase 5 (drafting and doctrine review) adds the `dossier-draft`
+skill (`skills/dossier-draft/SKILL.md`, no private scripts) and the read-only `doctrine-reviewer`
+agent (`agents/doctrine-reviewer.md`). Read the spec before any work; when this file and the spec
 disagree, the spec wins and this file must be updated. Planning lives in `.planning/` (GSD):
 ROADMAP, REQUIREMENTS, STATE.
 
@@ -134,8 +136,12 @@ status → manifests and distribution.
 - `bash tests/test-ingest-guard.sh` — the ingest skill's own commands through the real sources guard and scripts.
 - `bash tests/test-agent-fact-extractor.sh` — agent frontmatter, rules, parity with the skill.
 - `bash tests/test-skill-ingest.sh` — the `dossier-ingest` skill checklist.
+- `bash tests/test-agent-doctrine-reviewer.sh` — agent frontmatter, review rules, heading positions, parity with the skill.
+- `bash tests/test-skill-draft.sh` — the `dossier-draft` skill checklist.
+- `bash tests/test-draft-shapes.sh` — the skill's status block and history line through the real linter.
 - `bash tests/scenarios/selftest.sh` — free self-test of the scenario harness against a fake `claude`.
 - `bash tests/scenarios/selftest-ingest.sh` — free self-test of the ingest scenario harness.
+- `bash tests/scenarios/selftest-draft.sh` — free self-test of the two draft scenario harnesses.
 - `bash tests/scenarios/fix-typo.sh [--variant baseline|plugin|pointer-only]... [--runs N] [OUTDIR]`
   — the PROTO-07 pressure scenario: paid headless `claude -p` runs, run by the agent, never part
   of `tests/run.sh`. Exit 0 pass, 1 gate not met, 2 harness error.
@@ -143,6 +149,12 @@ status → manifests and distribution.
   — the INGEST-05 pressure scenario: paid headless `claude -p` runs, run by the agent, never part
   of `tests/run.sh`. Exit 0 pass, 1 gate not met, 2 harness error.
 - `bash tests/scenarios/ingest-pdf.sh [--runs N] [OUTDIR]` — the end-to-end PDF ingest of
+  ROADMAP criterion 1: a paid headless run with the plugin, run by the agent, never part of
+  `tests/run.sh`. Same exit codes.
+- `bash tests/scenarios/draft-reply.sh [--variant baseline|plugin|plugin-pointer]... [--runs N] [--prompt plain|pressured] [OUTDIR]`
+  — the DRAFT-04 pressure scenario: paid headless `claude -p` runs, run by the agent, never part
+  of `tests/run.sh`. Exit 0 pass, 1 gate not met, 2 harness error.
+- `bash tests/scenarios/draft-deadline-fr.sh [--runs N] [OUTDIR]` — the French deadline draft of
   ROADMAP criterion 1: a paid headless run with the plugin, run by the agent, never part of
   `tests/run.sh`. Same exit codes.
 - `claude --plugin-dir .` — load the plugin from the working copy during development.
