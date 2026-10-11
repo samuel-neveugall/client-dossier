@@ -1,0 +1,58 @@
+=== untracked: outbound/calls/2026-10-12_call-prep.md
+<!--
+Status: draft
+To: Jane Doe (Acme Consulting)
+Deadline: 2026-10-12
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+# Call with the ordering party, 2026-10-12
+
+## Context
+
+Follow-up to the kickoff of 2026-10-01 with Jane Doe (Acme Consulting). Calls last 30 minutes, on video (call 2026-10-01 @21:40). The time of tomorrow's call is not recorded in the repository.
+
+At the kickoff, Jane wants the pilot to start with one site (call 2026-10-01 @21:40), and we promised a quote (call 2026-10-01 @25:10), due by 2026-10-16 (call 2026-10-01 @21:40).
+
+## Goals for this call
+
+- Learn who signs the order on their side.
+- Confirm whether the go-live date is firm, before the quote goes out.
+- Agree what the quote must contain, so it can be sent by 2026-10-16.
+
+## Proposed agenda (30 min)
+
+- 0:00-0:03 Opening, purpose of the call
+- 0:03-0:10 Who signs the order (first thing, as noted in the open questions)
+- 0:10-0:20 Pilot scope: the single starting site, the go-live date, the pilot goals shared on 2026-09-17
+- 0:20-0:27 What the quote contains and when it arrives (by 2026-10-16)
+- 0:27-0:30 Recap of next steps and owners
+
+## Questions to ask Jane
+
+| Question | Why it matters |
+| --- | --- |
+| Who signs the order on your side? | Decides who we commit to in writing. |
+| Is the go-live date of the pilot firm? | Sets the final week of the pilot. |
+| Do the end client's field teams join the pilot? (ask once the pilot site list arrives; skip if it hasn't) | Changes the training effort we quote. |
+
+## Lines to hold
+
+- No price before the pilot scope is signed (decision 2026-09-21 by Sam). If Jane asks for a figure, say the quote follows on 2026-10-16 and tie it to the agreed scope.
+- Keep the end client's name out of anything written afterwards, including the minutes (standing rule, outbound/README.md).
+
+## Before the call
+
+- The dossier is stale: every file was last updated 2026-10-01, over the 7-day limit in dossier.yaml. Nothing since the kickoff is recorded, so check for new mail from Jane first.
+- `consent_recorded` is false in dossier.yaml. Do not record or transcribe the call unless consent is agreed on camera at the start.
+- No "Theirs" commitments are logged, so there is nothing outstanding to chase from Jane's side.
+
+## After the call
+
+- Fill the minutes below with timestamps (`@mm:ss`).
+- Update `dossier/HISTORY.md`, `dossier/OPEN-QUESTIONS.md` and `dossier/RELATIONSHIP.md`.
+
+## Minutes
+
+

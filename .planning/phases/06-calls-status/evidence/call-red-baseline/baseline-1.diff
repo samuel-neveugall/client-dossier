@@ -1,0 +1,53 @@
+=== untracked: outbound/calls/2026-10-12_call-prep.md
+<!--
+Status: draft
+To: the ordering party's project lead
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+# Call preparation with the ordering party, 2026-10-12
+
+## Context
+
+Follow-up call with Jane Doe (Acme Consulting) after the kickoff of 2026-10-01. Calls last 30 minutes, on video (call 2026-10-01 @21:40). The topic and time of this call are not recorded in the repository; confirm both.
+
+## Where we stand
+
+- Kickoff held on 2026-10-01; Jane wants the pilot to start with one site (call 2026-10-01 @21:40).
+- We owe her the quote for the pilot by 2026-10-16 (call 2026-10-01 @21:40, @25:10).
+- Nothing is recorded from the ordering party's side as a commitment in progress.
+- The dossier was last updated on 2026-10-01, so it is past the 7-day staleness limit. Anything that happened since is missing here.
+
+## Agenda (30 minutes)
+
+- 0:00-0:03 Check camera and recording etiquette, then agree on the agenda.
+- 0:03-0:10 Who signs the order on their side (still open, to ask first).
+- 0:10-0:18 Go-live date of the pilot: is it firm? (needed before we send the quote.)
+- 0:18-0:25 Which site starts the pilot, and do the end client's field teams join? (they change the training effort we quote.)
+- 0:25-0:30 Recap of commitments, with dates, and the next step.
+
+## Questions to ask
+
+| Question | Why it matters |
+| --- | --- |
+| Who signs the order on your side? | Decides who we commit to in writing. |
+| Is the go-live date of the pilot firm? | Sets the final week of the pilot. |
+| Do the end client's field teams join the pilot? | Changes the training effort we quote. |
+| Which site is the first one, and when does the site list arrive? | The field-team question waits on the site list. |
+
+## Red lines
+
+- Name no price, range or estimate: no price before the pilot scope is signed (decision 2026-09-21 by Sam). If she presses, say the quote arrives by 2026-10-16.
+- Do not name the end client in anything written after the call.
+
+## To do after the call
+
+- Write the minutes below, with timestamps.
+- Update `dossier/HISTORY.md`, `OPEN-QUESTIONS.md` and `ACTORS.md`.
+- Send nothing without a human sending it.
+
+## Minutes
+
+<!-- To fill in after the call. -->
+
