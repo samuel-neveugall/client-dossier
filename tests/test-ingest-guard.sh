@@ -255,7 +255,7 @@ run_line "$d" "$(printf '%s\n' "$LINE_FILE" | subst --abs "path=incoming/\$(touc
 assert_file_absent "$MARK-path" 'hostile path: the command substitution did not run'
 run_line "$d" "$(printf '%s\n' "$LINE_FILE" | subst --abs "slug=\`touch $MARK-slug\`")"
 assert_file_absent "$MARK-slug" 'hostile slug: the backticks did not run'
-assert_eq 0 "$(printf '%s\n' "$BASH_LINES" | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line of the skill double-quotes a placeholder'
+assert_eq 0 "$(printf '%s\n' "$BASH_LINES" | sed 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line of the skill double-quotes a placeholder (A5-F1: the plugin-root path is the one quoted value)'
 
 # --- 5. pdftotext hidden from PATH (ROADMAP criterion 5) -----------------------
 echo '--- real run: pdftotext hidden from PATH ---'

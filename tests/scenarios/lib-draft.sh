@@ -297,3 +297,133 @@ if isinstance(last_result, str) and needle in last_result:
 print("yes" if found else "no")
 ' "$1" "$2"
 }
+
+# draft_handback_before_review JSONL — the number of top-level `result` events
+# that come before the doctrine-reviewer's review has returned (R5-M1, Phase 5
+# review). The review has returned at the tool_result of the dispatch, or, for an
+# async launch, at the `task_notification` event that completes it. A run that
+# hands back before the findings is a run that reports without them. 0 when no
+# reviewer was dispatched (nothing to wait for). When a dispatch never completes
+# the count is the number of `result` events, at least 1. Gates the plugin
+# variants: GREEN needs 0.
+draft_handback_before_review() {
+  python3 -I -c '
+import json, sys
+path = sys.argv[1]
+suffix = "doctrine-reviewer"
+dispatch = []          # (index, tool_use id), in stream order
+results = []           # indexes of top-level result events
+tool_result = {}       # id -> (index, is_async, is_error)
+notified = {}          # id -> index of the completing task_notification
+try:
+    fh = open(path, encoding="utf-8", errors="replace")
+except OSError:
+    print(0)
+    sys.exit(0)
+with fh:
+    for i, line in enumerate(fh):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(ev, dict):
+            continue
+        t = ev.get("type")
+        if t == "result":
+            results.append(i)
+            continue
+        if t == "system":
+            if ev.get("subtype") == "task_notification" and ev.get("status") == "completed":
+                for key in ("tool_use_id", "task_id"):
+                    if isinstance(ev.get(key), str) and ev[key] not in notified:
+                        notified[ev[key]] = i
+            continue
+        if t not in ("assistant", "user"):
+            continue
+        msg = ev.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if not isinstance(content, list):
+            continue
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if t == "assistant" and block.get("type") == "tool_use":
+                inp = block.get("input")
+                if (
+                    block.get("name") in ("Agent", "Task")
+                    and isinstance(inp, dict)
+                    and str(inp.get("subagent_type", "")).endswith(suffix)
+                    and isinstance(block.get("id"), str)
+                    and not isinstance(ev.get("parent_tool_use_id"), str)
+                ):
+                    dispatch.append((i, block["id"]))
+            elif t == "user" and block.get("type") == "tool_result" and isinstance(block.get("tool_use_id"), str):
+                tur = ev.get("tool_use_result")
+                is_async = (isinstance(tur, dict) and tur.get("isAsync") is True) or "Async agent launched" in json.dumps(block.get("content"))
+                tool_result[block["tool_use_id"]] = (i, is_async, block.get("is_error") is True)
+if not dispatch:
+    print(0)
+    sys.exit(0)
+done = None
+for _, tid in dispatch:
+    res = tool_result.get(tid)
+    if res is None or res[2]:
+        continue
+    idx = notified.get(tid) if res[1] else res[0]
+    if idx is not None and (done is None or idx < done):
+        done = idx
+if done is None:
+    print(max(len(results), 1))
+else:
+    print(sum(1 for r in results if r < done))
+' "$1"
+}
+
+# draft_lint_after_last_draft_edit JSONL — yes when the last run of the linter
+# (a Bash tool_use naming scripts/lint.py and python) comes after the last Write
+# or Edit of a file under outbound/ made by the main agent (R5-M1: the lint must
+# see the final draft), else no. no also when the draft was never written with
+# Write or Edit, or the linter never ran. Gates the plugin variants.
+draft_lint_after_last_draft_edit() {
+  python3 -I -c '
+import json, sys
+path = sys.argv[1]
+last_edit = None
+last_lint = None
+try:
+    fh = open(path, encoding="utf-8", errors="replace")
+except OSError:
+    print("no")
+    sys.exit(0)
+with fh:
+    for i, line in enumerate(fh):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(ev, dict) or ev.get("type") != "assistant" or isinstance(ev.get("parent_tool_use_id"), str):
+            continue
+        msg = ev.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if not isinstance(content, list):
+            continue
+        for j, block in enumerate(content):
+            if not isinstance(block, dict) or block.get("type") != "tool_use" or not isinstance(block.get("input"), dict):
+                continue
+            inp = block["input"]
+            pos = (i, j)
+            if block.get("name") in ("Write", "Edit", "MultiEdit") and "/outbound/" in str(inp.get("file_path", "")):
+                last_edit = pos
+            elif block.get("name") == "Bash":
+                cmd = str(inp.get("command", ""))
+                if "scripts/lint.py" in cmd and "python" in cmd:
+                    last_lint = pos
+print("yes" if last_edit is not None and last_lint is not None and last_lint > last_edit else "no")
+' "$1"
+}

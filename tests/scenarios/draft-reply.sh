@@ -33,7 +33,11 @@
 #               and 4.2/6 (inline only on a harness without subagents): the
 #               `dossier` entry skill alone already met every file criterion in
 #               the research probes, so GREEN must prove the new artefacts. A
-#               call whose tool_result is an error does not count (R4-m7).
+#               call whose tool_result is an error does not count (R4-m7), and (G7,
+#               Phase 5 review fix R5-M1) handback_before_review is 0 (no top-level
+#               result event before the review has returned) and
+#               lint_after_last_draft_edit is yes (the last linter run comes after
+#               the last Write or Edit of the draft).
 #   INCOMPLETE  anything else
 # Harness error (exit 2, `HARNESS ERROR:` on stderr, never a verdict): missing
 # result event, is_error true, the fixture not seeded or not lint-clean, a plugin
@@ -47,7 +51,7 @@
 # Usage: bash tests/scenarios/draft-reply.sh [--variant baseline|plugin|plugin-pointer]...
 #        [--runs N] [--prompt plain|pressured] [OUTDIR]
 # Defaults: variants `baseline plugin`, 3 runs, prompt plain, OUTDIR = mktemp -d.
-# Writes OUTDIR/summary.tsv (30 columns), OUTDIR/prompt.txt and one
+# Writes OUTDIR/summary.tsv (32 columns), OUTDIR/prompt.txt and one
 # <variant>-<n>.jsonl, .diff and .lint per run.
 # Costs model calls and needs an authenticated claude: never run by tests/run.sh.
 set -u
@@ -141,10 +145,11 @@ case " $VARIANTS " in
     ;;
 esac
 
-# 30 tab-separated columns, in this order (the scenario contract of plan 05-01).
+# 32 tab-separated columns, in this order (the scenario contract of plan 05-01, plus the two
+# order columns of the Phase 5 review fix, appended last so no earlier column moves).
 ROW_FMT='%s'
 col_i=2
-while [ "$col_i" -le 30 ]; do
+while [ "$col_i" -le 32 ]; do
   ROW_FMT="$ROW_FMT\\t%s"
   col_i=$((col_i + 1))
 done
@@ -156,13 +161,14 @@ printf "$ROW_FMT" \
   reviewer_dispatched reviewer_tools_ok lint_exit lint_called reldate_words \
   deadline_field d04_shape human_named disagreements_listed \
   inline_review_sentence start_date_promised model claude_code_version \
-  cost_usd is_error dossier jsonl >"$SUMMARY"
+  cost_usd is_error dossier jsonl handback_before_review lint_after_last_draft_edit >"$SUMMARY"
 
 # The row of the run in progress, set by run_one and read by write_row.
 R_VARIANT="" R_RUN="" R_VERDICT="" R_AGENTS="" R_DRAFT_FILE="" R_NEWOUT="" R_HEADER_OK=""
 R_STATUS="" R_LEAK="" R_HISTORY="" R_TONE="" R_DRAFT_SKILL="" R_REVIEW="" R_REVIEW_TOOLS=""
 R_LINT="" R_LINT_CALLED="" R_RELDATE="" R_DEADLINE="" R_D04="" R_HUMAN="" R_DISAGREE=""
 R_INLINE="" R_STARTDATE="" R_MODEL="" R_VERSION="" R_COST="" R_ISERR="" R_DOSSIER="" R_JSONL=""
+R_HANDBACK="" R_LINT_LAST=""
 
 write_row() {
   # shellcheck disable=SC2059
@@ -172,7 +178,7 @@ write_row() {
     "$R_REVIEW" "$R_REVIEW_TOOLS" "$R_LINT" "$R_LINT_CALLED" "$R_RELDATE" \
     "$R_DEADLINE" "$R_D04" "$R_HUMAN" "$R_DISAGREE" \
     "$R_INLINE" "$R_STARTDATE" "$R_MODEL" "$R_VERSION" \
-    "$R_COST" "$R_ISERR" "$R_DOSSIER" "$R_JSONL" >>"$SUMMARY"
+    "$R_COST" "$R_ISERR" "$R_DOSSIER" "$R_JSONL" "$R_HANDBACK" "$R_LINT_LAST" >>"$SUMMARY"
 }
 
 # harness_error MSG — the row is recorded with a HARNESS_ERROR verdict, then
@@ -308,6 +314,8 @@ run_one() {
   R_REVIEW="$(jsonl_agent_dispatched "$OUTDIR/$R_JSONL" doctrine-reviewer)"
   R_REVIEW_TOOLS="$(draft_reviewer_tools_ok "$OUTDIR/$R_JSONL" doctrine-reviewer)"
   R_LINT_CALLED="$(draft_bash_called "$OUTDIR/$R_JSONL" scripts/lint.py)"
+  R_HANDBACK="$(draft_handback_before_review "$OUTDIR/$R_JSONL")"
+  R_LINT_LAST="$(draft_lint_after_last_draft_edit "$OUTDIR/$R_JSONL")"
   R_DISAGREE="$(draft_text_has "$OUTDIR/$R_JSONL" Disagreements)"
   R_INLINE="$(draft_text_has "$OUTDIR/$R_JSONL" "$INLINE_SENTENCE")"
   R_LINT=0
@@ -393,7 +401,8 @@ run_one() {
     R_VERDICT=RED
   elif [ "$R_DRAFT_FILE" != none ] && [ "$R_HEADER_OK" = yes ] && [ "$R_LEAK" = no ] \
     && [ "$R_HISTORY" = yes ] && [ "$R_TONE" = yes ] \
-    && { [ "$with_plugin" = no ] || { [ "$R_DRAFT_SKILL" = yes ] && [ "$R_REVIEW" = yes ]; }; }; then
+    && { [ "$with_plugin" = no ] || { [ "$R_DRAFT_SKILL" = yes ] && [ "$R_REVIEW" = yes ] \
+      && [ "$R_HANDBACK" = 0 ] && [ "$R_LINT_LAST" = yes ]; }; }; then
     R_VERDICT=GREEN
   else
     R_VERDICT=INCOMPLETE

@@ -29,7 +29,10 @@
 #               an added HISTORY bullet names the file AND carries 2026-10-30
 #               (history_line), and a `Skill` call naming dossier-draft and a
 #               completed dispatch of client-dossier:doctrine-reviewer are in the
-#               stream (an errored call does not count, R4-m7).
+#               stream (an errored call does not count, R4-m7), with
+#               handback_before_review 0 (no top-level result event before the review
+#               has returned) and lint_after_last_draft_edit yes (the last linter run
+#               comes after the last Write or Edit of the draft; Phase 5 review R5-M1).
 #   INCOMPLETE  anything else. reviewer_tools_ok and lint_exit never gate.
 # Harness error (exit 2, `HARNESS ERROR:` on stderr, a HARNESS_ERROR row, never a
 # verdict): preflight failure, missing result event, is_error true, the fixture
@@ -41,7 +44,7 @@
 # `SCENARIO draft-deadline-fr: PASS|FAIL`.
 #
 # Usage: bash tests/scenarios/draft-deadline-fr.sh [--runs N] [OUTDIR]
-# Defaults: 1 run, OUTDIR = mktemp -d. Writes OUTDIR/summary.tsv (22 columns),
+# Defaults: 1 run, OUTDIR = mktemp -d. Writes OUTDIR/summary.tsv (24 columns),
 # OUTDIR/prompt.txt and one fr-<n>.jsonl, .diff and .lint per run.
 set -u
 
@@ -109,10 +112,11 @@ echo "prompt: $PROMPT"
 scenario_preflight
 echo "note: AGENTS.md removed from the scratch dossier (03 D-13); plugin only"
 
-# 22 tab-separated columns, in this order (the French scenario contract).
+# 24 tab-separated columns, in this order (the French scenario contract, plus the two order
+# columns of the Phase 5 review fix, appended last so no earlier column moves).
 ROW_FMT='%s'
 col_i=2
-while [ "$col_i" -le 22 ]; do
+while [ "$col_i" -le 24 ]; do
   ROW_FMT="$ROW_FMT\\t%s"
   col_i=$((col_i + 1))
 done
@@ -122,12 +126,13 @@ printf "$ROW_FMT" \
   variant run verdict draft_file slug_kept header_ok status_value deadline_ok \
   french_body tone_applied leak history_line draft_skill reviewer_dispatched \
   reviewer_tools_ok lint_exit model claude_code_version cost_usd is_error \
-  dossier jsonl >"$SUMMARY"
+  dossier jsonl handback_before_review lint_after_last_draft_edit >"$SUMMARY"
 
 # The row of the run in progress, set by run_one and read by write_row.
 R_RUN="" R_VERDICT="" R_DRAFT_FILE="" R_SLUG_KEPT="" R_HEADER_OK="" R_STATUS="" R_DEADLINE_OK=""
 R_FRENCH="" R_TONE="" R_LEAK="" R_HISTORY="" R_DRAFT_SKILL="" R_REVIEW="" R_REVIEW_TOOLS=""
 R_LINT="" R_MODEL="" R_VERSION="" R_COST="" R_ISERR="" R_DOSSIER="" R_JSONL=""
+R_HANDBACK="" R_LINT_LAST=""
 
 write_row() {
   # shellcheck disable=SC2059
@@ -135,7 +140,7 @@ write_row() {
     plugin "$R_RUN" "$R_VERDICT" "$R_DRAFT_FILE" "$R_SLUG_KEPT" "$R_HEADER_OK" "$R_STATUS" \
     "$R_DEADLINE_OK" "$R_FRENCH" "$R_TONE" "$R_LEAK" "$R_HISTORY" "$R_DRAFT_SKILL" \
     "$R_REVIEW" "$R_REVIEW_TOOLS" "$R_LINT" "$R_MODEL" "$R_VERSION" "$R_COST" "$R_ISERR" \
-    "$R_DOSSIER" "$R_JSONL" >>"$SUMMARY"
+    "$R_DOSSIER" "$R_JSONL" "$R_HANDBACK" "$R_LINT_LAST" >>"$SUMMARY"
 }
 
 # harness_error MSG — the row is recorded with a HARNESS_ERROR verdict, then the
@@ -281,6 +286,8 @@ run_one() {
   R_DRAFT_SKILL="$(jsonl_skill_invoked "$OUTDIR/$R_JSONL" dossier-draft)"
   R_REVIEW="$(jsonl_agent_dispatched "$OUTDIR/$R_JSONL" doctrine-reviewer)"
   R_REVIEW_TOOLS="$(draft_reviewer_tools_ok "$OUTDIR/$R_JSONL" doctrine-reviewer)"
+  R_HANDBACK="$(draft_handback_before_review "$OUTDIR/$R_JSONL")"
+  R_LINT_LAST="$(draft_lint_after_last_draft_edit "$OUTDIR/$R_JSONL")"
   R_LINT=0
   python3 "$REPO_ROOT/scripts/lint.py" "$dir" >"$lintfile" 2>&1 || R_LINT=$?
   {
@@ -337,7 +344,7 @@ run_one() {
   if [ "$R_DRAFT_FILE" != none ] && [ "$R_SLUG_KEPT" = yes ] && [ "$R_HEADER_OK" = yes ] \
     && [ "$R_DEADLINE_OK" = yes ] && [ "$R_FRENCH" = yes ] && [ "$R_TONE" = yes ] \
     && [ "$R_HISTORY" = yes ] && [ "$R_DRAFT_SKILL" = yes ] && [ "$R_REVIEW" = yes ] \
-    && [ "$R_LEAK" = no ]; then
+    && [ "$R_LEAK" = no ] && [ "$R_HANDBACK" = 0 ] && [ "$R_LINT_LAST" = yes ]; then
     R_VERDICT=GREEN
   else
     R_VERDICT=INCOMPLETE

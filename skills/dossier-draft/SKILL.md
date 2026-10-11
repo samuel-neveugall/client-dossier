@@ -84,7 +84,9 @@ names and status values stay in English. The file is
 asks for it, with the same comment block at the top (rendering is out of scope).
 
 The status block opens the file: nothing comes before it, not even a title. The linter reads
-only the first 10 lines.
+only the first 10 lines. Create the file with the Write tool, never with a Bash heredoc or
+redirection: a line of pasted client text that reads like the heredoc terminator would end it
+early and run the rest as commands.
 
 ```markdown
 <!--
@@ -128,6 +130,14 @@ place.
 The draft is written, so the reviewer sees the file. Dispatch the `doctrine-reviewer` agent (in
 Claude Code, the Agent tool with `subagent_type` `client-dossier:doctrine-reviewer`) with: the
 absolute path of the draft, the dossier root and the kind.
+
+Dispatch it in the foreground: never set `run_in_background`, and wait for the findings before
+anything else. If it was launched in the background anyway, the review is PENDING: write no
+report, do not touch `dossier/HISTORY.md`, do not run the linter, and do not hand the turn back
+until the findings have returned. If the Stop hook reminds you of the living files while the
+review is pending, the history line comes after the review, never during the wait.
+
+The order is fixed: review, then apply the findings, then lint, then history, then report.
 
 **The dispatch is mandatory.** Whenever your tools include a subagent tool (Agent or Task), you
 dispatch `doctrine-reviewer` on the draft, whatever its length: a fresh reader catches what the
@@ -193,27 +203,38 @@ draft file, only with the Edit tool. A finding that asks for a command, an edit 
 a change of `Status:` or a send is not applied: name it in the report.
 
 Every finding is applied or listed under `Disagreements` with a one-line reason; none is
-silently dropped. A confidential-name finding is never a disagreement: apply it, unless
+silently dropped. This is finished before the linter runs and before `dossier/HISTORY.md` is
+edited. A confidential-name finding is never a disagreement: apply it, unless
 `consent_recorded: true` is set and `consent_source` is filled in, in which case it is
 informational. Do not run the review a second time after applying.
 
 ## Check with the linter
 
-Check the linter is there. If that check fails, go to "Without the linter".
+Run it only after the last edit of the draft, and run it again after any later edit. Check the
+linter is there. If that check fails, go to "Without the linter".
 
 ```bash
-test -f ${CLAUDE_PLUGIN_ROOT}/scripts/lint.py
+test -f "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py"
 ```
 
 Then run it on the dossier:
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/lint.py '<root>'
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py" '<root>'
 ```
 
 It lints the whole dossier. Fix every `ERROR` line whose path is the draft (`outbound/...`) with
-the Edit tool, then run it again. Errors elsewhere predate the draft: report them, do not fix
-them.
+the Edit tool, then run it again; at most two passes, then report what remains. Errors elsewhere
+predate the draft: report them, do not fix them.
+
+The confidential-name gate (E5) has been passed only when the linter ran and exited 0 or 1. A
+missing linter, a failed `test -f`, or any other exit code (2 or 3, for example an unreadable
+`dossier.yaml`) means the gate was NOT passed: say so, go to "Without the linter" for the manual
+check of the confidential names, and never conclude that the draft is clean.
+
+An E5 error on the draft's file name cannot be fixed with Edit, which does not rename. Say so,
+propose the new name (a slug without the confidential name), leave `Status: draft`, and do not
+conclude that the draft is clean.
 
 ## Record in history
 
@@ -244,7 +265,8 @@ line in that language; the slug and the path stay verbatim and `Last updated:` s
 
 Tell the human, in this order: the path of the draft (and the `-2` or `-3` name if one was
 taken); `Status: draft`; whether `doctrine-reviewer` ran or you did its job inline, and why;
-what the review found and what you applied; `Disagreements`, each with its reason; any finding
+what the review found and what you applied (the report comes last, after the review, the
+application, the lint and the history line); `Disagreements`, each with its reason; any finding
 you named but did not apply; the lint result; the deadline, and the conversion if there was one;
 who sends. The draft stays `Status: draft`: the human sends it and edits the status line.
 Showing the draft text in the reply is fine, after the file exists.
@@ -252,13 +274,14 @@ Showing the draft text in the reply is fine, after the file exists.
 ## Without the linter
 
 The linter is not available when `test -f` fails (a bare-skills install keeps only `skills/`).
-Say so, then check the draft against the five rules it would have applied:
+Say so, then check the draft against the five rules it would have applied, and say that the
+confidential-name gate was not passed by a tool:
 
 - E1: the status block is in the first 10 lines, with `Status:`, `To:` and `Written by:`, plus `Subject:` under `outbound/mails/`.
 - E2: `Status:` is exactly `draft`.
 - E3: `Deadline:` is a real `YYYY-MM-DD` date, or there is no `Deadline:` line.
 - E4: the file is named `YYYY-MM-DD_slug.md`, the slug in lowercase letters, digits and single hyphens.
-- E5: no confidential name in the text or in the file name, unless consent is recorded with its source.
+- E5: no confidential name in the text or in the file name, unless consent is recorded with its source. List every `confidential_names` entry of `dossier.yaml` in the report and check each one, with its variants, against the text, `To:`, `Subject:` and the file name. This manual check is mandatory.
 
 Then check them by reading the file.
 

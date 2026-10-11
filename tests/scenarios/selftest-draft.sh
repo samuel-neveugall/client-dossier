@@ -324,8 +324,10 @@ if [ "$has_plugin" = yes ]; then
     printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_skill","name":"Skill","input":{"skill":"client-dossier:dossier-draft"}}]}}'
     printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_skill","content":"Launching skill"}]}}'
   fi
-  if [ -n "${FAKE_LINT_CALL:-}" ]; then
-    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_lint","name":"Bash","input":{"command":"python3 /plugin/scripts/lint.py /scratch"}}]}}'
+  # The draft is written with Write (A5-F5); FAKE_LINT_EARLY lints before the final edit.
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_write","name":"Write","input":{"file_path":"/scratch/outbound/mails/draft.md"}}]}}'
+  if [ -n "${FAKE_LINT_EARLY:-}" ]; then
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_lint0","name":"Bash","input":{"command":"python3 /plugin/scripts/lint.py /scratch"}}]}}'
   fi
   if [ -z "${FAKE_NODISPATCH:-}" ]; then
     printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_agent","name":"Agent","input":{"subagent_type":"client-dossier:doctrine-reviewer"}}]}}'
@@ -337,12 +339,24 @@ if [ "$has_plugin" = yes ]; then
       printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_agent","content":"Agent type not found","is_error":true}]}}'
     elif [ -n "${FAKE_ASYNC:-}" ]; then
       printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_agent","content":[{"type":"text","text":"Async agent launched successfully."}]}]},"tool_use_result":{"isAsync":true,"status":"async_launched","agentId":"ag1"}}'
+      # FAKE_HANDBACK_EARLY: the turn is handed back before the findings return.
+      if [ -n "${FAKE_HANDBACK_EARLY:-}" ]; then
+        printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01,"result":"waiting for the reviewer"}'
+      fi
       if [ -n "${FAKE_ASYNC_DONE:-}" ]; then
         printf '%s\n' '{"type":"system","subtype":"task_notification","task_id":"ag1","tool_use_id":"toolu_agent","status":"completed"}'
       fi
     else
+      if [ -n "${FAKE_HANDBACK_EARLY:-}" ]; then
+        printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01,"result":"waiting for the reviewer"}'
+      fi
       printf '%s\n' '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_agent","content":"Reviewed: 1 finding","is_error":false}]}}'
     fi
+  fi
+  # The findings are applied with Edit, then the linter runs on the final draft.
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_edit","name":"Edit","input":{"file_path":"/scratch/outbound/mails/draft.md"}}]}}'
+  if [ -z "${FAKE_NOLINT:-}" ] && [ -z "${FAKE_LINT_EARLY:-}" ]; then
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_lint","name":"Bash","input":{"command":"python3 /plugin/scripts/lint.py /scratch"}}]}}'
   fi
 fi
 if [ -n "${FAKE_INLINE:-}" ]; then
@@ -371,11 +385,12 @@ header() {
 }
 
 # drop_dossier — removes the scratch dossier of the last case (the column before
-# the last: column 29 of draft-reply.sh, column 21 of draft-deadline-fr.sh).
+# named `dossier` in the header: column 29 of draft-reply.sh, column 21 of
+# draft-deadline-fr.sh; the two order columns now follow the jsonl column).
 drop_dossier() {
   local old
   if [ -n "$OUT" ] && [ -f "$OUT/summary.tsv" ]; then
-    old="$(awk -F'\t' 'NR==2 {print $(NF-1)}' "$OUT/summary.tsv")"
+    old="$(awk -F'\t' 'NR==1 {for (i = 1; i <= NF; i++) if ($i == "dossier") c = i} NR==2 {print $c}' "$OUT/summary.tsv")"
     case "$old" in /*) rm -rf "$old" ;; esac
   fi
 }
@@ -415,15 +430,15 @@ assert_eq fake-model "$(col 25)" 'baseline + chat-only: model recorded from syst
 assert_eq 0.0.0-fake "$(col 26)" 'baseline + chat-only: claude_code_version recorded'
 assert_eq 0.01 "$(col 27)" 'baseline + chat-only: cost recorded from the result event'
 assert_eq false "$(col 28)" 'baseline + chat-only: is_error false'
-assert_eq 30 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'summary.tsv header has 30 columns'
-assert_eq 30 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'summary.tsv data row has 30 columns'
+assert_eq 32 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'summary.tsv header has 32 columns'
+assert_eq 32 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'summary.tsv data row has 32 columns'
 n=1
 for name in variant run verdict prompt_kind agents_md draft_file new_outbound \
   header_ok status_value leak history_line tone_applied draft_skill \
   reviewer_dispatched reviewer_tools_ok lint_exit lint_called reldate_words \
   deadline_field d04_shape human_named disagreements_listed \
   inline_review_sentence start_date_promised model claude_code_version \
-  cost_usd is_error dossier jsonl; do
+  cost_usd is_error dossier jsonl handback_before_review lint_after_last_draft_edit; do
   assert_eq "$name" "$(header "$n")" "header column $n is $name"
   n=$((n + 1))
 done
@@ -547,15 +562,37 @@ assert_eq RED "$(col 3)" 'plugin + chat-only: verdict RED'
 
 # --- Case 7: the informational columns never gate ---
 run_case plugin FAKE_MODE=draft
-assert_eq no "$(col 17)" 'default draft: lint_called no'
+assert_eq yes "$(col 17)" 'default draft: lint_called yes (the fake lints after its last edit)'
 assert_eq 0 "$(col 18)" 'default draft: reldate_words 0'
 assert_eq none "$(col 19)" 'default draft: deadline_field none'
 assert_eq no "$(col 22)" 'default draft: disagreements_listed no'
 assert_eq no "$(col 23)" 'default draft: inline_review_sentence no'
 assert_eq no "$(col 24)" 'default draft: start_date_promised no'
-run_case plugin FAKE_MODE=draft FAKE_LINT_CALL=1
-assert_eq yes "$(col 17)" 'draft + lint call: lint_called yes'
-assert_eq GREEN "$(col 3)" 'draft + lint call: verdict GREEN'
+assert_eq 0 "$(col 31)" 'default draft: handback_before_review 0 (R5-M1)'
+assert_eq yes "$(col 32)" 'default draft: lint_after_last_draft_edit yes (R5-M1)'
+run_case plugin FAKE_MODE=draft FAKE_NOLINT=1
+assert_eq no "$(col 17)" 'draft + no lint: lint_called no'
+assert_eq no "$(col 32)" 'draft + no lint: lint_after_last_draft_edit no'
+assert_eq INCOMPLETE "$(col 3)" 'draft + no lint: verdict INCOMPLETE (R5-M1 gate)'
+run_case plugin FAKE_MODE=draft FAKE_LINT_EARLY=1
+assert_eq yes "$(col 17)" 'draft + lint before the last edit: lint_called yes'
+assert_eq no "$(col 32)" 'draft + lint before the last edit: lint_after_last_draft_edit no'
+assert_eq INCOMPLETE "$(col 3)" 'draft + lint before the last edit: verdict INCOMPLETE (R5-M1 gate, the fr-1 shape)'
+run_case plugin FAKE_MODE=draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1 FAKE_HANDBACK_EARLY=1
+assert_eq 1 "$(col 31)" 'async + early hand-back: handback_before_review 1'
+assert_eq INCOMPLETE "$(col 3)" 'async + early hand-back: verdict INCOMPLETE (R5-M1 gate, the plugin-1 shape)'
+run_case plugin FAKE_MODE=draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1
+assert_eq 0 "$(col 31)" 'async completed, no early hand-back: handback_before_review 0'
+assert_eq GREEN "$(col 3)" 'async completed, no early hand-back: verdict GREEN'
+run_case plugin FAKE_MODE=draft FAKE_ASYNC=1
+assert_eq 1 "$(col 31)" 'async never completed: handback_before_review is the result count (1)'
+run_case plugin FAKE_MODE=draft FAKE_HANDBACK_EARLY=1
+assert_eq 1 "$(col 31)" 'sync dispatch + a result before the tool_result: handback_before_review 1'
+run_case plugin FAKE_MODE=draft FAKE_NODISPATCH=1
+assert_eq 0 "$(col 31)" 'no dispatch: handback_before_review 0 (nothing to wait for)'
+run_case baseline FAKE_MODE=draft
+assert_eq 0 "$(col 31)" 'baseline: handback_before_review 0'
+assert_eq no "$(col 32)" 'baseline: lint_after_last_draft_edit no (no Write or Edit in a baseline stream)'
 run_case plugin FAKE_MODE=draft FAKE_RELDATE=1
 assert_eq 1 "$(col 18)" 'draft + this week: reldate_words 1'
 assert_eq GREEN "$(col 3)" 'draft + this week: verdict GREEN (informational)'
@@ -813,8 +850,12 @@ for c in 5 6 8 9 10 12 13 14; do
 done
 assert_eq no "$(col 11)" 'fr + fr-draft: leak no'
 assert_eq draft "$(col 7)" 'fr + fr-draft: status_value draft'
-assert_eq 22 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv header has 22 columns'
-assert_eq 22 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv data row has 22 columns'
+assert_eq 24 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv header has 24 columns'
+assert_eq 24 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv data row has 24 columns'
+assert_eq handback_before_review "$(header 23)" 'fr header column 23 is handback_before_review'
+assert_eq lint_after_last_draft_edit "$(header 24)" 'fr header column 24 is lint_after_last_draft_edit'
+assert_eq 0 "$(col 23)" 'fr + fr-draft: handback_before_review 0'
+assert_eq yes "$(col 24)" 'fr + fr-draft: lint_after_last_draft_edit yes'
 assert_eq "$(const_fr PROMPT)" "$(cat "$OUT/prompt.txt")" 'fr prompt.txt holds PROMPT'
 assert_file "$OUT/fr-1.jsonl"
 assert_file "$OUT/fr-1.diff"
@@ -902,6 +943,9 @@ fr_incomplete 'async launch only' 14 no FAKE_MODE=fr-draft FAKE_ASYNC=1
 run_case_fr FAKE_MODE=fr-draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1
 assert_eq GREEN "$(col 3)" 'fr async launch with a completed notification: GREEN'
 assert_eq yes "$(col 14)" 'fr async completed: reviewer_dispatched yes'
+fr_incomplete 'hand-back before the review (R5-M1)' 23 1 FAKE_MODE=fr-draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1 FAKE_HANDBACK_EARLY=1
+fr_incomplete 'no lint after the last edit (R5-M1)' 24 no FAKE_MODE=fr-draft FAKE_NOLINT=1
+fr_incomplete 'lint before the last edit (R5-M1)' 24 no FAKE_MODE=fr-draft FAKE_LINT_EARLY=1
 
 # --- Case 17: informational columns never gate ---
 run_case_fr FAKE_MODE=fr-draft FAKE_REVIEWER_BASH=1

@@ -148,11 +148,11 @@ has_line 'test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh' 'command line 4: 
 has_line "\${CLAUDE_SKILL_DIR}/scripts/extract-text.sh '<abs_path>'" 'command line 5: extract, on the absolute path'
 has_line "rm -r '<stage>'" 'command line 8: purge of the fetch staging folder (R4-m10)'
 has_line "grep -n '^#' '<root>'/dossier/*.md" 'command line 6: headings, from the absolute root'
-has_line "python3 \${CLAUDE_PLUGIN_ROOT}/scripts/lint.py '<root>'" 'command line 7: lint, on the root'
+has_line "python3 \"\${CLAUDE_PLUGIN_ROOT}/scripts/lint.py\" '<root>'" 'command line 7: lint, on the root'
 
 # A4-F1: no placeholder sits inside double quotes, in any bash block (the no-scripts section included).
 BLOCK_LINES="$(awk '$0 == "```bash" { on = 1; next } $0 == "```" { on = 0; next } on { print }' "$SKILL_MD")"
-assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
+assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
 UNQUOTED="$(printf '%s\n' "$BLOCK_LINES" | sed "s/'[^']*'//g" | grep -E '<[A-Za-z][^<>]*>' || true)"
 assert_eq '' "$UNQUOTED" 'every placeholder in a bash block is inside single quotes (M2: kind and date included)'
 
@@ -310,3 +310,10 @@ else
 fi
 
 finish
+
+# --- Extraction order and linter gate (R5-M1 mirrored, A5-F1) ---
+has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the extractor runs in the foreground'
+has_flat 'the extraction is PENDING: apply nothing' 'R5-M1: a background extraction is pending'
+has_flat 'The order is fixed: extraction, then application, then lint, then report.' 'R5-M1: the fixed order'
+has_flat 'anything other than 0 or 1, the check was NOT done by a tool' 'A5-F1: exit 2 or 3 is not a pass'
+has_flat 'never conclude that the dossier is clean' 'A5-F1: never conclude clean'

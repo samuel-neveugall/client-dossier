@@ -194,13 +194,14 @@ EXPECTED_CMDS="$(printf '%s\n' \
   "ls -1t '<root>/outbound/<folder>'" \
   "test -e '<root>/outbound/<folder>/<YYYY-MM-DD>_<slug>.<ext>'" \
   "git -C '<root>' config user.name" \
-  'test -f ${CLAUDE_PLUGIN_ROOT}/scripts/lint.py' \
-  "python3 \${CLAUDE_PLUGIN_ROOT}/scripts/lint.py '<root>'" | sort)"
+  'test -f "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py"' \
+  "python3 \"\${CLAUDE_PLUGIN_ROOT}/scripts/lint.py\" '<root>'" | sort)"
 assert_eq "$EXPECTED_CMDS" "$(printf '%s\n' "$CMD_LINES" | sort -u)" 'the command lines are exactly the six of the contract'
 PLACEHOLDERS="$(printf '%s\n' "$CMD_LINES" | grep -o '<[A-Za-z-]*>' | sort -u | tr '\n' ' ')"
 assert_eq '<YYYY-MM-DD> <ext> <folder> <root> <slug> ' "$PLACEHOLDERS" 'the command placeholders are root, folder, YYYY-MM-DD, slug, ext'
 # A4-F1: no placeholder sits inside double quotes; every placeholder is inside single quotes.
-assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
+# A5-F1: the plugin-root path is the one double-quoted value (a path with a space); strip it first.
+assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
 UNQUOTED="$(printf '%s\n' "$BLOCK_LINES" | sed "s/'[^']*'//g" | grep -E '<[A-Za-z][^<>]*>' || true)"
 assert_eq '' "$UNQUOTED" 'every placeholder in a bash block is inside single quotes'
 
@@ -209,8 +210,8 @@ L_DATE="$(line_of 'date +%F')"
 L_LS="$(line_of "ls -1t '<root>/outbound/<folder>'")"
 L_TESTE="$(line_of "test -e '<root>/outbound/<folder>/<YYYY-MM-DD>_<slug>.<ext>'")"
 L_GIT="$(line_of "git -C '<root>' config user.name")"
-L_TESTF="$(line_of 'test -f ${CLAUDE_PLUGIN_ROOT}/scripts/lint.py')"
-L_LINT="$(line_of "python3 \${CLAUDE_PLUGIN_ROOT}/scripts/lint.py '<root>'")"
+L_TESTF="$(line_of 'test -f "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py"')"
+L_LINT="$(line_of "python3 \"\${CLAUDE_PLUGIN_ROOT}/scripts/lint.py\" '<root>'")"
 H_WRITE="$(line_of '## Write the draft')"
 H_REVIEW="$(line_of '## Review')"
 H_LINT="$(line_of '## Check with the linter')"
@@ -459,3 +460,20 @@ else
 fi
 
 finish
+
+# --- Review order and linter gate (R5-M1, A5-F1, A5-F4, A5-F5) ---
+has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the reviewer runs in the foreground'
+has_flat 'the review is PENDING: write no report, do not touch `dossier/HISTORY.md`, do not run the linter' 'R5-M1: a background review is pending'
+has_flat 'do not hand the turn back until the findings have returned' 'R5-M1: no hand-back before the findings'
+has_flat 'the history line comes after the review, never during the wait' 'R5-M1: the Stop hook reminder does not move history before the review'
+has_flat 'The order is fixed: review, then apply the findings, then lint, then history, then report.' 'R5-M1: the fixed order'
+has_flat 'This is finished before the linter runs and before `dossier/HISTORY.md` is edited.' 'R5-M1: findings applied or listed before lint and history'
+has_flat 'Run it only after the last edit of the draft, and run it again after any later edit.' 'R5-M1: lint after the last draft edit'
+has_flat 'at most two passes' 'A5-F4: the lint loop is bounded'
+has_flat 'means the gate was NOT passed' 'A5-F1: a missing linter or exit 2 or 3 is a gate not passed'
+has_flat 'never conclude that the draft is clean' 'A5-F1: never conclude clean'
+has_flat 'List every `confidential_names` entry of `dossier.yaml` in the report' 'A5-F1: the manual check lists the confidential names'
+has_flat 'An E5 error on the draft'"'"'s file name cannot be fixed with Edit' 'A5-F4: E5 on the file name'
+has_flat 'propose the new name' 'A5-F4: propose the new name'
+has_flat 'leave `Status: draft`' 'A5-F4: the status stays draft'
+has_flat 'Create the file with the Write tool, never with a Bash heredoc or redirection' 'A5-F5: the Write tool'

@@ -136,7 +136,7 @@ dossier's language.
 
 ## Checking the shape
 
-From the dossier, run `python3 ${CLAUDE_PLUGIN_ROOT}/scripts/lint.py` to check the mechanical
+From the dossier, run `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py"` to check the mechanical
 rules (fact lines, status headers, confidential names). If that script is not available (a
 bare-skills install has no scripts), say so and apply the rules above by reading the files.
 
