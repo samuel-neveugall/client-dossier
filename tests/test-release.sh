@@ -118,7 +118,9 @@ PY
 
 # sha FILE — sha256 of a file, whichever tool this platform has.
 sha() {
-  if command -v shasum >/dev/null 2>&1; then
+  if [ ! -f "$1" ]; then
+    echo absent
+  elif command -v shasum >/dev/null 2>&1; then
     shasum -a 256 "$1" | cut -d' ' -f1
   else
     sha256sum "$1" | cut -d' ' -f1
@@ -259,6 +261,140 @@ refuse 'injection $()' "$d" '1.0.0$(touch PWNED)'
 refuse 'injection backticks' "$d" '1.0.0`touch PWNED`'
 refuse 'injection &&' "$d" '1.0.0 && touch PWNED'
 refuse 'injection newline' "$d" $'1.0.0\ntouch PWNED'
+
+# --- argument handling: each refusal on one shared fresh fixture ------------------
+
+d="$(fixture)"
+refuse 'no argument' "$d"
+err_has 'no argument' 'usage'
+refuse 'two arguments' "$d" 1.0.0 2.0.0
+err_has 'two arguments' 'usage'
+refuse 'empty argument' "$d" ''
+err_has 'empty argument' 'not a semantic version'
+refuse 'two components' "$d" 1.0
+err_has 'two components' 'not a semantic version: 1.0'
+refuse 'v prefix' "$d" v1.0.0
+refuse 'leading zero' "$d" 01.0.0
+refuse 'four components' "$d" 1.0.0.0
+refuse 'empty pre-release' "$d" 1.0.0-
+refuse 'option-like value' "$d" --help
+err_has 'option-like value' 'not a semantic version: --help'
+refuse 'newline stays visible' "$d" $'1.0.0\nx'
+err_has 'newline stays visible' "\$'1.0.0\\nx'"
+refuse 'command substitution stays inert' "$d" '1.0.0$(id)'
+err_has 'command substitution stays inert' '\$\(id\)'
+
+# --- dirty trees ---------------------------------------------------------------
+
+d="$(fixture)"
+printf 'stray\n' >"$d/untracked.txt"
+refuse 'untracked file' "$d" 1.0.0
+err_has 'untracked file' 'working tree is not clean'
+assert_file "$d/untracked.txt"
+
+d="$(fixture)"
+printf 'edited\n' >>"$d/notes.txt"
+refuse 'modified tracked file' "$d" 1.0.0
+err_has 'modified tracked file' 'working tree is not clean'
+assert_eq 'edited' "$(tail -1 "$d/notes.txt")" 'modified tracked file: the modification is kept'
+
+# --- existing tags -------------------------------------------------------------
+
+d="$(fixture)"
+release_ok 'release before the duplicate' "$d" 1.0.0 . "$PLAIN_CHANGED"
+refuse 'same version again' "$d" 1.0.0
+err_has 'same version again' 'tag v1.0.0 already exists'
+
+d="$(fixture)"
+git -C "$d" tag v1.1.0
+refuse 'manually created tag' "$d" 1.1.0
+err_has 'manually created tag' 'tag v1.1.0 already exists'
+
+# --- manifests -----------------------------------------------------------------
+
+d="$(fixture)"
+set_manifest_version "$d" "$CODEX_MANIFEST" 0.9.0
+commit_all "$d" 'codex drifts'
+refuse 'manifests disagree' "$d" 1.0.0
+err_has 'manifests disagree' 'the two manifests disagree: 0.1.0 vs 0.9.0'
+
+d="$(fixture)"
+refuse 'already at the current version' "$d" 0.1.0
+err_has 'already at the current version' 'already at 0.1.0'
+
+d="$(fixture)"
+rm -f "$d/$CODEX_MARKET"
+commit_all "$d" 'codex marketplace removed'
+refuse 'a file is missing' "$d" 1.0.0
+err_has 'a file is missing' "missing file: $CODEX_MARKET"
+
+# --- changelog -----------------------------------------------------------------
+
+d="$(fixture)"
+printf '# Changelog\n\n## [Unreleased-ish]\n\n- one\n' >"$d/$CHANGELOG"
+commit_all "$d" 'no unreleased heading'
+refuse 'changelog without Unreleased' "$d" 1.0.0
+err_has 'changelog without Unreleased' 'exactly one'
+
+d="$(fixture)"
+printf '# Changelog\n\n## [Unreleased]\n\n- one\n\n## [Unreleased]\n\n- two\n' >"$d/$CHANGELOG"
+commit_all "$d" 'two unreleased headings'
+refuse 'changelog with two Unreleased' "$d" 1.0.0
+err_has 'changelog with two Unreleased' 'exactly one'
+
+d="$(fixture)"
+printf '# Changelog\n\n## [Unreleased]\n\n## [1.0.0] - 2020-01-01\n\n- old\n' >"$d/$CHANGELOG"
+commit_all "$d" 'changelog already holds 1.0.0'
+refuse 'changelog already holds the heading' "$d" 1.0.0
+err_has 'changelog already holds the heading' "already holds a '## [1.0.0]' heading"
+
+# --- a failing commit leaves the five files as they were -------------------------
+
+d="$(fixture)"
+mkdir -p "$d/.git/hooks"
+printf '#!/bin/sh\nexit 1\n' >"$d/.git/hooks/pre-commit"
+chmod +x "$d/.git/hooks/pre-commit"
+refuse 'commit hook rejects the release' "$d" 1.0.0
+err_has 'commit hook rejects the release' 'the commit failed'
+
+# --- outside any repository ----------------------------------------------------
+
+plain="$(mktemp -d)"
+printf '%s\n' "$plain" >>"$CLEAN_LIST"
+cp -p "$RELEASE_SH" "$plain/release.sh"
+OUT_STATUS=0
+OUT_ERR="$( (cd "$plain" && ./release.sh 1.0.0) 2>&1 >/dev/null)" || OUT_STATUS=$?
+assert_eq 1 "$OUT_STATUS" 'outside a repository: exit 1'
+case "$OUT_ERR" in
+  "release: not inside a git repository"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *)
+    echo "FAIL: outside a repository: unexpected message '$OUT_ERR'" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    ;;
+esac
+
+# --- accepted forms ------------------------------------------------------------
+
+d="$(fixture)"
+release_ok 'pre-release 1.1.0-rc.1' "$d" 1.1.0-rc.1 . "$PLAIN_CHANGED"
+assert_grep_e '^## \[1\.1\.0-rc\.1\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$d/$CHANGELOG"
+
+d="$(fixture)"
+release_ok 'build metadata 1.0.0+build.5' "$d" 1.0.0+build.5 . "$PLAIN_CHANGED"
+
+# A marketplace entry that already carries a version follows the release; an entry
+# without one never gains the key.
+d="$(fixture 0.1.0)"
+CODEX_CHANGED="$(printf '%s\n%s\n%s\n%s' "$CODEX_MARKET" "$CLAUDE_MANIFEST" "$CODEX_MANIFEST" "$CHANGELOG")"
+release_ok 'entry that carries a version' "$d" 1.0.0 . "$CODEX_CHANGED"
+assert_eq 1.0.0 "$(entry_version "$d/$CODEX_MARKET")" 'Codex entry with a version follows the release'
+assert_eq none "$(entry_version "$d/$CLAUDE_MARKET")" 'Claude entry without a version never gains one'
+
+# A second release on top of the first works and keeps both headings, newest first.
+release_ok 'second release 1.0.1' "$d" 1.0.1 . "$CODEX_CHANGED"
+assert_eq 1.0.1 "$(entry_version "$d/$CODEX_MARKET")" 'second release: Codex entry follows again'
+HEADINGS="$(grep -E '^## \[' "$d/$CHANGELOG" | cut -d' ' -f1-2 | tr '\n' ' ')"
+assert_eq '## [Unreleased] ## [1.0.1] ## [1.0.0] ' "$HEADINGS" 'second release: headings, newest first'
 
 # --- cleanup --------------------------------------------------------------------
 
