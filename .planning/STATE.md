@@ -4,14 +4,14 @@ current_phase: 06
 current_phase_name: calls-status
 status: ready_to_plan
 stopped_at: Phase 5 closed (verification passed 5/5, UAT 6/6 agent-run); Phase 6 ready to plan
-last_updated: "2026-10-11T07:30:00.000Z"
+last_updated: "2026-10-11T06:10:35.149Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 05 closed - review fix round 3, re-verification passed, UAT complete
-state_head: 7bc1bf3ddfadf492ab5dede67cc44af1d6c2db07
+state_head: 0d552a9a10f6c8cebf8f91ddf90e2aae6f160576
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 31
+  total_plans: 37
   completed_plans: 31
   percent: 71
 ---
@@ -29,7 +29,7 @@ human and a doctrine check.
 
 ## Current Position
 
-Phase: 06 (calls-status) — READY TO PLAN. Phase 05 (drafting-doctrine-review) is CLOSED.
+Phase: 06 (calls-status) — READY TO EXECUTE
 Status: Phase 5 done: `05-VERIFICATION.md` passed 5/5 (iter1 kept as `05-VERIFICATION.iter1.md`), `05-UAT.md`
 complete 6/6 (agent-run, evidence `evidence/uat/`, 0.774 USD), review fix rounds 1-3 recorded in
 `05-REVIEW-FIX.md`. Dispatch of `doctrine-reviewer` is mandatory, foreground, and applied before lint and
