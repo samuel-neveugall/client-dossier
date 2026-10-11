@@ -324,4 +324,250 @@ if bad:
 PY
 assert_eq 0 "$STATUS" 'the fourteen ported constants are AST-identical to lint.py'"'"'s'
 
+# ---------------------------------------------------------------------------
+# Task 2: commitments, upcoming items, overdue drafts, stale files, one-line status
+# ---------------------------------------------------------------------------
+
+# expect_commitments LABEL DIR EXPECTED — runs the report and compares
+# "date:state:side" of every commitment, comma separated, to EXPECTED.
+expect_commitments() {
+  local label="$1" dir="$2" expected="$3"
+  run_st "$dir" --json --today "$TODAY" "$dir"
+  assert_eq 0 "$ST_STATUS" "$label: exit 0"
+  assert_eq "$expected" "$(st_json '",".join(i["date"] + ":" + i["state"] + ":" + i["side"] for i in d["commitments"])')" "$label"
+}
+
+# reset_out DIR — an outbound/ folder holding only its README and .gitkeep files.
+reset_out() {
+  find "$1/outbound" -type f -o -type l | grep -v -e '/README.md$' -e '/\.gitkeep$' | while IFS= read -r f; do rm -f "$f"; done
+}
+
+# mk_out DIR REL STATUS DEADLINE — an outbound file with a status header; an
+# empty DEADLINE writes no Deadline: line.
+mk_out() {
+  local d="$1" rel="$2" status="$3" deadline="$4"
+  mkdir -p "$(dirname "$d/$rel")"
+  {
+    printf 'Status: %s\nTo: Jane Doe\nWritten by: Sam\n' "$status"
+    if [ -n "$deadline" ]; then printf 'Deadline: %s\n' "$deadline"; fi
+    printf '\nBody of the draft.\n'
+  } >"$d/$rel"
+}
+
+echo '--- Commitments: the 7-day window and its edges ---'
+
+D2="$(mk_dossier en)"
+set_updated "$D2" 2026-10-10
+
+write_history "$D2" '- Send the plan by 2026-10-11 (call @12:34).' '' ''
+expect_commitments 'due today is due_soon, not overdue' "$D2" '2026-10-11:due_soon:ours'
+write_history "$D2" '- Send the plan by 2026-10-18 (call @12:34).' '' ''
+expect_commitments 'due in 7 days is due_soon' "$D2" '2026-10-18:due_soon:ours'
+write_history "$D2" '- Send the plan by 2026-10-19 (call @12:34).' '' ''
+expect_commitments 'due in 8 days is not reported' "$D2" ''
+write_history "$D2" '- Send the plan by 2026-10-10 (call @12:34).' '' ''
+expect_commitments 'due yesterday is overdue' "$D2" '2026-10-10:overdue:ours'
+write_history "$D2" '- Send the plan (call 2026-10-01 @12:34).' '' ''
+expect_commitments 'an undated line is not reported (the date inside its source does not count)' "$D2" ''
+write_history "$D2" '' '- Jane sends the list by 2026-10-09 (mail 2026-10-01 from Jane).' ''
+expect_commitments 'a line under the second ### is theirs' "$D2" '2026-10-09:overdue:theirs'
+assert_eq Theirs "$(st_json 'd["commitments"][0]["heading"]')" 'theirs: the ### text is kept as the heading'
+write_history "$D2" '* Send the plan by 2026-10-09 (call @12:34).' '' ''
+expect_commitments 'a * bullet counts' "$D2" '2026-10-09:overdue:ours'
+write_history "$D2" $'<!--\n- Send the plan by 2026-10-01 (call @12:34).\n-->' '' ''
+expect_commitments 'a bullet inside a multi-line comment is ignored' "$D2" ''
+write_history "$D2" $'```\n- Send the plan by 2026-10-01 (call @12:34).\n```' '' ''
+expect_commitments 'a bullet inside a fenced block is ignored' "$D2" ''
+write_history "$D2" '- On 2026-10-01 Jane promised the list by 2026-10-16 (mail 2026-10-01 from Jane).' '' ''
+expect_commitments 'two dates: the LAST one outside the source is the due date' "$D2" '2026-10-16:due_soon:ours'
+write_history "$D2" '- Send the plan by 2026-10-04, done 2026-10-05 (call @12:34).' '' ''
+expect_commitments 'a line marked done <date> is skipped' "$D2" ''
+write_history "$D2" '- Send the plan by 2026-10-04, Done 2026-10-05 (call @12:34).' '' ''
+expect_commitments 'Done <date> is skipped too (case-insensitive)' "$D2" ''
+write_history "$D2" '- Send the plan by 2026-10-04, done tomorrow (call @12:34).' '' ''
+expect_commitments 'done without a real date does not skip the line' "$D2" '2026-10-04:overdue:ours'
+write_history "$D2" $'- Send A by 2026-10-12 (call @1).\n- Send B by 2026-10-09 (call @2).' $'- Jane C by 2026-10-10 (mail 2026-10-01 from Jane).' ''
+expect_commitments 'items are sorted by date' "$D2" '2026-10-09:overdue:ours,2026-10-10:overdue:theirs,2026-10-12:due_soon:ours'
+assert_eq '[]' "$(st_json 'd["upcoming"]')" 'commitments never appear as upcoming items'
+
+echo '--- Commitments citing an outbound draft (D-12) ---'
+
+DRAFT_LINE="- 2026-10-01: draft mail 'x' written, to be sent by Sam, deadline 2026-10-20 (outbound/mails/2026-10-01_x.md)."
+write_history "$D2" "$DRAFT_LINE" '' ''
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_x.md draft 2026-10-09
+expect_commitments 'a cited draft takes the file Deadline: (never the leading date)' "$D2" '2026-10-09:overdue:ours'
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_x.md 'sent 2026-10-08 by Sam' 2026-10-09
+expect_commitments 'a cited file that is sent gives nothing' "$D2" ''
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_x.md 'reviewed by Sam' 2026-10-15
+expect_commitments 'a cited reviewed-by draft with a deadline in 4 days is due_soon' "$D2" '2026-10-15:due_soon:ours'
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_x.md draft ''
+expect_commitments 'a cited draft without a deadline field gives nothing' "$D2" ''
+reset_out "$D2"
+expect_commitments 'a citation of a missing file falls back to the last date outside the source' "$D2" ''
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "outbound/mails/2026-10-01_x.md" in n])')" 'a missing cited file adds a note'
+write_history "$D2" "- 2026-10-01: draft mail 'x' written, deadline 2026-10-09 (outbound/mails/2026-10-01_x.md)." '' ''
+expect_commitments 'a missing cited file: the fallback date is overdue' "$D2" '2026-10-09:overdue:ours'
+write_history "$D2" "- 2026-10-01: draft mail 'x' written, deadline 2026-10-09 (outbound/../dossier.yaml)." '' ''
+expect_commitments 'outbound/../dossier.yaml is not read: fallback to the last date' "$D2" '2026-10-09:overdue:ours'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "outbound/../dossier.yaml" in n])')" 'outbound/../ citation adds a note'
+write_history "$D2" "- 2026-10-01: draft mail 'x' written, deadline 2026-10-09 (outbound/mails/2026-10-01_link.md)." '' ''
+mkdir -p "$D2/outbound/mails"
+printf 'Status: sent 2026-10-08 by Sam\nTo: x\nWritten by: Sam\nDeadline: 2026-10-30\n' >"$WORK/outside.md"
+ln -s "$WORK/outside.md" "$D2/outbound/mails/2026-10-01_link.md"
+expect_commitments 'a cited symlink is not read: fallback to the last date' "$D2" '2026-10-09:overdue:ours'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "2026-10-01_link.md" in n])')" 'a cited symlink adds a note'
+reset_out "$D2"
+
+echo '--- Upcoming items ---'
+
+write_history "$D2" '' '' $'- 2026-10-12: meeting with Jane (call @12:34).\n- 2026-10-01: old meeting (call @12:34).\n- 2026-10-19: far meeting (call @12:34).\n- 2026-10-11: kickoff (call @12:34).'
+run_st "$D2" --json --today "$TODAY" "$D2"
+assert_eq 0 "$ST_STATUS" 'upcoming: exit 0'
+assert_eq '2026-10-11,2026-10-12' "$(st_json '",".join(i["date"] for i in d["upcoming"])')" 'upcoming: only 0..7 days, sorted'
+assert_eq '[]' "$(st_json 'd["commitments"]')" 'upcoming: never in commitments, never overdue'
+assert_eq dossier/HISTORY.md "$(st_json 'd["upcoming"][0]["file"]')" 'upcoming: file recorded'
+
+echo '--- A French dossier: same positions, no word list ---'
+
+DF="$(mk_dossier fr)"
+set_updated "$DF" 2026-10-10
+write_history "$DF" '- Envoyer le devis avant le 2026-10-08 (appel @12:34).' '- Jane envoie la liste avant le 2026-10-15 (mail 2026-10-01 de Jane).' '- 2026-10-13 : réunion (appel @1).' fr
+run_st "$DF" --json --today "$TODAY" "$DF"
+assert_eq 0 "$ST_STATUS" 'fr: exit 0'
+assert_eq '2026-10-08:overdue:ours,2026-10-15:due_soon:theirs' "$(st_json '",".join(i["date"] + ":" + i["state"] + ":" + i["side"] for i in d["commitments"])')" 'fr: ours and theirs by position'
+assert_eq 'Les nôtres' "$(st_json 'd["commitments"][0]["heading"]')" 'fr: the ### text is the owner text (ours)'
+assert_eq 'Les leurs' "$(st_json 'd["commitments"][1]["heading"]')" 'fr: the ### text is the owner text (theirs)'
+assert_eq 1 "$(st_json 'len(d["upcoming"])')" 'fr: the third ## is the upcoming list'
+printf '# Relation\n\nLast updated: 2026-10-10\n\n## État en une ligne\n\nSur les rails, livrable le 2026-10-20 (appel @12:34).\n\n## Chiffres\n' >"$DF/dossier/RELATIONSHIP.md"
+run_st "$DF" --json --today "$TODAY" "$DF"
+assert_eq 'Sur les rails, livrable le 2026-10-20 (appel @12:34).' "$(st_json 'd["status_line"]')" 'fr: the first ## of RELATIONSHIP.md gives the status line'
+
+echo '--- Overdue drafts ---'
+
+write_history "$D2" '' '' ''
+expect_drafts() {
+  local label="$1" expected="$2"
+  run_st "$D2" --json --today "${3:-$TODAY}" "$D2"
+  assert_eq 0 "$ST_STATUS" "$label: exit 0"
+  assert_eq "$expected" "$(st_json '",".join(i["path"] for i in d["overdue_drafts"])')" "$label"
+}
+reset_out "$D2"
+expect_drafts 'a fresh scaffold has no overdue draft' ''
+mk_out "$D2" outbound/mails/2026-10-01_a.md draft 2026-10-10
+expect_drafts 'draft with a past deadline is reported' 'outbound/mails/2026-10-01_a.md'
+assert_eq draft "$(st_json 'd["overdue_drafts"][0]["status"]')" 'overdue draft: status kept'
+assert_eq 2026-10-10 "$(st_json 'd["overdue_drafts"][0]["deadline"]')" 'overdue draft: deadline kept'
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_a.md 'reviewed by Sam' 2026-10-10
+expect_drafts 'reviewed by with a past deadline is reported' 'outbound/mails/2026-10-01_a.md'
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_a.md 'sent 2026-10-09 by Sam' 2026-10-05
+expect_drafts 'a sent file is not reported' ''
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_a.md draft ''
+expect_drafts 'no deadline field is not reported' ''
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_a.md draft 2026-10-11
+expect_drafts 'a deadline of today is not reported' ''
+reset_out "$D2"
+printf 'Status: draft\nTo: Jane\nWritten by: Sam\nl4\nl5\nl6\nl7\nl8\nl9\nl10\nDeadline: 2026-10-01\n' >"$D2/outbound/mails/2026-10-01_a.md"
+expect_drafts 'a Deadline: on line 11 is outside the header window' ''
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-01_a.md draft 2026-10-01
+printf 'Status: draft\nDeadline: 2026-10-01\n' >"$D2/outbound/README.md"
+printf 'x' >"$D2/outbound/mails/2026-10-01_b.pdf"
+expect_drafts 'outbound/README.md and a .pdf are skipped' 'outbound/mails/2026-10-01_a.md'
+git -C "$D2" checkout -q -- outbound/README.md 2>/dev/null
+ln -s "$D2/outbound/mails/2026-10-01_a.md" "$D2/outbound/mails/2026-10-01_c.md"
+expect_drafts 'a symlinked outbound file is not followed' 'outbound/mails/2026-10-01_a.md'
+reset_out "$D2"; mk_out "$D2" outbound/calls/2026-10-01_x.md 'sent 2026-10-02 by Sam' ''
+printf 'Status: draft\nTo: Jane\nWritten by: Sam\n\nCall prep.\n' >"$D2/outbound/calls/2026-10-01_y.md"
+expect_drafts 'a call file without a deadline is never reported (even in 2027)' '' 2027-01-01
+reset_out "$D2"; mk_out "$D2" outbound/mails/2026-10-02_z.md draft 2026-10-09; mk_out "$D2" outbound/deliverables/2026-10-01_a.md draft 2026-10-05
+expect_drafts 'drafts are sorted by deadline then path' 'outbound/deliverables/2026-10-01_a.md,outbound/mails/2026-10-02_z.md'
+reset_out "$D2"
+
+echo '--- Stale living files and staleness_days ---'
+
+# set_one DIR FILE DATE — one living file says `Last updated: DATE`.
+set_one() {
+  python3 -I -c 'import os, re, sys
+p = os.path.join(sys.argv[1], "dossier", sys.argv[2])
+t = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write(re.sub(r"(?m)^Last updated:.*$", "Last updated: " + sys.argv[3], t, count=1))' "$1" "$2" "$3"
+}
+# set_cfg DIR LINE — the staleness_days line of dossier.yaml becomes LINE.
+set_cfg() {
+  python3 -I -c 'import os, re, sys
+p = os.path.join(sys.argv[1], "dossier.yaml")
+t = open(p, encoding="utf-8").read()
+open(p, "w", encoding="utf-8").write(re.sub(r"(?m)^staleness_days:.*$", lambda m: sys.argv[2], t))' "$1" "$2"
+}
+expect_stale() {
+  local label="$1" expected="$2"
+  run_st "$D2" --json --today "$TODAY" "$D2"
+  assert_eq 0 "$ST_STATUS" "$label: exit 0"
+  assert_eq "$expected" "$(st_json '",".join(i["path"] + ":" + str(i["days"]) for i in d["stale_files"])')" "$label"
+}
+set_updated "$D2" 2026-10-10
+expect_stale 'files updated yesterday are not stale' ''
+assert_eq 7 "$(st_json 'd["staleness_days"]')" 'default staleness_days is 7'
+set_one "$D2" ACTORS.md 2026-10-03
+expect_stale '8 days old is stale (default 7)' 'dossier/ACTORS.md:8'
+assert_eq 2026-10-03 "$(st_json 'd["stale_files"][0]["last_updated"]')" 'stale: last_updated kept'
+set_one "$D2" ACTORS.md 2026-10-04
+expect_stale '7 days old is not stale' ''
+set_updated "$D2" 2026-10-07
+set_cfg "$D2" 'staleness_days: 3'
+expect_stale 'staleness_days: 3 makes 4-day-old files stale' 'dossier/ACTORS.md:4,dossier/CHANNELS.md:4,dossier/HISTORY.md:4,dossier/LEARNINGS.md:4,dossier/OPEN-QUESTIONS.md:4,dossier/RELATIONSHIP.md:4,dossier/TONE.md:4'
+assert_eq 3 "$(st_json 'd["staleness_days"]')" 'staleness_days: 3 is reported'
+set_cfg "$D2" 'staleness_days: "3"'
+assert_eq 3 "$(run_st "$D2" --json --today "$TODAY" "$D2"; st_json 'd["staleness_days"]')" 'a quoted staleness_days works'
+set_cfg "$D2" 'staleness_days: 3   # three days'
+assert_eq 3 "$(run_st "$D2" --json --today "$TODAY" "$D2"; st_json 'd["staleness_days"]')" 'a trailing comment after staleness_days is ignored'
+set_cfg "$D2" 'staleness_days: x'
+run_st "$D2" --json --today "$TODAY" "$D2"
+assert_eq 7 "$(st_json 'd["staleness_days"]')" 'staleness_days: x gives 7'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "staleness_days" in n])')" 'staleness_days: x adds a note'
+set_cfg "$D2" 'staleness_days: 0'
+run_st "$D2" --json --today "$TODAY" "$D2"
+assert_eq 7 "$(st_json 'd["staleness_days"]')" 'staleness_days: 0 gives 7'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "staleness_days" in n])')" 'staleness_days: 0 adds a note'
+printf '{"version": 1, "language": "en", "staleness_days": 3}\n' >"$D2/dossier.yaml"
+run_st "$D2" --json --today "$TODAY" "$D2"
+assert_eq 3 "$(st_json 'd["staleness_days"]')" 'a JSON dossier.yaml works'
+git -C "$D2" checkout -q -- dossier.yaml
+printf 'version: 1\nlanguage: en\n' >"$D2/dossier.yaml"
+run_st "$D2" --json --today "$TODAY" "$D2"
+assert_eq 7 "$(st_json 'd["staleness_days"]')" 'a missing staleness_days gives 7'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "staleness_days" in n])')" 'a missing staleness_days adds a note'
+git -C "$D2" checkout -q -- dossier.yaml
+set_updated "$D2" 2026-10-10
+set_one "$D2" TONE.md 2026-10-20
+expect_stale 'a future Last updated: is not stale' ''
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "future" in n])')" 'a future Last updated: adds a note'
+set_updated "$D2" 2026-10-10
+rm -f "$D2/dossier/CHANNELS.md"
+expect_stale 'a missing living file is not stale' ''
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "CHANNELS.md" in n])')" 'a missing living file adds a note'
+git -C "$D2" checkout -q -- dossier/CHANNELS.md
+
+echo '--- The one-line status ---'
+
+DS="$(mk_dossier en)"
+run_st "$DS" --json --today "$TODAY" "$DS"
+assert_eq None "$(st_json 'd["status_line"]')" 'the init.py template (example in a comment) gives null'
+run_st "$DS" --today "$TODAY" "$DS"
+case "$ST_OUT" in
+  *'One-line status: none recorded'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo 'FAIL: text mode: One-line status: none recorded' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+python3 -I -c 'import re, sys
+p = sys.argv[1]
+t = open(p, encoding="utf-8").read()
+t = t.replace("## Status in one line\n", "## Status in one line\n\nOn track, deliverable due 2026-10-20, no blockers (call @12:34).\n", 1)
+open(p, "w", encoding="utf-8").write(t)' "$DS/dossier/RELATIONSHIP.md"
+run_st "$DS" --json --today "$TODAY" "$DS"
+assert_eq 'On track, deliverable due 2026-10-20, no blockers (call @12:34).' "$(st_json 'd["status_line"]')" 'a line under ## Status in one line is returned verbatim'
+run_st "$DS" --today "$TODAY" "$DS"
+case "$ST_OUT" in
+  *'One-line status: On track, deliverable due 2026-10-20'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo 'FAIL: text mode: the status line is printed' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+
 finish
