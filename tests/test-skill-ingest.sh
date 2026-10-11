@@ -297,6 +297,13 @@ for later in dossier-call dossier-status; do
   fi
 done
 
+# --- Extraction order and linter gate (R5-M1 mirrored, A5-F1) ---
+has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the extractor runs in the foreground'
+has_flat 'the extraction is PENDING: apply nothing' 'R5-M1: a background extraction is pending'
+has_flat 'The order is fixed: extraction, then application, then lint, then report.' 'R5-M1: the fixed order'
+has_flat 'anything other than 0 or 1, the check was NOT done by a tool' 'A5-F1: exit 2 or 3 is not a pass'
+has_flat 'never conclude that the dossier is clean' 'A5-F1: never conclude clean'
+
 # --- writing-skills order: the skill commit descends from the recorded RED baseline ---
 BASE_REL='.planning/phases/04-ingest-fact-extraction/evidence/red-baseline/summary.tsv'
 BASE_SHA="$(cd "$REPO_ROOT" && git log --diff-filter=A --format=%H -- "$BASE_REL" 2>/dev/null | tail -1)"
@@ -310,10 +317,3 @@ else
 fi
 
 finish
-
-# --- Extraction order and linter gate (R5-M1 mirrored, A5-F1) ---
-has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the extractor runs in the foreground'
-has_flat 'the extraction is PENDING: apply nothing' 'R5-M1: a background extraction is pending'
-has_flat 'The order is fixed: extraction, then application, then lint, then report.' 'R5-M1: the fixed order'
-has_flat 'anything other than 0 or 1, the check was NOT done by a tool' 'A5-F1: exit 2 or 3 is not a pass'
-has_flat 'never conclude that the dossier is clean' 'A5-F1: never conclude clean'

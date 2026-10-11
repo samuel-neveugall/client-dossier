@@ -232,6 +232,12 @@ missing linter, a failed `test -f`, or any other exit code (2 or 3, for example 
 `dossier.yaml`) means the gate was NOT passed: say so, go to "Without the linter" for the manual
 check of the confidential names, and never conclude that the draft is clean.
 
+Exit 1 is not enough on its own: read the output. A `[C1]` error line (a `dossier.yaml` that does
+not parse, or a misspelt key such as `confidential_name:`) means E5 did not run with your
+confidential names, so the gate was NOT passed either, exactly as for an exit code outside 0 and
+1. Say so, do the manual check, and report the `[C1]` line: the human fixes `dossier.yaml`, you
+do not edit it.
+
 An E5 error on the draft's file name cannot be fixed with Edit, which does not rename. Say so,
 propose the new name (a slug without the confidential name), leave `Status: draft`, and do not
 conclude that the draft is clean.

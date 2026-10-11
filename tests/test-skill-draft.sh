@@ -438,6 +438,29 @@ for later in dossier-call dossier-status; do
   fi
 done
 
+
+# --- Review order and linter gate (R5-M1, A5-F1, A5-F4, A5-F5) ---
+has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the reviewer runs in the foreground'
+has_flat 'the review is PENDING: write no report, do not touch `dossier/HISTORY.md`, do not run the linter' 'R5-M1: a background review is pending'
+has_flat 'do not hand the turn back until the findings have returned' 'R5-M1: no hand-back before the findings'
+has_flat 'the history line comes after the review, never during the wait' 'R5-M1: the Stop hook reminder does not move history before the review'
+has_flat 'The order is fixed: review, then apply the findings, then lint, then history, then report.' 'R5-M1: the fixed order'
+has_flat 'This is finished before the linter runs and before `dossier/HISTORY.md` is edited.' 'R5-M1: findings applied or listed before lint and history'
+has_flat 'Run it only after the last edit of the draft, and run it again after any later edit.' 'R5-M1: lint after the last draft edit'
+has_flat 'at most two passes' 'A5-F4: the lint loop is bounded'
+has_flat 'means the gate was NOT passed' 'A5-F1: a missing linter or exit 2 or 3 is a gate not passed'
+has_flat 'never conclude that the draft is clean' 'A5-F1: never conclude clean'
+has_flat 'List every `confidential_names` entry of `dossier.yaml` in the report' 'A5-F1: the manual check lists the confidential names'
+has_flat 'An E5 error on the draft'"'"'s file name cannot be fixed with Edit' 'A5-F4: E5 on the file name'
+has_flat 'propose the new name' 'A5-F4: propose the new name'
+has_flat 'leave `Status: draft`' 'A5-F4: the status stays draft'
+has_flat 'Create the file with the Write tool, never with a Bash heredoc or redirection' 'A5-F5: the Write tool'
+has_flat 'Exit 1 is not enough on its own: read the output.' 'R6-5: exit 1 alone does not pass the gate'
+has_flat 'A `[C1]` error line' 'R6-5: a C1 error line is a gate not passed'
+has_flat 'means E5 did not run with your confidential names, so the gate was NOT passed either' 'R6-5: C1 means E5 did not run'
+has_flat 'the human fixes `dossier.yaml`, you do not edit it' 'R6-5: the agent does not edit dossier.yaml'
+
+
 # --- writing-skills order: the skill commit descends from the recorded RED baseline ---
 BASE_REL='.planning/phases/05-drafting-doctrine-review/evidence/red-baseline/summary.tsv'
 SKILL_REL='skills/dossier-draft/SKILL.md'
@@ -460,20 +483,3 @@ else
 fi
 
 finish
-
-# --- Review order and linter gate (R5-M1, A5-F1, A5-F4, A5-F5) ---
-has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the reviewer runs in the foreground'
-has_flat 'the review is PENDING: write no report, do not touch `dossier/HISTORY.md`, do not run the linter' 'R5-M1: a background review is pending'
-has_flat 'do not hand the turn back until the findings have returned' 'R5-M1: no hand-back before the findings'
-has_flat 'the history line comes after the review, never during the wait' 'R5-M1: the Stop hook reminder does not move history before the review'
-has_flat 'The order is fixed: review, then apply the findings, then lint, then history, then report.' 'R5-M1: the fixed order'
-has_flat 'This is finished before the linter runs and before `dossier/HISTORY.md` is edited.' 'R5-M1: findings applied or listed before lint and history'
-has_flat 'Run it only after the last edit of the draft, and run it again after any later edit.' 'R5-M1: lint after the last draft edit'
-has_flat 'at most two passes' 'A5-F4: the lint loop is bounded'
-has_flat 'means the gate was NOT passed' 'A5-F1: a missing linter or exit 2 or 3 is a gate not passed'
-has_flat 'never conclude that the draft is clean' 'A5-F1: never conclude clean'
-has_flat 'List every `confidential_names` entry of `dossier.yaml` in the report' 'A5-F1: the manual check lists the confidential names'
-has_flat 'An E5 error on the draft'"'"'s file name cannot be fixed with Edit' 'A5-F4: E5 on the file name'
-has_flat 'propose the new name' 'A5-F4: propose the new name'
-has_flat 'leave `Status: draft`' 'A5-F4: the status stays draft'
-has_flat 'Create the file with the Write tool, never with a Bash heredoc or redirection' 'A5-F5: the Write tool'
