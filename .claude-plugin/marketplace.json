@@ -1,0 +1,13 @@
+{
+  "name": "client-dossier",
+  "owner": {
+    "name": "Samuel Neveu"
+  },
+  "description": "Self-hosted marketplace for the client-dossier plugin.",
+  "plugins": [
+    {
+      "name": "client-dossier",
+      "source": "./"
+    }
+  ]
+}
