@@ -1266,6 +1266,46 @@ def bash_hit(command, cwd):
     return scan(command, os.path.realpath(cwd), 0)
 
 
+PATCH_HEADERS = ("*** Add File: ", "*** Update File: ", "*** Delete File: ",
+                 "*** Move to: ")
+
+
+def patch_hit(text, cwd):
+    """The root-relative path of the first file under a sources/ folder that
+    the apply_patch text `text` adds, updates, deletes or moves to, else None
+    (D-05, the Codex mirror of the Write family; 07-RESEARCH Pattern 8).
+
+    Codex edits files through a PreToolUse call named `apply_patch` whose
+    tool_input.command is the patch. A hunk header is a line holding
+    `*** Add File: `, `*** Update File: `, `*** Delete File: ` or
+    `*** Move to: ` and the path. Added lines start with `+`, so a
+    header-looking text inside added content is never a header. Codex trims
+    the line before it reads a header, so leading blanks and a carriage
+    return are tolerated here too (refusing a bit more is the safe side).
+    Every header path is judged by sources_target like a Write path; past
+    MAX_JUDGED headers the rest only gets the visible_sources check, which
+    keeps the scan linear on a pathological patch (F3)."""
+    judged = 0
+    for line in text.split("\n"):
+        line = line.strip()
+        if not line.startswith("*** "):
+            continue
+        for prefix in PATCH_HEADERS:
+            if line.startswith(prefix):
+                path = line[len(prefix):].strip()
+                if not path:
+                    break
+                judged += 1
+                if judged > MAX_JUDGED or len(path) > MAX_OPERAND:
+                    hit = visible_sources(path)
+                else:
+                    hit = sources_target(path, cwd)
+                if hit:
+                    return hit
+                break
+    return None
+
+
 def main():
     data = json.load(sys.stdin)
     if not isinstance(data, dict):
@@ -1286,6 +1326,10 @@ def main():
         if isinstance(command, str) and command:
             hit = bash_hit(command, cwd)
             note = " (heuristic guard: this Bash command appears to modify it)"
+    elif tool == "apply_patch":
+        command = tool_input.get("command")
+        if isinstance(command, str) and command:
+            hit = patch_hit(command, cwd)
     if hit:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",

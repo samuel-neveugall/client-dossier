@@ -64,10 +64,17 @@ list a linter will one day refuse to let leak into `outbound/`.
 
 ## Step 4 — Propose adoption renames, confirm, then execute
 
-Run:
+Check the bundled script is there before you use it:
 
 ```
-${CLAUDE_SKILL_DIR}/scripts/init.py --target <dossier root> --propose-renames
+test -x "${CLAUDE_SKILL_DIR}/scripts/init.py"
+```
+
+If that check fails, the rename proposal cannot be computed here: say so, skip to step 5, and in
+step 6 follow "If the bundled script is not available". Otherwise run:
+
+```
+"${CLAUDE_SKILL_DIR}/scripts/init.py" --target '<dossier root>' --propose-renames
 ```
 
 against the repository the user is in. Show the proposal exactly as it is printed:
@@ -108,18 +115,19 @@ status-header field names and values) stay exactly as the script wrote them.
 ## Step 6 — Run the script, or do its job by hand
 
 Run the bundled script with every value collected above spelled out as its own flag, so a
-reader can reproduce the exact call:
+reader can reproduce the exact call. If the `test -x` check of step 4 failed, the next
+subsection applies instead:
 
 ```
-${CLAUDE_SKILL_DIR}/scripts/init.py \
-  --target <dossier root> \
-  --language <code> \
-  --template-variant <code, only if step 5 forced one> \
+"${CLAUDE_SKILL_DIR}/scripts/init.py" \
+  --target '<dossier root>' \
+  --language '<code>' \
+  --template-variant '<code, only if step 5 forced one>' \
   --counterpart '<Name>|<role>|<contact>;<contact>' \
   --confidential-name '<name>' \
-  --consent-recorded <true|false> \
+  --consent-recorded '<true|false>' \
   --consent-source '<text>' \
-  --staleness-days <n>
+  --staleness-days '<n>'
 ```
 
 (repeat `--counterpart` once per counterpart and `--confidential-name` once per name collected

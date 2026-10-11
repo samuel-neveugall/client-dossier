@@ -562,9 +562,23 @@ shapes = [
     ("escaped ANSI-C openers", "echo " + "$'\\'" * (MB // 4), False),
     ("rm -rf * repeated", "rm -rf *; " * (MB // 10), True),
 ]
+# Codex apply_patch (D-05, plan 07-03): the same 1 MB bounds hold for patch text.
+patch_shapes = [
+    ("apply_patch: 1 MB of Add File headers outside sources",
+     "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(MB // 30)), False),
+    ("apply_patch: 1 MB of headers, the last one under sources",
+     "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(MB // 30))
+     + "*** Update File: " + S + "\n", True),
+    ("apply_patch: 1 MB of Update headers, the last one under sources",
+     "".join("*** Update File: outbound/m%d.md\n" % i for i in range(MB // 28))
+     + "*** Delete File: " + S + "\n", True),
+    ("apply_patch: one 1 MB header line", "*** Add File: " + "a" * MB + "\n", False),
+    ("apply_patch: 1 MB of added lines", "*** Add File: dossier/x.md\n" + "+y\n" * (MB // 3), False),
+]
 bad = 0
-for name, command, want_deny in shapes:
-    stdin = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd})
+cases = [("Bash",) + shape for shape in shapes] + [("apply_patch",) + shape for shape in patch_shapes]
+for tool, name, command, want_deny in cases:
+    stdin = json.dumps({"tool_name": tool, "tool_input": {"command": command}, "cwd": cwd})
     start = time.time()
     try:
         proc = subprocess.run([sys.executable, guard], input=stdin, capture_output=True,
@@ -583,6 +597,95 @@ PY
 PERF_STATUS=$?
 printf '%s\n' "$PERF_OUT"
 assert_eq 0 "$PERF_STATUS" 'every 1 MB command is judged in under 4 s, exit 0'
+
+# --- Codex apply_patch (D-05, plan 07-03) ---
+# Codex edits files through a PreToolUse call named apply_patch whose
+# tool_input.command is the patch text (07-RESEARCH Pattern 8). A hunk header
+# is a line starting at column 0 with `*** Add File: `, `*** Update File: `,
+# `*** Delete File: ` or `*** Move to: `; added lines start with `+`.
+# mkpatch LINE... — a patch envelope around the given lines.
+mkpatch() { printf '*** Begin Patch\n'; printf '%s\n' "$@"; printf '*** End Patch\n'; }
+patch_json() { hook_json PreToolUse "$1" apply_patch command "$2"; }
+
+echo '--- apply_patch: headers under sources/ are denied ---'
+expect_deny 'apply_patch Update File of a source' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '@@' '-reprot' '+report')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch Add File of a NEW source (as for Write, D-03)' \
+  "$(patch_json "$d" "$(mkpatch '*** Add File: sources/received/new.txt' '+hello')")" 'sources/received/new.txt'
+expect_deny 'apply_patch Delete File of a source' \
+  "$(patch_json "$d" "$(mkpatch "*** Delete File: $TRANSCRIPT_REL")")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch Move to a path under sources/' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: dossier/HISTORY.md' '*** Move to: sources/received/moved.md' '@@' '-a' '+b')")" \
+  'sources/received/moved.md'
+expect_deny 'apply_patch Move of a source out of sources/' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '*** Move to: dossier/moved.txt' '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch absolute header path' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: $d/$TRANSCRIPT_REL" '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch dot-dot traversal into sources/' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: dossier/../$TRANSCRIPT_REL" '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch two files, the second under sources/' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: dossier/HISTORY.md' '@@' '-a' '+b' '*** Add File: sources/received/second.txt' '+x')")" \
+  'sources/received/second.txt'
+expect_deny 'apply_patch CRLF line endings' \
+  "$(patch_json "$d" "$(printf '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-a\r\n+b\r\n*** End Patch\r\n' "$TRANSCRIPT_REL")")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch relative header from a subfolder cwd' \
+  "$(patch_json "$d/dossier" "$(mkpatch "*** Update File: ../$TRANSCRIPT_REL" '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch header with surrounding spaces' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File:   $TRANSCRIPT_REL  " '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+
+# Codex trims a line before it reads a header, so an indented header counts (the
+# safe side); a `+` line never does, and a header under another folder stays silent.
+expect_deny 'apply_patch indented header after an added file (Codex trims)' \
+  "$(patch_json "$d" "$(mkpatch '*** Add File: dossier/notes.md' '+x' "  *** Update File: $TRANSCRIPT_REL")")" "$TRANSCRIPT_REL"
+
+echo '--- apply_patch: everything else is silent ---'
+expect_silent 'apply_patch on living files only' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: dossier/HISTORY.md' '@@' '-a' '+b' '*** Add File: outbound/mails/2026-10-11_note.md' '+Hello')")"
+expect_silent 'apply_patch whose added line looks like a sources header' \
+  "$(patch_json "$d" "$(mkpatch '*** Add File: dossier/notes.md' '+*** Update File: sources/x.txt' '+*** Move to: sources/y.txt')")"
+expect_silent 'apply_patch with no header' \
+  "$(patch_json "$d" 'just some text about sources/transcripts')"
+expect_silent 'apply_patch with an empty header path' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: ')")"
+expect_silent 'apply_patch with an empty command' "$(patch_json "$d" '')"
+expect_silent 'apply_patch with a numeric command' \
+  "$(python3 -c 'import json, sys
+print(json.dumps({"tool_name": "apply_patch", "tool_input": {"command": 12}, "cwd": sys.argv[1]}))' "$d")"
+expect_silent 'apply_patch with a list command' \
+  "$(python3 -c 'import json, sys
+print(json.dumps({"tool_name": "apply_patch", "tool_input": {"command": ["apply_patch", "*** Update File: sources/x"]}, "cwd": sys.argv[1]}))' "$d")"
+expect_silent 'apply_patch on sources/ outside any dossier' \
+  "$(patch_json "$outside" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '@@' '-a' '+b')")"
+expect_silent 'apply_patch sources header with a sibling name' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: sources-old/x.txt' '*** Add File: mysources/y.txt')")"
+
+echo '--- apply_patch: past the judged budget a visible sources still denies ---'
+bigpatch="$(python3 -c 'import sys
+n = 5000
+sys.stdout.write("*** Begin Patch\n" + "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(n))
+                 + "*** Add File: dossier/deep/sources/z.txt\n+x\n*** End Patch\n")')"
+run_hook guard-sources.py "$(patch_json "$d" "$bigpatch")"
+check_common 'apply_patch past MAX_JUDGED with a visible sources component'
+assert_eq deny "$(hook_field hookSpecificOutput.permissionDecision)" 'apply_patch past MAX_JUDGED: visible sources denies'
+
+echo '--- apply_patch: end to end through the hooks.json command, Codex-shaped stdin ---'
+HOOK_CMD="$(python3 -c 'import json, sys
+d = json.load(open(sys.argv[1]))
+print(d["hooks"]["PreToolUse"][0]["hooks"][0]["command"])' "$REPO_ROOT/hooks/hooks.json")"
+E2E_ERR="$(mktemp)"
+E2E_STATUS=0
+E2E_OUT="$(patch_json "$d" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '@@' '-reprot' '+report')" \
+  | CLAUDE_PLUGIN_ROOT="$REPO_ROOT" sh -c "$HOOK_CMD" 2>"$E2E_ERR")" || E2E_STATUS=$?
+assert_eq 0 "$E2E_STATUS" 'apply_patch end to end: exit status 0'
+assert_eq '' "$(cat "$E2E_ERR")" 'apply_patch end to end: empty stderr'
+rm -f "$E2E_ERR"
+assert_eq deny "$(printf '%s' "$E2E_OUT" | python3 -c 'import json, sys
+print(json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"])')" 'apply_patch end to end: decision is deny'
+case "$E2E_OUT" in
+  *"$SPEC_SENTENCE: $TRANSCRIPT_REL"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo "FAIL: apply_patch end to end: reason lacks the spec sentence and path: $E2E_OUT" >&2
+     TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
 
 
 rm -rf "$b"
