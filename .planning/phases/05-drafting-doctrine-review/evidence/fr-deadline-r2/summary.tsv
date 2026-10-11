@@ -1,0 +1,2 @@
+variant	run	verdict	draft_file	slug_kept	header_ok	status_value	deadline_ok	french_body	tone_applied	leak	history_line	draft_skill	reviewer_dispatched	reviewer_tools_ok	lint_exit	model	claude_code_version	cost_usd	is_error	dossier	jsonl	handback_before_review	lint_after_last_draft_edit
+plugin	1	GREEN	outbound/mails/2026-10-11_reponse-date-audit.md	yes	yes	draft	yes	yes	yes	no	yes	yes	yes	yes	0	claude-sonnet-5-5	2.1.296	0.1618136	false	/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.mTHNuOWVoh	fr-1.jsonl	0	yes
