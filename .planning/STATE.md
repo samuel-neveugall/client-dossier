@@ -1,19 +1,19 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 06
-current_phase_name: calls-status
+current_phase: 07
+current_phase_name: manifests-docs-distribution
 status: phase_complete
 stopped_at: Phase 6 executed (verification passed 5/5, UAT 3/3 agent-run); review pending
-last_updated: "2026-10-11T06:10:35.149Z"
+last_updated: "2026-10-11T09:15:16.646Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 05 closed - review fix round 3, re-verification passed, UAT complete
-state_head: 0d552a9a10f6c8cebf8f91ddf90e2aae6f160576
+state_head: 12b12c281d72963fe84f3c8e46d30158780399f0
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 37
+  total_plans: 46
   completed_plans: 37
-  percent: 86
+  percent: 80
 ---
 
 # Project State
@@ -29,7 +29,7 @@ human and a doctrine check.
 
 ## Current Position
 
-Phase: 06 (calls-status) — EXECUTED
+Phase: 07 (manifests-docs-distribution) — READY TO EXECUTE
 Status: Phase 5 done: `05-VERIFICATION.md` passed 5/5 (iter1 kept as `05-VERIFICATION.iter1.md`), `05-UAT.md`
 complete 6/6 (agent-run, evidence `evidence/uat/`, 0.774 USD), review fix rounds 1-3 recorded in
 `05-REVIEW-FIX.md`. Dispatch of `doctrine-reviewer` is mandatory, foreground, and applied before lint and
@@ -37,7 +37,7 @@ history (harness gates handback_before_review, lint_after_last_draft_edit, histo
 `tests/run.sh` 20 files, 0 failed; test-lint 1728/0; DRAFT-01..05 complete, PROTO-02 pointer to `dossier-draft` added.
 Last activity: 2026-10-11 — Phase 6 executed: plans 06-01..06-06, `06-VERIFICATION.md` passed 5/5, `06-UAT.md` 3/3 agent-run, `tests/run.sh` 24 files 0 failed. CALL-04 RED 3/3 -> GREEN 3/3; CALL-05 RED 3/3 -> GREEN 3/3 (D-16 fallback unused). Phase 6 paid spend 1.74 USD. Next: revue-6, then Phase 7.
 
-Progress: [█████████░] 86%
+Progress: [████████░░] 80%
 
 ## Performance Metrics
 
