@@ -28,7 +28,7 @@ Check the filing script is there before you use it. If this fails, go to "Withou
 at the end.
 
 ```bash
-test -x ${CLAUDE_SKILL_DIR}/scripts/file_source.py
+test -x "${CLAUDE_SKILL_DIR}/scripts/file_source.py"
 ```
 
 ## Before filing: kind, content date, slug
@@ -53,7 +53,7 @@ and file it with `--kind received`. The staged file is outside the dossier; its 
 JSON is what you file, and its `stage` is the folder to remove once the source is filed.
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/file_source.py fetch '<url>'
+"${CLAUDE_SKILL_DIR}/scripts/file_source.py" fetch '<url>'
 ```
 
 If the download fails, or the staged file is a login or consent page, file nothing and say:
@@ -76,7 +76,7 @@ holds without it.
 File the source:
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/file_source.py --kind '<kind>' --date '<YYYY-MM-DD>' --slug '<slug>' '<path>'
+"${CLAUDE_SKILL_DIR}/scripts/file_source.py" --kind '<kind>' --date '<YYYY-MM-DD>' --slug '<slug>' '<path>'
 ```
 
 It prints one JSON object. Read `status`:
@@ -98,11 +98,11 @@ Check the script is there, then run it on the filed copy, named by the `abs_path
 result (it works from any folder):
 
 ```bash
-test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh
+test -x "${CLAUDE_SKILL_DIR}/scripts/extract-text.sh"
 ```
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/extract-text.sh '<abs_path>'
+"${CLAUDE_SKILL_DIR}/scripts/extract-text.sh" '<abs_path>'
 ```
 
 Report from the exit code:

@@ -348,8 +348,8 @@ prep reuses)
      `staleness_days`, and lint findings.
   4. The "prepare tomorrow's call" scenario moves from RED (writes "tomorrow", skips open
      questions) to GREEN.
-  5. The "where are we with this deal" scenario moves from RED (re-reads everything, misses
-     due commitments) to GREEN (uses `dossier-status`).
+  5. The "where are we with this deal" scenario moves from RED (re-reads everything, misses at
+     least one of: a due commitment, an overdue draft, an unreflected source) to GREEN (uses `dossier-status`).
 **Plans**: TBD
 
 ### Phase 7: Manifests, Docs & Distribution

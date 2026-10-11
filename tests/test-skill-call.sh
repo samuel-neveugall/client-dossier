@@ -159,7 +159,7 @@ assert_eq '### The call date|### Read before writing|### Write the call file|###
 assert_eq '<YYYY-MM-DD> <root> <slug> ' "$(printf '%s\n' "$CMD_LINES" | grep -o '<[A-Za-z-]*>' | sort -u | tr '\n' ' ')" 'the command placeholders are exactly root, YYYY-MM-DD, slug'
 # A4-F1: no placeholder sits inside double quotes; every placeholder is inside single quotes.
 # A5-F1: the plugin-root path is the one double-quoted value (a path with a space); strip it first.
-assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
+assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed -e 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' -e 's/"${CLAUDE_SKILL_DIR}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
 UNQUOTED="$(printf '%s\n' "$BLOCK_LINES" | sed "s/'[^']*'//g" | grep -E '<[A-Za-z][^<>]*>' || true)"
 assert_eq '' "$UNQUOTED" 'every placeholder in a bash block is inside single quotes'
 assert_eq "$(grep -c 'scripts/lint.py' "$SKILL_MD" 2>/dev/null)" "$(grep 'scripts/lint.py' "$SKILL_MD" 2>/dev/null | grep -cF '${CLAUDE_PLUGIN_ROOT}/')" 'every lint.py mention uses the plugin root'
@@ -263,6 +263,7 @@ means the gate was NOT passed
 never conclude that the call file is clean
 Exit 1 is not enough on its own: read the output.
 A `[C1]` error line
+so the gate was NOT passed either, exactly as for an exit code outside 0 and 1
 the human fixes `dossier.yaml`, you do not edit it
 PINS
 

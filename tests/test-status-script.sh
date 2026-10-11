@@ -758,6 +758,82 @@ case "$ST_OUT" in
   *) echo 'FAIL: text mode: the lint summary then its findings' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
 esac
 
+echo '--- Review fixes (fix-6a): R7-M1, R7-m2, R7-m3, R7-m4, R7-m8 ---'
+
+# R7-M1: a staged, never committed source with an old mtime in a dossier NESTED
+# in a larger repository is filed today (git diff --cached needs --relative).
+DR="$WORK/bigrepo2"
+mkdir -p "$DR/clients/acme"
+git init -q "$DR"
+git -C "$DR" config user.email "test@example.invalid"
+git -C "$DR" config user.name "Test Runner"
+printf 'other project\n' >"$DR/README.md"
+python3 "$(init_py)" --target "$DR/clients/acme" --language en >/dev/null 2>&1
+set_updated "$DR/clients/acme" 2026-10-05
+commit_at "$DR" 2026-10-04 'repo with a nested dossier'
+mk_src "$DR/clients/acme" sources/received/2026-09-01_staged.txt 20260901
+git -C "$DR" add clients/acme/sources/received/2026-09-01_staged.txt
+expect_sources 'R7-M1: a nested dossier reports a staged, never committed, old-mtime source as filed today' "$DR/clients/acme" "sources/received/2026-09-01_staged.txt:$TODAY:untracked"
+assert_grep '"--relative",' "$(st_script)"
+
+# R7-m2: a future Last updated: never becomes last_reflected.
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+sed -i.bak 's/^Last updated:.*$/Last updated: 2026-12-01/' "$DG/dossier/RELATIONSHIP.md"
+rm -f "$DG/dossier/RELATIONSHIP.md.bak"
+commit_at "$DG" 2026-10-05 'living files'
+mk_src "$DG" sources/received/2026-10-06_f.txt 20261006
+commit_at "$DG" 2026-10-06 'file f'
+expect_sources 'R7-m2: a future Last updated: does not hide a source filed after the past dates' "$DG" 'sources/received/2026-10-06_f.txt:2026-10-06:git'
+assert_eq 2026-10-05 "$(st_json 'd["last_reflected"]')" 'R7-m2: last_reflected ignores the future date'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "after today is ignored" in n])')" 'R7-m2: a note says the future date was ignored'
+
+# R7-m3: git log fails while rev-parse succeeds: an explicit note.
+SHIMDIR="$WORK/gitshim"
+mkdir -p "$SHIMDIR"
+REAL_GIT="$(command -v git)"
+cat >"$SHIMDIR/git" <<SHIM
+#!/bin/sh
+for a in "\$@"; do
+  if [ "\$a" = log ]; then exit 1; fi
+done
+exec "$REAL_GIT" "\$@"
+SHIM
+chmod +x "$SHIMDIR/git"
+ST_STATUS=0
+ST_OUT="$(cd "$DG" && PATH="$SHIMDIR:$PATH" python3 "$(st_script)" --json --today "$TODAY" "$DG" 2>"$ERRDIR/err")" || ST_STATUS=$?
+assert_eq 0 "$ST_STATUS" 'R7-m3: git log failing: exit 0'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "git log failed" in n])')" 'R7-m3: git log failing gives an explicit note'
+
+# R7-m4: the default linter is used only from a root carrying a plugin marker.
+FAKE="$WORK/fakeroot"
+mkdir -p "$FAKE/skills/dossier-status/scripts" "$FAKE/scripts"
+cp "$(st_script)" "$FAKE/skills/dossier-status/scripts/status.py"
+printf 'import sys\nprint("0 error(s), 0 warning(s)")\nsys.exit(0)\n' >"$FAKE/scripts/lint.py"
+ST_OUT="$(cd "$DG" && python3 "$FAKE/skills/dossier-status/scripts/status.py" --json --today "$TODAY" "$DG" 2>"$ERRDIR/err")" || true
+assert_eq False "$(st_json 'd["lint"]["available"]')" 'R7-m4: a scripts/lint.py under a root with no plugin marker is not run'
+mkdir -p "$FAKE/.codex-plugin"
+printf '{}\n' >"$FAKE/.codex-plugin/plugin.json"
+ST_OUT="$(cd "$DG" && python3 "$FAKE/skills/dossier-status/scripts/status.py" --json --today "$TODAY" "$DG" 2>"$ERRDIR/err")" || true
+assert_eq True "$(st_json 'd["lint"]["available"]')" 'R7-m4: the same root with a .codex-plugin/plugin.json marker runs its linter'
+rm -rf "$FAKE/.codex-plugin"
+mkdir -p "$FAKE/.claude-plugin"
+printf '{}\n' >"$FAKE/.claude-plugin/plugin.json"
+ST_OUT="$(cd "$DG" && python3 "$FAKE/skills/dossier-status/scripts/status.py" --json --today "$TODAY" "$DG" 2>"$ERRDIR/err")" || true
+assert_eq True "$(st_json 'd["lint"]["available"]')" 'R7-m4: the same root with a .claude-plugin/plugin.json marker runs its linter'
+
+# R7-m8: the linter subprocess is isolated, and a symlinked HISTORY.md is not read.
+assert_grep '"-I", "-B"' "$(st_script)"
+DY="$(mk_dossier en)"
+set_updated "$DY" 2026-10-10
+printf '# History\n\n## Chronology\n\n## Commitments in progress\n\n### Ours\n- Send it by 2026-10-01 (call @12:34).\n\n### Theirs\n\n## Upcoming\n' >"$WORK/outside-history.md"
+rm -f "$DY/dossier/HISTORY.md"
+ln -s "$WORK/outside-history.md" "$DY/dossier/HISTORY.md"
+run_st "$DY" --json --today "$TODAY" "$DY"
+assert_eq 0 "$ST_STATUS" 'R7-m8: a symlinked HISTORY.md: exit 0'
+assert_eq '[]' "$(st_json 'd["commitments"]')" 'R7-m8: a symlinked HISTORY.md is not read'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "no commitments computed" in n])')" 'R7-m8: a symlinked HISTORY.md gives a note'
+
 echo '--- Read-only: the dossier and its .git are byte-identical after a run ---'
 
 # tree_sha DIR — one sha256 over every regular file under DIR, .git included

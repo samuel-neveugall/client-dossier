@@ -42,20 +42,20 @@ has_line_with() { # FIXED_STRING LABEL
     TESTS_FAILED=$((TESTS_FAILED + 1))
   fi
 }
-has_line_with 'file_source.py fetch' 'the fetch line'
-has_line_with 'file_source.py --kind' 'the filing line'
-has_line_with "extract-text.sh '" 'the extraction line'
-if printf '%s\n' "$BASH_LINES" | grep -qxF 'test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh'; then
+has_line_with 'file_source.py" fetch' 'the fetch line'
+has_line_with 'file_source.py" --kind' 'the filing line'
+has_line_with "extract-text.sh\" '" 'the extraction line'
+if printf '%s\n' "$BASH_LINES" | grep -qxF 'test -x "${CLAUDE_SKILL_DIR}/scripts/extract-text.sh"'; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
 else
-  echo "FAIL: no bash line is: test -x \${CLAUDE_SKILL_DIR}/scripts/extract-text.sh" >&2
+  echo "FAIL: no bash line is: test -x \"\${CLAUDE_SKILL_DIR}/scripts/extract-text.sh\"" >&2
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
 assert_eq '0' "$(printf '%s\n' "$BASH_LINES" | grep -c '\\$' | tr -d ' ')" 'no bash line ends with a backslash (one command per line)'
 
-LINE_FETCH="$(printf '%s\n' "$BASH_LINES" | grep -F 'file_source.py fetch' | head -1)"
-LINE_FILE="$(printf '%s\n' "$BASH_LINES" | grep -F 'file_source.py --kind' | head -1)"
-LINE_EXTRACT="$(printf '%s\n' "$BASH_LINES" | grep -F "extract-text.sh '" | head -1)"
+LINE_FETCH="$(printf '%s\n' "$BASH_LINES" | grep -F 'file_source.py" fetch' | head -1)"
+LINE_FILE="$(printf '%s\n' "$BASH_LINES" | grep -F 'file_source.py" --kind' | head -1)"
+LINE_EXTRACT="$(printf '%s\n' "$BASH_LINES" | grep -F "extract-text.sh\" '" | head -1)"
 LINE_CP="$(printf '%s\n' "$BASH_LINES" | grep -F 'cp -n' | head -1)"
 LINE_PDFTOTEXT="$(printf '%s\n' "$BASH_LINES" | grep -F 'pdftotext -enc UTF-8' | head -1)"
 
@@ -212,9 +212,9 @@ assert_eq "$BROCHURE_TXT_SHA" "$(sha "$d/sources/received/2026-10-01_brochure.tx
 
 # --- 4. Real runs of the skill's own lines (INGEST-01, INGEST-04) --------------
 echo '--- real run: the skill lines, from the dossier root ---'
-run_line "$d" 'test -x '"$(printf '%s' '${CLAUDE_SKILL_DIR}' | python3 -c 'import shlex, sys; print(shlex.quote(sys.argv[1]))' "$SKILL_ABS")"'/scripts/file_source.py'
+run_line "$d" "$(printf '%s\n' 'test -x "${CLAUDE_SKILL_DIR}/scripts/file_source.py"' | subst --abs)"
 assert_eq 0 "$RUN_STATUS" 'line: test -x on file_source.py exits 0'
-run_line "$d" "$(printf '%s\n' 'test -x ${CLAUDE_SKILL_DIR}/scripts/extract-text.sh' | subst --abs)"
+run_line "$d" "$(printf '%s\n' 'test -x "${CLAUDE_SKILL_DIR}/scripts/extract-text.sh"' | subst --abs)"
 assert_eq 0 "$RUN_STATUS" 'line: test -x on extract-text.sh exits 0'
 
 FILE_ABS="$(printf '%s\n' "$LINE_FILE" | subst --abs)"
@@ -255,7 +255,7 @@ run_line "$d" "$(printf '%s\n' "$LINE_FILE" | subst --abs "path=incoming/\$(touc
 assert_file_absent "$MARK-path" 'hostile path: the command substitution did not run'
 run_line "$d" "$(printf '%s\n' "$LINE_FILE" | subst --abs "slug=\`touch $MARK-slug\`")"
 assert_file_absent "$MARK-slug" 'hostile slug: the backticks did not run'
-assert_eq 0 "$(printf '%s\n' "$BASH_LINES" | sed 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line of the skill double-quotes a placeholder (A5-F1: the plugin-root path is the one quoted value)'
+assert_eq 0 "$(printf '%s\n' "$BASH_LINES" | sed -e 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' -e 's/"${CLAUDE_SKILL_DIR}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line of the skill double-quotes a placeholder (A5-F1: the plugin-root path is the one quoted value)'
 
 # --- 5. pdftotext hidden from PATH (ROADMAP criterion 5) -----------------------
 echo '--- real run: pdftotext hidden from PATH ---'

@@ -160,7 +160,8 @@ synthesized-for-tracking, not verbatim spec text.
       (writes "tomorrow", skips open questions, no "what we do not do" section) before
       `dossier-call` exists, and re-run GREEN after
 - [x] **CALL-05**: The "where are we with this deal" baseline pressure scenario is recorded
-      RED (re-reads everything, answers from memory, misses due commitments) before
+      RED (re-reads everything, answers from memory, misses at least one of: a due
+      commitment, an overdue draft, an unreflected source) before
       `dossier-status` exists, and re-run GREEN after
 
 ### Distribution (manifests, commands, README/LICENSE/CHANGELOG, plugin eval)

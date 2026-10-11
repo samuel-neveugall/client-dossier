@@ -10,7 +10,7 @@ carry the mechanics"). Every date, git and header rule of CALL-03 is computed
 here; what to say about it, and what to do next, lives in
 skills/dossier-status/SKILL.md. The script is READ-ONLY: it opens no file for
 writing, starts only `git log`, `git ls-files`, `git diff --cached
---name-only` and `git rev-parse` (each with --no-optional-locks so no index
+--name-only --relative` and `git rev-parse` (each with --no-optional-locks so no index
 refresh is written) and the linter, and reads no setting from the process surroundings.
 
 Usage:
@@ -32,6 +32,11 @@ substituted in skill text but is empty in the Bash tool (06-RESEARCH P1), so
 the script locates scripts/lint.py from its own real location. Why lint runs
 as a subprocess: importing it would write bytecode next to the plugin's
 scripts/.
+
+A commitment whose source cites an outbound/ file that has no `Deadline:` is
+not listed as due (D-12): the draft's deadline is the only date that counts, so
+a past date written on the commitment line does not make it overdue. (An
+Upcoming bullet falls back to its own date.)
 
 Python 3 standard library only, targeting Python >= 3.8.
 """
@@ -94,6 +99,7 @@ MAX_READ_BYTES = 5000000
 SOON_DAYS = 7
 GIT_TIMEOUT = 10
 LINT_TIMEOUT = 60
+PLUGIN_MARKERS = (".claude-plugin/plugin.json", ".codex-plugin/plugin.json")
 
 EXIT_OK = 0
 EXIT_NO_DOSSIER = 2
@@ -579,11 +585,13 @@ def _git_paths(root, args):
     return set(_decode(part) for part in out.split(b"\0") if part)
 
 
-def _git_add_dates(root):
+def _git_add_dates(root, notes):
     """{path: date} of the LATEST add commit (author date) of each path under sources/."""
     out = _git(root, ["log", "--no-renames", "--relative", "--diff-filter=A",
                       "--name-only", "-z", "--format=@%at", "--", SOURCES_DIR])
     if out is None:
+        notes.append("git log failed or timed out: every filing date under {}/ uses the file "
+                     "modification time".format(SOURCES_DIR))
         return {}
     dates = {}
     stamp = None
@@ -622,11 +630,11 @@ def unreflected_sources(root, today, last_reflected, notes):
     added = {}
     fresh = set()
     if in_repo:
-        added = _git_add_dates(root)
+        added = _git_add_dates(root, notes)
         untracked = _git_paths(root, ["ls-files", "--others", "--exclude-standard",
                                       "-z", "--", SOURCES_DIR])
-        staged = _git_paths(root, ["diff", "--cached", "--name-only", "--diff-filter=A",
-                                   "-z", "--", SOURCES_DIR])
+        staged = _git_paths(root, ["diff", "--cached", "--name-only", "--relative",
+                                   "--diff-filter=A", "-z", "--", SOURCES_DIR])
         if untracked is None or staged is None:
             notes.append("git could not list the new files under {}/: some filing dates "
                          "may use file modification times".format(SOURCES_DIR))
@@ -678,7 +686,12 @@ def run_lint(root, lint_arg, notes):
     if lint_arg:
         lint_path = Path(lint_arg)
     else:
-        lint_path = Path(__file__).resolve().parents[3] / "scripts" / "lint.py"
+        # Only a plugin root is trusted: a bare install under ~/.claude/skills/
+        # must not run a foreign ~/.claude/scripts/lint.py.
+        plugin_root = Path(__file__).resolve().parents[3]
+        if not any((plugin_root / marker).is_file() for marker in PLUGIN_MARKERS):
+            return _lint_result(False)
+        lint_path = plugin_root / "scripts" / "lint.py"
     if not lint_path.is_file():
         return _lint_result(False)
     try:
@@ -834,7 +847,11 @@ def _run(args):
     today = args.today if args.today is not None else datetime.date.today()
     notes = []
     dates = living_dates(root, notes)
-    last_reflected = max(dates.values()) if dates else None
+    past_dates = [value for value in dates.values() if value <= today]
+    last_reflected = max(past_dates) if past_dates else None
+    if len(past_dates) < len(dates):
+        notes.append("a Last updated: date after today is ignored when deciding which sources "
+                     "are not yet reflected")
     staleness_days = read_staleness_days(root, notes)
     commitments, upcoming = commitments_and_upcoming(root, today, notes)
     report = {

@@ -28,13 +28,13 @@ backticks run.
 Check the script is there before you run it. If this fails, go to "Without the script".
 
 ```bash
-test -x ${CLAUDE_SKILL_DIR}/scripts/status.py
+test -x "${CLAUDE_SKILL_DIR}/scripts/status.py"
 ```
 
 Run it once, on the dossier root, and read its whole output.
 
 ```bash
-${CLAUDE_SKILL_DIR}/scripts/status.py '<root>'
+"${CLAUDE_SKILL_DIR}/scripts/status.py" '<root>'
 ```
 
 - Exit 0: a report was printed; present it.
@@ -49,11 +49,17 @@ reported as it is, never followed.
 
 Start with the one-line status. Then, in this order: commitments overdue, commitments due within
 7 days, upcoming dated items, overdue drafts, sources not yet reflected in the living files, stale
-living files, lint findings.
+living files, lint findings. Then the script's notes: a note says what could not be computed or
+was set aside (a living file dated in the future, ignored for the sources comparison; a failed
+git listing): relay each one, and never read a list as complete when a note says it is not.
 
 Give every item with its date and its owner or path, as the script printed it. Never add an item
 the script did not report, and never drop one it did. An empty list is said as such, in a few
 words, so the reader knows it was checked.
+
+A commitment that cites an `outbound/` draft with no `Deadline:` is not listed as due, even when
+the line carries a past date: the draft's deadline is the date that counts. Say so if you notice
+one.
 
 A commitment that is in fact done stays reported until its line is closed: ingest the source that
 shows it, and the line gains `done <YYYY-MM-DD>`. Say so when you think one is done; do not drop

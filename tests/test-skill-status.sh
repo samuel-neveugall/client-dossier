@@ -129,8 +129,8 @@ fi
 
 # --- Command lines: exactly three, in order, each in its section ---
 BLOCK_LINES="$(awk '$0 == "```bash" { on = 1; next } $0 == "```" { on = 0; next } on && NF && $0 !~ /^#/ { print }' "$SKILL_MD" 2>/dev/null)"
-L1='test -x ${CLAUDE_SKILL_DIR}/scripts/status.py'
-L2="\${CLAUDE_SKILL_DIR}/scripts/status.py '<root>'"
+L1='test -x "${CLAUDE_SKILL_DIR}/scripts/status.py"'
+L2="\"\${CLAUDE_SKILL_DIR}/scripts/status.py\" '<root>'"
 L3='date +%F'
 EXPECTED="$(printf '%s\n%s\n%s' "$L1" "$L2" "$L3")"
 assert_eq "$EXPECTED" "$BLOCK_LINES" 'the bash blocks hold exactly the three command lines, in order'
@@ -144,7 +144,7 @@ PLACEHOLDERS="$(grep -oE '<[A-Za-z][A-Za-z ]*>' "$SKILL_MD" | sort -u | tr '\n' 
 assert_eq '<root> ' "$PLACEHOLDERS" 'the only placeholder is <root>'
 assert_eq 0 "$(grep -cE '\$ARGUMENTS|\$0|\$1' "$SKILL_MD" | tr -d ' ')" 'no argument variables'
 # A4-F1: no placeholder in double quotes; every placeholder inside single quotes.
-assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
+assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | sed -e 's/"${CLAUDE_PLUGIN_ROOT}[^"]*"//g' -e 's/"${CLAUDE_SKILL_DIR}[^"]*"//g' | grep -c '"[^"]*<[A-Za-z]' | tr -d ' ')" 'no bash line puts a placeholder in double quotes'
 UNQUOTED="$(printf '%s\n' "$BLOCK_LINES" | sed "s/'[^']*'//g" | grep -E '<[A-Za-z][^<>]*>' || true)"
 assert_eq '' "$UNQUOTED" 'every placeholder in a bash block is inside single quotes'
 assert_eq 0 "$(printf '%s\n' "$BLOCK_LINES" | grep -c '\\$' | tr -d ' ')" 'no bash line ends with a backslash'
@@ -198,6 +198,9 @@ When the script reports the linter as unavailable, say so, then state the rules 
 A lint run that exited with anything other than 0 or 1, or a `[C1]` error line, means the dossier was NOT checked: say so, and never conclude that the dossier is clean.
 PINS
 # The suggestions name the human who sends and the stale file to refresh.
+has_flat 'A commitment that cites an `outbound/` draft with no `Deadline:` is not listed as due' 'R7-m5: a commitment citing a draft without Deadline: is not listed as due'
+has_flat "Then the script's notes" 'R7-m2: the notes come last in the presentation order'
+has_flat 'a living file dated in the future, ignored for the sources comparison' 'R7-m2: the future-date note is named'
 has_flat 'the human who sends' 'suggestion: the human who sends the overdue draft'
 has_flat 'refresh' 'suggestion: refresh the stale living file'
 
