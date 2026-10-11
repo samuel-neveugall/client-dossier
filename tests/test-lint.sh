@@ -22,6 +22,7 @@ FIXTURES=""
 EMPTY=""
 READONLY=""
 GEN_TMP=""
+E5H=""
 # Folders this file chmod 000s to exercise the unreadable-folder checks
 # (G-02-4e, T-02-28): newline-separated, appended to as each one is locked
 # -- never space-separated (IN-02 of the iteration-4 review): unquoted `for
@@ -49,7 +50,7 @@ EOF
 # assertion anywhere below still leaks nothing. Unlocking runs first: rm -rf
 # on a mode-000 folder fails silently and leaks it.
 trap 'unlock_locked_dirs
-rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
+rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP" "$E5H"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
 # fires and every other one stays silent.
@@ -1134,6 +1135,135 @@ assert_lint "$rt" 0 'round-trip: the unreserved unknown language exits 0'
 assert_eq 1 "$(count_out_lines "^info: language 'it' ")" "round-trip: the info line names 'it'"
 assert_clean 'round-trip: the unreserved unknown-language dossier'
 rm -rf "$rt"
+
+# --- E5 hardening (05 D-09; A5-F2, A5-F3, A5-F8): markup between the words, apostrophe
+# look-alikes, an end-of-line hyphen inside a word, percent-encoded file names, homoglyphs and a
+# non-empty .gitkeep. One scratch copy of a dossier configured with `Big Telco` and `O'Brien`
+# per case; the body and the file name are written from ASCII-only text (\uXXXX and \n are
+# decoded by python), so the table below stays readable in any terminal. Each row is
+# KIND|LABEL|BODY|FILENAME: `hit` expects an [E5], `miss` expects none (the negative cases: a
+# word that merely CONTAINS the name, a name one letter off). An empty FILENAME is the
+# conforming 2026-09-17_relance.md; rows with a name in FILENAME carry a harmless body. Only
+# [E5] is asserted: a non-conforming slug is an [E4] on purpose.
+E5H="$(scratch_repo)"
+python3 "$(init_py)" --target "$E5H" --language en --confidential-name 'Big Telco' \
+  --confidential-name "O'Brien" >/dev/null || echo "FAIL: e5-hard: init.py could not scaffold" >&2
+
+# e5_hard_case KIND LABEL BODY FILENAME — one row of the table.
+e5_hard_case() {
+  local kind="$1" label="$2" body="$3" fname="${4:-2026-09-17_relance.md}" work
+  work="$(mktemp -d)"
+  cp -R "$E5H/." "$work/"
+  python3 - "$work/outbound/mails/$(python3 -c 'import sys;print(sys.argv[1].encode("ascii").decode("unicode_escape"))' "$fname")" "$body" <<'PY'
+import sys
+path, body = sys.argv[1], sys.argv[2].encode("ascii").decode("unicode_escape")
+head = "Status: draft\nTo: Jane Doe\nSubject: x\nWritten by: agent session, 2026-09-17\n\n"
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(head + body + "\n")
+PY
+  LINT_OUT="$(python3 "$(lint_py)" "$work" 2>/dev/null)" || true
+  if [ "$kind" = hit ]; then
+    assert_finding E5 "e5-hard $label: found"
+  else
+    assert_no_finding E5 "e5-hard $label: not a leak"
+  fi
+  rm -rf "$work"
+}
+
+while IFS='|' read -r kind label body fname; do
+  [ -n "$kind" ] && e5_hard_case "$kind" "$label" "$body" "$fname"
+done <<'EOF'
+hit|bold between words|We met **Big** Telco today.|
+hit|bold whole name|We met **Big Telco** today.|
+hit|underscore emphasis|We met __Big__ Telco today.|
+hit|html bold|We met <b>Big</b> Telco today.|
+hit|wbr between words|We met Big<wbr>Telco today.|
+hit|spans|We met <span>Big</span><span>Telco</span> today.|
+hit|table cells|<td>Big</td><td>Telco</td>|
+hit|tag inside a word|We met Big Te<b>lco</b> today.|
+hit|html comment|We met Big<!-- x --> Telco today.|
+hit|tag over two lines|We met Big <span\nclass="x">Telco</span>|
+hit|markdown links|We met [Big](http://u.example/a) [Telco](http://v.example/b) today.|
+hit|link with title|We met [Big](http://u.example "t") [Telco](http://v.example) today.|
+hit|reference links|We met [Big][1] [Telco][2] today.|
+hit|inline code|We met `Big` `Telco` today.|
+hit|double-encoded tag|We met &amp;lt;b&amp;gt;Big&amp;lt;/b&amp;gt; Telco today.|
+hit|double-encoded space|We met Big&amp;#32;Telco today.|
+hit|single-encoded space|We met Big&#32;Telco today.|
+hit|apostrophe U+0027|We met O'Brien today.|
+hit|apostrophe U+2018|We met O\u2018Brien today.|
+hit|apostrophe U+2019|We met O\u2019Brien today.|
+hit|apostrophe U+02BC|We met O\u02bcBrien today.|
+hit|apostrophe U+0060|We met O`Brien today.|
+hit|apostrophe U+00B4|We met O\u00b4Brien today.|
+hit|apostrophe U+2032|We met O\u2032Brien today.|
+hit|no apostrophe|We met OBrien today.|
+hit|apostrophe and a space|We met O\u2018 Brien today.|
+hit|hyphen break inside a word|We met Big Tel-\nco today.|
+hit|hyphen break, indented continuation|We met Big Tel-\n   co today.|
+hit|hyphen break U+2010|We met Big Tel\u2010\nco today.|
+hit|hyphen break in the first word|We met Bi-\ng Telco today.|
+hit|hyphen break between the words|We met Big-\nTelco today.|
+hit|Cyrillic es in Telco|We met Big Tel\u0441o today.|
+hit|Cyrillic i in Big|We met B\u0456g Telco today.|
+hit|Greek omicron|We met Big Telc\u03bf today.|
+hit|Cyrillic capital O|We met BIG TELC\u041e today.|
+hit|Cyrillic a and e|We met Big T\u0435lco today.|
+hit|Greek upsilon in O'Brien|We met O'Br\u03b9en today.|
+hit|file name %20|Hello.|2026-09-17_big%20telco.md
+hit|file name plus|Hello.|2026-09-17_big+telco.md
+hit|file name double %25|Hello.|2026-09-17_big%2520telco.md
+hit|file name %27 apostrophe|Hello.|2026-09-17_o%27brien.md
+hit|file name %E2%80%99 apostrophe|Hello.|2026-09-17_o%E2%80%99brien.md
+hit|file name Cyrillic|Hello.|2026-09-17_big-tel\u0441o.md
+hit|file name uppercase %20|Hello.|2026-09-17_Big%20Telco.md
+miss|bigger name|We met Bigger Telco today.|
+miss|name contained in a longer word|We met Big Telcom today.|
+miss|plural suffix|We met Big Telcos today.|
+miss|prefix glued on|We met Pigbig Telco today.|
+miss|different first word|We met Pig Telco today.|
+miss|comma between words|We met Big, Telco today.|
+miss|bold on unrelated words|We met **Big** and Telco today.|
+miss|links on unrelated words|We met [Big](http://u.example) and [Telco](http://v.example) today.|
+miss|tag around a near name|We met Big <b>Tel</b> co today.|
+miss|html tag around a longer word|We met <b>Big</b> Telcom today.|
+miss|hyphen break in a near name|We met Big Tel-\ncom today.|
+miss|hyphen break over a blank line|We met Big Tel-\n\nco today.|
+miss|OBrien inside a longer word|We met Obrienne today.|
+miss|O'Brien plus letters|We met O'Brienne today.|
+miss|homoglyph near name|We met Big Tel\u0441om today.|
+miss|a lone tag|We met Big <wbr> and others, Telco not.|
+miss|file name near name|Hello.|2026-09-17_big%20telcom.md
+miss|file name unrelated|Hello.|2026-09-17_big%20bank.md
+miss|file name longer word|Hello.|2026-09-17_bigger%20telco.md
+EOF
+
+# A non-empty .gitkeep under outbound/ is read by E5 and by nothing else (A5-F8); an empty one
+# stays ignored (LINT-01).
+gk="$(mktemp -d)"
+cp -R "$E5H/." "$gk/"
+printf 'leftover note about Big Telco\n' >"$gk/outbound/mails/.gitkeep"
+assert_lint "$gk" 1 'e5-hard gitkeep: a name in a non-empty outbound .gitkeep exits 1'
+assert_only E5 'e5-hard gitkeep: only [E5] fires (E1-E4 never see a .gitkeep)'
+assert_out_line '^outbound/mails/\.gitkeep:1: ERROR \[E5\] .*Big Telco' 'e5-hard gitkeep: reported with its line'
+printf 'keep this folder\n' >"$gk/outbound/mails/.gitkeep"
+assert_lint "$gk" 0 'e5-hard gitkeep: a non-empty .gitkeep without a name exits 0'
+assert_clean 'e5-hard gitkeep: innocuous content'
+: >"$gk/outbound/mails/.gitkeep"
+assert_lint "$gk" 0 'e5-hard gitkeep: an empty .gitkeep stays ignored'
+printf 'Big Telco\n' >"$gk/dossier/.gitkeep"
+assert_lint "$gk" 0 'e5-hard gitkeep: a non-empty .gitkeep outside outbound/ is not read'
+rm -rf "$gk"
+
+# The linter stays read-only on the scratch dossier (nothing written by the new passes).
+ro="$(mktemp -d)"
+cp -R "$E5H/." "$ro/"
+printf 'Status: draft\nTo: Jane\nSubject: x\nWritten by: a\n\nWe met **Big** Telco.\n' >"$ro/outbound/mails/2026-09-17_relance.md"
+before="$(find "$ro" -type f -exec shasum {} + | sort | shasum)"
+python3 "$(lint_py)" "$ro" >/dev/null 2>&1 || true
+after="$(find "$ro" -type f -exec shasum {} + | sort | shasum)"
+assert_eq "$before" "$after" 'e5-hard: the linter wrote nothing'
+rm -rf "$ro"
 
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 # The upward walk has no stop condition (D-01), so this case only means
