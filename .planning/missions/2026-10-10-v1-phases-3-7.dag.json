@@ -308,7 +308,7 @@
         "exec-7"
       ],
       "scope": [],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -319,7 +319,7 @@
         "revue-7"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "uat-7",
@@ -579,6 +579,19 @@
         "exec-7"
       ],
       "scope": [],
+      "status": "ready"
+    },
+    {
+      "id": "fix-7a",
+      "step": "fix R8-F1/F2/F5",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier-init/",
+        "hooks/",
+        "scripts/release.sh",
+        "tests/"
+      ],
       "status": "ready"
     }
   ]
