@@ -604,6 +604,17 @@
         "skills/dossier-init/",
         "scripts/release.sh"
       ],
+      "status": "done"
+    },
+    {
+      "id": "fix-7b",
+      "step": "round 3: R9-1..R9-3",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "skills/dossier-init/"
+      ],
       "status": "ready"
     }
   ]
