@@ -374,7 +374,44 @@ commands, and trigger-description eval to have something to reference)
      input such as "write to the client" routes to `dossier-draft`, not `dossier-ingest`.
   6. `scripts/release.sh <version>` leaves both manifests at the same version, a matching
      `CHANGELOG.md` heading and a git tag.
-**Plans**: TBD
+**Plans**: 9 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 07-01-PLAN.md — tracer: the completed Claude Code manifest and self-hosted marketplace installed
+  end to end from a clone of HEAD into an isolated configuration (tests/dist/install-claude.sh), the
+  Codex manifest and marketplace listing, tests/test-manifests.sh with the validate gate (D-02, D-03,
+  D-04, D-14, D-17)
+- [ ] 07-02-PLAN.md — scripts/release.sh tested in scratch repositories (every refusal, injection
+  strings, annotated local tag, nothing pushed), MIT LICENSE, CHANGELOG with Unreleased only (D-01,
+  D-09, D-16)
+- [ ] 07-03-PLAN.md — the sources guard reads Codex apply_patch headers (D-05 mirror), dossier-init's
+  script calls quoted and guarded (D-15), DIST-03 checks over every skill
+- [ ] 07-04-PLAN.md — the eight-case `claude plugin eval` routing suite, its free shape test and the
+  evals/results/ ignore line (D-07, D-11)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 07-05-PLAN.md — isolated Codex install check; bare-skills install check by copy and by the pinned
+  skills@1.7.2 behind an agent-run registry gate (D-04, D-05, D-17)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 07-06-PLAN.md — README for the four targets, limits (03 D-04/D-17, 05 D-09), Codex trust and
+  directory (D-13), versioning, licence, privacy, with tests/test-readme.sh (D-08)
+- [ ] 07-07-PLAN.md — recorded install logs, Haiku shake-out, then the recorded Sonnet routing run with
+  its mechanical gate (paid, agent-run, D-11)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 07-08-PLAN.md — P-01, provisional: the one dossier-lint command, the collision test and the
+  DIST-04 / spec §4 / D-06 / criterion 4 amendments, isolated so option (b) is a one-plan edit
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 07-09-PLAN.md — closure: CLAUDE.md, spec, traceability, the STATE pre-publication checklist
+  (D-12, D-13), the command smoke for 07-UAT, a release rehearsal on a scratch clone, full verification
 
 ## Progress
 
