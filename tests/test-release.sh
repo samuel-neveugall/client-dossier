@@ -181,12 +181,12 @@ err_has() {
 # and assert the whole success contract. CHANGED is the newline-separated list of files
 # HEAD must touch (git's order).
 release_ok() {
-  local label="$1" d="$2" version="$3" run_in="$4" changed="$5"
+  local label="$1" d="$2" version="$3" run_in="$4" changed="$5" flag="${6:-}"
   local base head status=0 out_file err_file remote m n got want
   base="$(git -C "$d" rev-parse HEAD)"
   out_file="$(mktemp)"
   err_file="$(mktemp)"
-  (cd "$d/$run_in" && "$d/scripts/release.sh" "$version") >"$out_file" 2>"$err_file" || status=$?
+  (cd "$d/$run_in" && "$d/scripts/release.sh" ${flag:+"$flag"} "$version") >"$out_file" 2>"$err_file" || status=$?
   assert_eq 0 "$status" "$label: exit 0"
   assert_eq "" "$(cat "$err_file")" "$label: nothing on stderr"
   assert_grep 'Nothing was pushed' "$out_file"
@@ -395,6 +395,58 @@ release_ok 'second release 1.0.1' "$d" 1.0.1 . "$CODEX_CHANGED"
 assert_eq 1.0.1 "$(entry_version "$d/$CODEX_MARKET")" 'second release: Codex entry follows again'
 HEADINGS="$(grep -E '^## \[' "$d/$CHANGELOG" | cut -d' ' -f1-2 | tr '\n' ' ')"
 assert_eq '## [Unreleased] ## [1.0.1] ## [1.0.0] ' "$HEADINGS" 'second release: headings, newest first'
+
+# --- R8-F5: a failing tag undoes the release commit ------------------------------
+
+d="$(fixture)"
+git -C "$d" config tag.gpgSign true
+git -C "$d" config gpg.program false
+refuse 'tag fails after the commit' "$d" 1.0.0
+err_has 'tag fails after the commit' 'the tag failed'
+assert_eq 'fixture' "$(git -C "$d" log -1 --format=%s)" 'tag failure: the release commit is gone'
+assert_eq '' "$(git -C "$d" tag -l)" 'tag failure: no tag left'
+assert_eq 0.1.0 "$(manifest_version "$d/$CLAUDE_MANIFEST")" 'tag failure: the manifest is back at 0.1.0'
+
+# --- R8-F5: a failed write leaves no file changed -------------------------------------
+
+if [ "$(id -u)" -ne 0 ]; then
+  d="$(fixture 0.1.0)"
+  chmod a-w "$d/.agents/plugins"
+  refuse 'a write fails while staging' "$d" 1.0.0
+  err_has 'a write fails while staging' 'nothing was changed'
+  assert_eq 0.1.0 "$(manifest_version "$d/$CLAUDE_MANIFEST")" 'staging failure: Claude manifest untouched'
+  assert_eq 0.1.0 "$(manifest_version "$d/$CODEX_MANIFEST")" 'staging failure: Codex manifest untouched'
+  assert_eq '' "$(grep -c '1.0.0' "$d/$CHANGELOG" | grep -v '^0$')" 'staging failure: CHANGELOG untouched'
+  assert_eq '' "$(find "$d" -name '.release-*' -not -path '*/.git/*' | head -1)" 'staging failure: no temp file left'
+  chmod u+w "$d/.agents/plugins"
+fi
+
+# --- R8-F5: the default-branch check ------------------------------------------------------
+
+d="$(fixture)"
+git -C "$d" checkout -q -b topic
+refuse 'release from a topic branch' "$d" 1.0.0
+err_has 'release from a topic branch' "on branch 'topic'"
+err_has 'release from a topic branch' '--allow-branch'
+
+d="$(fixture)"
+git -C "$d" checkout -q -b topic
+release_ok 'topic branch with --allow-branch' "$d" 1.0.0 . "$PLAIN_CHANGED" --allow-branch
+
+d="$(fixture)"
+git -C "$d" checkout -q --detach
+refuse 'detached HEAD' "$d" 1.0.0
+err_has 'detached HEAD' 'detached'
+
+# origin/HEAD, when set, names the default branch: a branch called main is then refused
+# if origin says trunk.
+d="$(fixture)"
+git -C "$d" update-ref refs/remotes/origin/trunk HEAD
+git -C "$d" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk
+refuse 'origin/HEAD names another default branch' "$d" 1.0.0
+err_has 'origin/HEAD names another default branch' "default branch 'trunk'"
+git -C "$d" checkout -q -b trunk
+release_ok 'on the branch origin/HEAD names' "$d" 1.0.0 . "$PLAIN_CHANGED"
 
 # --- cleanup --------------------------------------------------------------------
 
