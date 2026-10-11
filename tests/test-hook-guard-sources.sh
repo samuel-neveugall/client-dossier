@@ -688,6 +688,27 @@ case "$E2E_OUT" in
 esac
 
 
+echo '--- Bash heredoc apply_patch on sources/ is denied (R8-F2, 03 D-16, Samuel 2026-10-10) ---'
+nl='
+'
+heredoc_patch() { printf "apply_patch <<'EOF'\n*** Begin Patch\n%s\n*** End Patch\nEOF" "$1"; }
+bash_deny 'heredoc apply_patch Update File of a source' \
+  "$(heredoc_patch "*** Update File: $TRANSCRIPT_REL${nl}@@${nl}-reprot${nl}+report")"
+bash_deny 'heredoc apply_patch Delete File of a source' \
+  "$(heredoc_patch "*** Delete File: $TRANSCRIPT_REL")"
+bash_deny 'heredoc apply_patch Move to a path under sources/' \
+  "$(heredoc_patch "*** Update File: dossier/HISTORY.md${nl}*** Move to: sources/received/moved.md${nl}@@${nl}-a${nl}+b")" \
+  "$b" 'sources/received/moved.md'
+bash_deny 'heredoc apply_patch Add File over an existing source' \
+  "$(heredoc_patch "*** Add File: $TRANSCRIPT_REL${nl}+x")"
+bash_ok 'heredoc apply_patch on dossier/ stays allowed' \
+  "$(heredoc_patch "*** Update File: dossier/HISTORY.md${nl}@@${nl}-a${nl}+b")"
+bash_ok 'cat > dossier/notes.md heredoc citing a patch header outside sources/' \
+  "cat > dossier/notes.md <<'EOF'${nl}*** Update File: dossier/HISTORY.md${nl}EOF"
+bash_ok 'a command mentioning *** with no header' \
+  "echo '*** Begin Patch' > dossier/notes.md"
+
+
 rm -rf "$b"
 
 rm -rf "$d" "$plain" "$e" "$outside" "$nos"

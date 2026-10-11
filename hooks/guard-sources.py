@@ -1325,6 +1325,14 @@ def main():
         command = tool_input.get("command")
         if isinstance(command, str) and command:
             hit = bash_hit(command, cwd)
+            if not hit and "*** " in command and (
+                    "*** Begin Patch" in command or
+                    any(h in command for h in PATCH_HEADERS)):
+                # `apply_patch <<'EOF' ... EOF` through Bash: the tokenizer
+                # strips heredoc bodies, so judge the patch headers on the
+                # raw text (R8-F2, 03 D-16). A header citing a path outside
+                # sources/ is never a hit.
+                hit = patch_hit(command, cwd)
             note = " (heuristic guard: this Bash command appears to modify it)"
     elif tool == "apply_patch":
         command = tool_input.get("command")
