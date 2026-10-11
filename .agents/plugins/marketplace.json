@@ -1,0 +1,20 @@
+{
+  "name": "client-dossier",
+  "interface": {
+    "displayName": "client-dossier"
+  },
+  "plugins": [
+    {
+      "name": "client-dossier",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

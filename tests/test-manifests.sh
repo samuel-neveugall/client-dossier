@@ -127,6 +127,50 @@ else:
         emit("claude marketplace entry keys", "name source", keys(entry))
         emit("claude marketplace entry name", "client-dossier", entry.get("name"))
         emit("claude marketplace entry source", "./", entry.get("source"))
+
+# --- Codex manifest (D-05, D-14) ---
+codex = load(codex_plugin)
+if codex is None:
+    emit("codex plugin.json exists", "yes", "missing")
+else:
+    emit("codex plugin keys", " ".join(IDENTITY) + " skills interface", keys(codex))
+    for key in IDENTITY:
+        same = plugin is not None and codex.get(key) == plugin.get(key)
+        emit("codex " + key + " equals claude", "yes", "yes" if same else "no")
+    emit("codex skills", "./skills/", codex.get("skills"))
+    interface = codex.get("interface")
+    emit("codex interface keys",
+         "displayName shortDescription developerName category capabilities",
+         keys(interface) if isinstance(interface, dict) else "not an object")
+    emit("codex interface developerName", "Samuel Neveu",
+         interface.get("developerName") if isinstance(interface, dict) else "missing")
+    # Codex loads hooks/hooks.json by default; a manifest key would replace it.
+    emit("codex plugin.json has no hooks key", "no", "yes" if "hooks" in codex else "no")
+
+# --- Codex marketplace ---
+codex_mk = load(codex_market)
+if codex_mk is None:
+    emit("codex marketplace.json exists", "yes", "missing")
+else:
+    emit("codex marketplace keys", "name interface plugins", keys(codex_mk))
+    emit("codex marketplace name", "client-dossier", codex_mk.get("name"))
+    face = codex_mk.get("interface")
+    emit("codex marketplace interface.displayName is non-empty", "yes",
+         "yes" if isinstance(face, dict) and isinstance(face.get("displayName"), str)
+         and face["displayName"].strip() else "no")
+    entries = codex_mk.get("plugins")
+    emit("codex marketplace holds exactly one entry", "1",
+         len(entries) if isinstance(entries, list) else "not a list")
+    if isinstance(entries, list) and len(entries) == 1:
+        entry = entries[0]
+        emit("codex marketplace entry keys", "name source policy category", keys(entry))
+        emit("codex marketplace entry name", "client-dossier", entry.get("name"))
+        emit("codex marketplace entry source",
+             json.dumps({"source": "local", "path": "./"}), json.dumps(entry.get("source")))
+        emit("codex marketplace entry policy",
+             json.dumps({"installation": "AVAILABLE", "authentication": "ON_INSTALL"}),
+             json.dumps(entry.get("policy")))
+        emit("codex marketplace entry category", "Productivity", entry.get("category"))
 PY
 )"
 
@@ -140,6 +184,8 @@ EOF
 # D-14: the Codex manifest is one of the two markers status.py needs to find
 # the linter.
 assert_grep '\.codex-plugin/plugin\.json' "$REPO_ROOT/skills/dossier-status/scripts/status.py"
+assert_file "$CODEX_PLUGIN"
+assert_file "$CODEX_MARKET"
 
 # --- claude plugin validate (D-03) -------------------------------------------
 if ! command -v claude >/dev/null 2>&1; then
