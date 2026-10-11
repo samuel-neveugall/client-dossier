@@ -570,4 +570,265 @@ case "$ST_OUT" in
   *) echo 'FAIL: text mode: the status line is printed' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
 esac
 
+# ---------------------------------------------------------------------------
+# Task 3: unreflected sources from git and mtimes, lint variants, read-only, escaping
+# ---------------------------------------------------------------------------
+
+# commit_at DIR DATE MSG — stage everything and commit with author and committer
+# dates DATE at noon local time.
+commit_at() {
+  GIT_AUTHOR_DATE="$2T12:00:00" GIT_COMMITTER_DATE="$2T12:00:00" git -C "$1" add -A >/dev/null 2>&1
+  GIT_AUTHOR_DATE="$2T12:00:00" GIT_COMMITTER_DATE="$2T12:00:00" git -C "$1" commit -q -m "$3" >/dev/null 2>&1
+}
+
+# mtime_at FILE YYYYMMDD — the file's modification time becomes that day, noon.
+mtime_at() {
+  touch -t "${2}1200" "$1"
+}
+
+# mk_src DIR REL YYYYMMDD — a source file with that mtime.
+mk_src() {
+  mkdir -p "$(dirname "$1/$2")"
+  printf 'content of %s\n' "$2" >"$1/$2"
+  mtime_at "$1/$2" "$3"
+}
+
+# expect_sources LABEL DIR EXPECTED — "path:filed:how" of every unreflected source.
+expect_sources() {
+  local label="$1" dir="$2" expected="$3"
+  run_st "$dir" --json --today "$TODAY" "$dir"
+  assert_eq 0 "$ST_STATUS" "$label: exit 0"
+  assert_eq "$expected" "$(st_json '",".join(i["path"] + ":" + i["filed"] + ":" + i["how"] for i in d["unreflected_sources"])')" "$label"
+}
+
+echo '--- Unreflected sources (D-04) ---'
+
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+commit_at "$DG" 2026-10-04 'living files updated'
+expect_sources 'a clean scaffold has no unreflected source' "$DG" ''
+assert_eq 2026-10-05 "$(st_json 'd["last_reflected"]')" 'last_reflected is the newest Last updated: date'
+
+mk_src "$DG" sources/received/2026-10-06_a.txt 20261006
+commit_at "$DG" 2026-10-06 'file a'
+expect_sources 'a source committed after the last update is reported (how git)' "$DG" 'sources/received/2026-10-06_a.txt:2026-10-06:git'
+
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+mk_src "$DG" sources/received/2026-10-05_b.txt 20261005
+commit_at "$DG" 2026-10-05 'file b'
+expect_sources 'a source filed the same day as the last update is not reported (strictly later only)' "$DG" ''
+
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+mk_src "$DG" sources/received/2026-10-04_c.txt 20261004
+commit_at "$DG" 2026-10-06 'file c, committed late'
+expect_sources 'commit lag: mtime 2026-10-04, committed 2026-10-06, is not a false positive (min of both)' "$DG" ''
+
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+mk_src "$DG" sources/received/2026-10-01_d.txt 20261001
+commit_at "$DG" 2026-10-01 'file d'
+git -C "$DG" mv sources/received/2026-10-01_d.txt sources/received/2026-10-07_e.txt
+mtime_at "$DG/sources/received/2026-10-07_e.txt" 20261007
+commit_at "$DG" 2026-10-07 'rename d to e'
+expect_sources 'a renamed source counts as an add at the rename commit' "$DG" 'sources/received/2026-10-07_e.txt:2026-10-07:git'
+
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+commit_at "$DG" 2026-10-05 'living files'
+mk_src "$DG" sources/received/2026-10-09_f.txt 20261001
+expect_sources 'an untracked source is filed today (how untracked), whatever its mtime' "$DG" "sources/received/2026-10-09_f.txt:$TODAY:untracked"
+git -C "$DG" add sources/received/2026-10-09_f.txt
+expect_sources 'a staged but never committed source is filed today too' "$DG" "sources/received/2026-10-09_f.txt:$TODAY:untracked"
+
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+mk_src "$DG" sources/received/2026-10-08_g.txt 20261008
+mk_src "$DG" sources/README.md 20261008
+mk_src "$DG" sources/received/.gitkeep 20261008
+mk_src "$DG" sources/received/.DS_Store 20261008
+commit_at "$DG" 2026-10-08 'noise after the max date'
+expect_sources 'sources/README.md, .gitkeep and .DS_Store are never reported' "$DG" 'sources/received/2026-10-08_g.txt:2026-10-08:git'
+
+DG="$(mk_dossier en)"
+set_updated "$DG" 2026-10-05
+printf 'sources/received/ignored.txt\n' >"$DG/.gitignore"
+commit_at "$DG" 2026-10-05 'gitignore'
+mk_src "$DG" sources/received/ignored.txt 20261008
+expect_sources 'a git-ignored source uses its mtime date (how mtime)' "$DG" 'sources/received/ignored.txt:2026-10-08:mtime'
+
+DN="$WORK/notgit"
+mkdir -p "$DN"
+python3 "$(init_py)" --target "$DN" --language en >/dev/null 2>&1
+set_updated "$DN" 2026-10-05
+mk_src "$DN" sources/received/2026-10-09_h.txt 20261009
+mk_src "$DN" sources/received/2026-10-02_old.txt 20261002
+expect_sources 'outside a git repository every source uses its mtime date' "$DN" 'sources/received/2026-10-09_h.txt:2026-10-09:mtime'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "git" in n])')" 'outside a git repository a note says git was not available'
+
+DR="$WORK/bigrepo"
+mkdir -p "$DR/clients/acme"
+git init -q "$DR"
+git -C "$DR" config user.email "test@example.invalid"
+git -C "$DR" config user.name "Test Runner"
+printf 'other project\n' >"$DR/README.md"
+python3 "$(init_py)" --target "$DR/clients/acme" --language en >/dev/null 2>&1
+set_updated "$DR/clients/acme" 2026-10-05
+commit_at "$DR" 2026-10-04 'repo with a nested dossier'
+mk_src "$DR/clients/acme" sources/received/2026-10-06_n.txt 20261006
+commit_at "$DR" 2026-10-06 'nested source'
+expect_sources 'a dossier nested in a larger repository reports root-relative paths with git dates' "$DR/clients/acme" 'sources/received/2026-10-06_n.txt:2026-10-06:git'
+assert_eq "$DR/clients/acme" "$(st_json 'd["root"]')" 'nested dossier: the root is the folder holding dossier.yaml'
+
+DG="$(mk_dossier en)"
+python3 -I -c 'import glob, re, sys
+for p in glob.glob(sys.argv[1] + "/dossier/*.md"):
+    t = open(p, encoding="utf-8").read()
+    open(p, "w", encoding="utf-8").write(re.sub(r"(?m)^Last updated:.*$", "Last updated: soon", t, count=1))' "$DG"
+commit_at "$DG" 2026-10-04 'no valid dates'
+mk_src "$DG" sources/received/2026-10-02_i.txt 20261002
+commit_at "$DG" 2026-10-02 'file i'
+expect_sources 'no valid Last updated: date anywhere: every source is reported' "$DG" 'sources/received/2026-10-02_i.txt:2026-10-02:git'
+assert_eq None "$(st_json 'd["last_reflected"]')" 'no valid Last updated: date: last_reflected is null'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "Last updated" in n and "every source" in n])')" 'no valid Last updated: date: a note says why'
+
+echo '--- The linter variants (D-02, D-12) ---'
+
+DL="$(mk_dossier en)"
+set_updated "$DL" 2026-10-10
+run_st "$DL" --json --today "$TODAY" --lint /nonexistent/lint.py "$DL"
+assert_eq 0 "$ST_STATUS" '--lint of an absent file: exit 0'
+assert_eq False "$(st_json 'd["lint"]["available"]')" '--lint of an absent file: available false'
+assert_eq None "$(st_json 'd["lint"]["exit"]')" '--lint of an absent file: exit null'
+run_st "$DL" --today "$TODAY" --lint /nonexistent/lint.py "$DL"
+case "$ST_OUT" in
+  *'Lint: unavailable'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo 'FAIL: text mode: Lint: unavailable' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+
+BARE="$WORK/bare"
+mkdir -p "$BARE/skills/dossier-status/scripts"
+cp "$(st_script)" "$BARE/skills/dossier-status/scripts/status.py"
+ST_STATUS=0
+ST_OUT="$(cd "$DL" && CLAUDE_PLUGIN_ROOT="$REPO_ROOT" python3 "$BARE/skills/dossier-status/scripts/status.py" --json --today "$TODAY" "$DL" 2>"$ERRDIR/err")" || ST_STATUS=$?
+assert_eq 0 "$ST_STATUS" 'bare-skills layout: exit 0'
+assert_eq False "$(st_json 'd["lint"]["available"]')" 'bare-skills layout: no scripts/lint.py beside the skills, so lint is unavailable'
+assert_eq False "$(st_json 'd["lint"]["available"]')" 'bare-skills layout: the exported plugin-root variable is never read'
+
+mk_out "$DL" outbound/mails/2026-10-01_nohdr.md draft ''
+printf 'Hello, no status block here.\n' >"$DL/outbound/mails/2026-10-01_nohdr.md"
+run_st "$DL" --json --today "$TODAY" "$DL"
+assert_eq True "$(st_json 'd["lint"]["errors"] >= 1')" 'lint: an outbound mail without a status block gives at least one error'
+assert_eq True "$(st_json 'any(f["id"].startswith("E") and f["path"].startswith("outbound/") for f in d["lint"]["findings"])')" 'lint: a finding with an E identifier under outbound/ is parsed'
+assert_eq 1 "$(st_json 'd["lint"]["exit"]')" 'lint: exit 1 when there is an error'
+rm -f "$DL/outbound/mails/2026-10-01_nohdr.md"
+
+STUB="$WORK/stub-lint.py"
+printf 'import sys\nsys.exit(3)\n' >"$STUB"
+run_st "$DL" --json --today "$TODAY" --lint "$STUB" "$DL"
+assert_eq 0 "$ST_STATUS" 'a stub linter exiting 3: status still exits 0'
+assert_eq True "$(st_json 'd["lint"]["available"]')" 'a stub linter exiting 3: available true'
+assert_eq 3 "$(st_json 'd["lint"]["exit"]')" 'a stub linter exiting 3: exit 3 recorded'
+assert_eq None "$(st_json 'd["lint"]["errors"]')" 'a stub linter exiting 3: counts null'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "lint could not run" in n])')" 'a stub linter exiting 3: a note'
+run_st "$DL" --today "$TODAY" --lint "$STUB" "$DL"
+case "$ST_OUT" in
+  *'Lint: did not run'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo 'FAIL: text mode: Lint: did not run' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+printf 'import sys\nsys.exit(2)\n' >"$STUB"
+run_st "$DL" --json --today "$TODAY" --lint "$STUB" "$DL"
+assert_eq 2 "$(st_json 'd["lint"]["exit"]')" 'a stub linter exiting 2: exit 2 recorded'
+assert_eq 1 "$(st_json 'len([n for n in d["notes"] if "lint could not run" in n])')" 'a stub linter exiting 2: a note'
+printf 'print("info: something to know")\nprint("outbound/mails/x.md:3: ERROR [E2] a: b")\nprint("dossier/A.md:0: WARNING [W2] c")\nprint("1 error(s), 1 warning(s)")\nimport sys\nsys.exit(1)\n' >"$STUB"
+run_st "$DL" --json --today "$TODAY" --lint "$STUB" "$DL"
+assert_eq '1,1,2' "$(st_json '",".join(str(x) for x in (d["lint"]["errors"], d["lint"]["warnings"], len(d["lint"]["findings"])))')" 'a stub report: summary and findings are parsed'
+assert_eq 'outbound/mails/x.md:3:ERROR:E2:a: b' "$(st_json 'd["lint"]["findings"][0]["path"] + ":" + str(d["lint"]["findings"][0]["line"]) + ":" + d["lint"]["findings"][0]["severity"] + ":" + d["lint"]["findings"][0]["id"] + ":" + d["lint"]["findings"][0]["message"]')" 'a stub report: a finding is split into path, line, severity, id, message'
+assert_eq '["something to know"]' "$(st_json 'd["lint"]["info"]')" 'a stub report: info lines are kept'
+run_st "$DL" --today "$TODAY" --lint "$STUB" "$DL"
+case "$ST_OUT" in
+  *'Lint: 1 error(s), 1 warning(s)'*'outbound/mails/x.md:3: ERROR [E2] a: b'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo 'FAIL: text mode: the lint summary then its findings' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+
+echo '--- Read-only: the dossier and its .git are byte-identical after a run ---'
+
+# tree_sha DIR — one sha256 over every regular file under DIR, .git included
+# (relative path and content, sorted); logic copied from lib-scenario.sh.
+tree_sha() {
+  python3 -I -c '
+import hashlib, os, sys
+root = sys.argv[1]
+digest = hashlib.sha256()
+for base, dirs, files in os.walk(root):
+    dirs.sort()
+    for name in sorted(files):
+        path = os.path.join(base, name)
+        digest.update(os.path.relpath(path, root).encode("utf-8", "surrogateescape") + b"\0")
+        try:
+            with open(path, "rb") as fh:
+                digest.update(hashlib.sha256(fh.read()).hexdigest().encode())
+        except OSError:
+            digest.update(b"UNREADABLE")
+        digest.update(b"\n")
+print(digest.hexdigest())
+' "$1"
+}
+
+DX="$(mk_dossier en)"
+set_updated "$DX" 2026-10-05
+mk_src "$DX" sources/received/2026-10-03_old.txt 20261003
+mk_out "$DX" outbound/mails/2026-10-01_a.md draft 2026-10-02
+write_history "$DX" '- Send the plan by 2026-10-04 (call @12:34).' '' ''
+commit_at "$DX" 2026-10-06 'backdated commit'
+mtime_at "$DX/dossier/HISTORY.md" 20260901
+mk_src "$DX" sources/received/2026-10-10_new.txt 20261010
+git -C "$DX" status --short >/dev/null 2>&1
+BEFORE="$(tree_sha "$DX")"
+run_st "$DX" --json --today "$TODAY" "$DX"
+assert_eq 0 "$ST_STATUS" 'read-only: JSON run exit 0'
+assert_eq "$BEFORE" "$(tree_sha "$DX")" 'read-only: tree (with .git) identical after --json'
+run_st "$DX" --today "$TODAY" "$DX"
+assert_eq 0 "$ST_STATUS" 'read-only: text run exit 0'
+assert_eq "$BEFORE" "$(tree_sha "$DX")" 'read-only: tree (with .git) identical after text mode'
+assert_eq 1 "$(printf '%s\n' "$ST_OUT" | grep -c 'sources/received/2026-10-10_new.txt')" 'read-only: the untracked source was reported in that run'
+assert_eq 0 "$(find "$(dirname "$(st_script)")" -name '__pycache__' | wc -l | tr -d ' ')" 'no __pycache__ folder appeared beside the script'
+
+echo '--- Escaping: no raw control character reaches stdout ---'
+
+DE="$(mk_dossier en)"
+set_updated "$DE" 2026-10-05
+commit_at "$DE" 2026-10-05 'living files'
+BELL="$(printf '2026-10-09_bell\007x.txt')"
+mk_src "$DE" "sources/received/$BELL" 20261009
+ESC="$(printf '\033')"
+write_history "$DE" "- Send the plan by 2026-10-09 ${ESC}[31mred (call @12:34)." '' ''
+run_st "$DE" --today "$TODAY" "$DE"
+assert_eq 0 "$ST_STATUS" 'escaping: text run exit 0'
+assert_eq 0 "$(printf '%s' "$ST_OUT" | python3 -I -c 'import sys
+d = sys.stdin.buffer.read()
+print(sum(1 for b in d if b < 0x20 and b != 10))')" 'escaping: no byte below 0x20 other than the newline in text mode'
+case "$ST_OUT" in
+  *'\x07'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo 'FAIL: escaping: the bell is printed as \x07' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+case "$ST_OUT" in
+  *'\x1b[31mred'*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo 'FAIL: escaping: the ESC of a commitment line is printed as \x1b' >&2; TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+run_st "$DE" --json --today "$TODAY" "$DE"
+assert_eq 0 "$ST_STATUS" 'escaping: JSON run exit 0'
+assert_eq 0 "$(printf '%s' "$ST_OUT" | python3 -I -c 'import sys
+d = sys.stdin.buffer.read()
+print(sum(1 for b in d if (b < 0x20 or b > 0x7e) and b != 10))')" 'escaping: the JSON is pure printable ASCII'
+assert_eq 1 "$(st_json 'len([i for i in d["unreflected_sources"] if "bell" in i["path"]])')" 'escaping: the bell-named source is still reported (and parsed back from the JSON)'
+
+echo '--- Static: bounded, prefixed, scoped subprocesses ---'
+
+assert_grep '--no-renames' "$(st_script)"
+assert_grep 'core.fsmonitor=false' "$(st_script)"
+assert_grep_e 'README_NAME' "$(st_script)"
+assert_eq 1 "$([ "$(grep -c 'timeout' "$(st_script)")" -ge 2 ] && echo 1 || echo 0)" 'status.py names a timeout for git and for lint'
+
 finish
