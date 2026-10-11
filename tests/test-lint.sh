@@ -1236,6 +1236,50 @@ miss|a lone tag|We met Big <wbr> and others, Telco not.|
 miss|file name near name|Hello.|2026-09-17_big%20telcom.md
 miss|file name unrelated|Hello.|2026-09-17_big%20bank.md
 miss|file name longer word|Hello.|2026-09-17_bigger%20telco.md
+hit|R6-1 br then wbr inside the name|Hello<br>Big Tel<wbr>co today.|
+hit|R6-1 wbr then br after the name|We met Big Tel<wbr>co<br>Corp today.|
+hit|R6-1 br before and wbr inside|Hello<br>Big Tel<wbr>co<br>Corp.|
+hit|R6-1 ZWSP before and inside|Hello\u200bBig Tel\u200bco today.|
+hit|R6-1 tag before and soft hyphen inside|Hello<br>Big Te\u00adlco today.|
+hit|R6-1 emphasis before and tag inside|Hello**Big Tel<wbr>co** today.|
+hit|R6-1 ZWSP between and tag inside|Big\u200bTe<b>lco</b> today.|
+hit|R6-1 link target then tag inside|[Hi](http://u.example)Big Tel<wbr>co today.|
+hit|R6-1 apostrophe name with mixed|Hello<br>O<wbr>'Brien today.|
+miss|R6-1 br then a spaced wbr|Hello<br>Big Tel<wbr> co today.|
+miss|R6-1 br then a longer word|Hello<br>Big Tel<wbr>com today.|
+miss|R6-1 br then a longer first word|Hello<br>Bigger Tel<wbr>co today.|
+miss|R6-1 ZWSP then a near name|Hello\u200bBig Tel\u200bcom today.|
+miss|R6-1 gap glued to a longer word|Hello<br>Pigbig Tel<wbr>co today.|
+hit|R6-2 single-quoted title|We met [Big](http://u.example 'the title') [Telco](http://v.example) today.|
+hit|R6-2 parenthesised title|We met [Big](http://u.example (the title)) [Telco](http://v.example) today.|
+hit|R6-2 angle-bracket target with a space|We met [Big](<http://u.example/a b>) [Telco](http://v.example) today.|
+hit|R6-2 blanks inside the parentheses|We met [Big]( http://u.example ) [Telco](  http://v.example  ) today.|
+hit|R6-2 nested parentheses|We met [Big](http://u.example/a_(b)) [Telco](http://v.example) today.|
+hit|R6-2 doubly nested parentheses|We met [Big](http://u.example/(a(b))) [Telco](http://v.example) today.|
+hit|R6-2 angle target and title|We met [Big](<http://u.example/a b> "t") [Telco](v) today.|
+hit|R6-2 greater-than in a double-quoted attribute|We met Big<a title="a>b">Telco</a> today.|
+hit|R6-2 greater-than in a single-quoted attribute|We met Big <a title='a>b'>Telco</a> today.|
+hit|R6-2 greater-than in an attribute inside the name|We met Big Te<span title="x>y">lco</span> today.|
+hit|R6-2 image link|We met ![Big](http://u.example 'p') Telco today.|
+miss|R6-2 single-quoted title on unrelated words|We met [Big](http://u.example 'the title') and [Telco](http://v.example) today.|
+miss|R6-2 nested parentheses on unrelated words|We met [Big](http://u.example/a_(b)) and [Telco](http://v.example) today.|
+miss|R6-2 attribute with greater-than, unrelated words|We met <a title="a>b">Big</a> and Telco today.|
+miss|R6-2 attribute with greater-than, near name|We met Big <a title="a>b">Tel</a> co today.|
+miss|R6-2 unbalanced quote in a tag|We met <a it's>Big</a> and more, Telco not.|
+miss|R6-2 ordinary prose with angle brackets|We met when a < b and c > d, Big and Telco apart.|
+hit|R6-3 hyphen U+2010 between the words|We met Big\u2010Telco today.|
+hit|R6-3 non-breaking hyphen U+2011|We met Big\u2011Telco today.|
+hit|R6-3 en dash between the words|We met Big\u2013Telco today.|
+hit|R6-3 non-breaking hyphen in O'Brien spelling|We met O\u2011Brien today.|
+hit|R6-3 fullwidth grave U+FF40|We met O\uff40Brien today.|
+hit|R6-3 fullwidth apostrophe U+FF07|We met O\uff07Brien today.|
+hit|R6-3 fullwidth grave in a file name|Hello.|2026-09-17_o\uff40brien.md
+hit|R6-3 U+2010 in a file name|Hello.|2026-09-17_big\u2010telco.md
+miss|R6-3 U+2011 and a longer word|We met Big\u2011Telcom today.|
+miss|R6-3 fullwidth grave and a longer word|We met O\uff40Brienne today.|
+miss|R6-3 U+2010 in a near name|We met Big\u2010Telcom today.|
+miss|R6-3 U+2011 between unrelated words|We met Big\u2011and Telco today.|
+miss|R6-3 L'Oreal is not a configured name|We met L'Or\u00e9al and O\u2011Neil today.|
 EOF
 
 # A non-empty .gitkeep under outbound/ is read by E5 and by nothing else (A5-F8); an empty one
@@ -1254,6 +1298,34 @@ assert_lint "$gk" 0 'e5-hard gitkeep: an empty .gitkeep stays ignored'
 printf 'Big Telco\n' >"$gk/dossier/.gitkeep"
 assert_lint "$gk" 0 'e5-hard gitkeep: a non-empty .gitkeep outside outbound/ is not read'
 rm -rf "$gk"
+
+# A non-empty .gitkeep E5 cannot read is an "unreadable" error, never a silent skip (R6-4):
+# UTF-16, Latin-1, over 5 MB and a symlink. Positive and negative.
+gu="$(mktemp -d)"
+cp -R "$E5H/." "$gu/"
+printf '\xff\xfeB\x00i\x00g\x00 \x00T\x00e\x00l\x00c\x00o\x00\n\x00' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: UTF-16 exits 1'
+assert_only E5 'e5-hard unreadable gitkeep: UTF-16: only [E5] fires'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: UTF-16 reported as unreadable'
+printf 'caf\xe9 Telco\n' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: Latin-1 exits 1'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: Latin-1 reported as unreadable'
+python3 -c 'import sys; sys.stdout.write("x" * 5100000)' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: over 5 MB exits 1'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: over 5 MB reported as unreadable'
+rm -f "$gu/outbound/mails/.gitkeep"
+printf 'keep\n' >"$gu/real-keep"
+ln -s ../../real-keep "$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: a symlink exits 1'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: a symlink reported as unreadable'
+rm -f "$gu/outbound/mails/.gitkeep"
+printf 'caf\xe9\n' >"$gu/dossier/.gitkeep"
+assert_lint "$gu" 0 'e5-hard unreadable gitkeep: an unreadable .gitkeep outside outbound/ is not read'
+rm -f "$gu/dossier/.gitkeep"
+printf 'plain ascii keep\n' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 0 'e5-hard unreadable gitkeep: a readable non-empty .gitkeep stays clean'
+assert_clean 'e5-hard unreadable gitkeep: readable content'
+rm -rf "$gu"
 
 # The linter stays read-only on the scratch dossier (nothing written by the new passes).
 ro="$(mktemp -d)"
