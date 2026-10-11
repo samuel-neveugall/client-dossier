@@ -26,6 +26,34 @@ has_fixed "'accord de l'\\''intéressé'"
 has_fixed 'A value holding a line break is refused'
 has_fixed '`--consent-source`'
 
+# R9-1: the rule precedes the first call that takes a quoted value (step 4's --propose-renames),
+# and step 6 only reminds of it in one line.
+echo '--- the rule is stated before the first call (R9-1) ---'
+rule_line=$(grep -nF "Quoting rule, for every value" "$SKILL" | head -1 | cut -d: -f1)
+first_call=$(grep -nF -e "--target '" "$SKILL" | head -1 | cut -d: -f1)
+step4=$(grep -n '^## Step 4' "$SKILL" | head -1 | cut -d: -f1)
+step6=$(grep -n '^## Step 6' "$SKILL" | head -1 | cut -d: -f1)
+if [ -n "$rule_line" ] && [ -n "$first_call" ] && [ -n "$step4" ] && [ -n "$step6" ] \
+   && [ "$rule_line" -gt "$step4" ] && [ "$rule_line" -lt "$first_call" ] && [ "$rule_line" -lt "$step6" ]; then
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo "FAIL: quoting rule (line ${rule_line:-none}) is not between step 4 and the first --target call (line ${first_call:-none})" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+if [ "$(grep -cF "Quoting rule, for every value" "$SKILL")" = 1 ]; then
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo "FAIL: the full quoting rule must appear exactly once" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+has_fixed "Quote every value as in the quoting rule of step 4"
+if sed -n "${step6},\$p" "$SKILL" | grep -qF "Quote every value as in the quoting rule of step 4"; then
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+  echo "FAIL: step 6 lacks the one-line reminder" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+fi
+
 # esc VALUE — the rule as the skill states it: ' becomes '\'' inside single quotes.
 esc() { printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 

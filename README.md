@@ -173,7 +173,8 @@ Copying a new file into `sources/` is allowed: that is how a source is filed.
 
 The guard reads the command text and nothing else, so it does not see what the text only builds at
 run time: `eval`, interpreters such as `python3 -c`, command substitutions and process
-substitutions, variables, loops over globs, shells nested deeper than two levels, and very large
+substitutions, variables, loops over globs, a patch piped or read in rather than written out in the
+command (`printf '%s\n' … | apply_patch`), shells nested deeper than two levels, and very large
 commands (past its size bounds it only refuses a visible `sources` component). A `cd` through a
 variable is guessed, not followed, and a `cp` onto the name of an existing source is not told apart
 from filing a new one.

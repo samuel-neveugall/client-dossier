@@ -197,6 +197,8 @@ MAX_JUDGED = 4096
 MAX_EXPANSION = 64
 MAX_LISTING = 50000
 MAX_PILE = 64
+MAX_BASES = 32
+SEEN_CWDS = []
 JUDGED = [0]
 
 
@@ -1220,7 +1222,10 @@ def run_segment(words, targets, where, depth):
         return None, where
     verb = os.path.basename(command[0])
     if verb in ("cd", "pushd", "popd"):
-        return None, move(verb, command[1:], where)
+        moved = move(verb, command[1:], where)
+        if len(SEEN_CWDS) < MAX_BASES:
+            SEEN_CWDS.append(moved[0])
+        return None, moved
     return hit_verb(verb, command[1:], where[0], depth), where
 
 
@@ -1263,6 +1268,7 @@ def scan(command, cwd, depth):
 def bash_hit(command, cwd):
     """The root-relative path of an existing source file that `command`
     appears to modify, else None."""
+    del SEEN_CWDS[:]
     return scan(command, os.path.realpath(cwd), 0)
 
 
@@ -1270,7 +1276,19 @@ PATCH_HEADERS = ("*** Add File: ", "*** Update File: ", "*** Delete File: ",
                  "*** Move to: ")
 
 
-def patch_hit(text, cwd):
+def patch_bases(cwd, seen):
+    """The directories a relative patch header may be relative to: CWD, every
+    directory a `cd`/`pushd` of the command moved to (R9-2) and, for a
+    directory that became unknown, the roots above it (NF-5)."""
+    bases = []
+    for where in [cwd] + list(seen):
+        for base in base_dirs(where):
+            if base not in bases and len(bases) < MAX_BASES:
+                bases.append(base)
+    return bases
+
+
+def patch_hit(text, cwd, seen=()):
     """The root-relative path of the first file under a sources/ folder that
     the apply_patch text `text` adds, updates, deletes or moves to, else None
     (D-05, the Codex mirror of the Write family; 07-RESEARCH Pattern 8).
@@ -1284,9 +1302,19 @@ def patch_hit(text, cwd):
     return are tolerated here too (refusing a bit more is the safe side).
     Every header path is judged by sources_target like a Write path; past
     MAX_JUDGED headers the rest only gets the visible_sources check, which
-    keeps the scan linear on a pathological patch (F3)."""
+    keeps the scan linear on a pathological patch (F3).
+
+    SEEN are the directories a `cd` of the surrounding Bash command moved to:
+    a relative header is judged against each of them too (R9-2). The text is
+    also cut on the two characters `\\n`, so a one-line ANSI-C string
+    (`$'*** Begin Patch\\n*** Update File: sources/x'`) is read like a patch
+    (R9-3). What stays outside, as the accepted D-04 class (03 D-17): a patch
+    the command does not show as one string, such as `printf '%s\\n' ARG...
+    | apply_patch` (one header per argument), a pipe from a file, a variable
+    or a command substitution."""
+    bases = patch_bases(cwd, seen)
     judged = 0
-    for line in text.split("\n"):
+    for line in text.replace("\\n", "\n").split("\n"):
         line = line.strip()
         if not line.startswith("*** "):
             continue
@@ -1299,7 +1327,11 @@ def patch_hit(text, cwd):
                 if judged > MAX_JUDGED or len(path) > MAX_OPERAND:
                     hit = visible_sources(path)
                 else:
-                    hit = sources_target(path, cwd)
+                    hit = None
+                    for base in bases:
+                        hit = sources_target(path, base)
+                        if hit:
+                            break
                 if hit:
                     return hit
                 break
@@ -1332,7 +1364,7 @@ def main():
                 # strips heredoc bodies, so judge the patch headers on the
                 # raw text (R8-F2, 03 D-16). A header citing a path outside
                 # sources/ is never a hit.
-                hit = patch_hit(command, cwd)
+                hit = patch_hit(command, cwd, SEEN_CWDS)
             note = " (heuristic guard: this Bash command appears to modify it)"
     elif tool == "apply_patch":
         command = tool_input.get("command")

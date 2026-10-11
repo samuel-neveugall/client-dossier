@@ -560,6 +560,9 @@ shapes = [
     ("a million glob and brace characters", "rm " + "{a,b}" * 4000 + " " + "*/" * 100000, False),
     ("a million ANSI-C openers", "echo " + "$'" * (MB // 2), False),
     ("escaped ANSI-C openers", "echo " + "$'\\'" * (MB // 4), False),
+    ("a heredoc patch of 1 MB after 100 distinct cd targets",
+     "".join("cd d%d; " % i for i in range(100)) + "apply_patch <<'EOF'\n"
+     + "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(MB // 30)) + "EOF", False),
     ("rm -rf * repeated", "rm -rf *; " * (MB // 10), True),
 ]
 # Codex apply_patch (D-05, plan 07-03): the same 1 MB bounds hold for patch text.
@@ -707,6 +710,63 @@ bash_ok 'cat > dossier/notes.md heredoc citing a patch header outside sources/' 
   "cat > dossier/notes.md <<'EOF'${nl}*** Update File: dossier/HISTORY.md${nl}EOF"
 bash_ok 'a command mentioning *** with no header' \
   "echo '*** Begin Patch' > dossier/notes.md"
+
+echo '--- Bash heredoc apply_patch: relative headers follow cd, ANSI-C one-liners (R9-2, R9-3; 03 D-16, Samuel 2026-10-10) ---'
+mkdir -p "$b/sources/received"
+bash_deny 'cd sources && heredoc apply_patch Update File received/t.md' \
+  "cd sources && $(heredoc_patch "*** Update File: received/t.md${nl}@@${nl}-a${nl}+b")" "$b" 'sources/received/t.md'
+bash_deny 'cd sources/received ; heredoc Add File t.md' \
+  "cd sources/received ; $(heredoc_patch "*** Add File: t.md${nl}+x")" "$b" 'sources/received/t.md'
+bash_deny 'pushd sources then Delete File' \
+  "pushd sources >/dev/null && $(heredoc_patch "*** Delete File: received/t.md")" "$b" 'sources/received/t.md'
+bash_deny 'cd sources then Move to a relative target' \
+  "cd sources && $(heredoc_patch "*** Update File: ../dossier/HISTORY.md${nl}*** Move to: received/moved.md${nl}@@${nl}-a${nl}+b")" "$b" 'sources/received/moved.md'
+bash_deny 'subshell (cd sources && apply_patch)' \
+  "(cd sources && $(heredoc_patch "*** Update File: received/t.md")${nl})" "$b" 'sources/received/t.md'
+bash_deny 'cd into sources inside bash -c' \
+  "bash -c \"cd sources && apply_patch <<'EOF'${nl}*** Update File: received/t.md${nl}EOF${nl}\"" "$b" 'sources/received/t.md'
+bash_deny 'cd to a subfolder of sources then a ../ header' \
+  "cd sources/received && $(heredoc_patch "*** Update File: ../transcripts/2026-10-01_kickoff.txt")"
+bash_deny 'cd to an unknown directory from inside sources/ (guessed cwd)' \
+  "cd \$X && $(heredoc_patch "*** Update File: t.md")" "$b/sources/received" 'sources/received/t.md'
+bash_deny 'relative header from a cwd inside sources/ (no cd)' \
+  "$(heredoc_patch "*** Update File: t.md")" "$b/sources/received" 'sources/received/t.md'
+bash_ok 'cd dossier && heredoc apply_patch on HISTORY.md' \
+  "cd dossier && $(heredoc_patch "*** Update File: HISTORY.md${nl}@@${nl}-a${nl}+b")"
+bash_ok 'cd dossier, cd .., then a root-relative header outside sources' \
+  "cd dossier; cd .. && $(heredoc_patch "*** Update File: dossier/HISTORY.md")"
+# Safe side by design: every cd target is a base, so a cd into sources/ and back out still judges
+# a bare HISTORY.md against sources/ (a refused false positive, never a missed write).
+bash_deny 'cd sources then cd back out: the safe side refuses a bare name' \
+  "cd sources; cd ../dossier && $(heredoc_patch "*** Update File: HISTORY.md")" "$b" 'sources/HISTORY.md'
+bash_ok 'cd to a dossier folder, headers outside sources (commit-free)' \
+  "cd dossier && cat > notes.md <<'EOF'${nl}*** Update File: received/t.md${nl}EOF"
+bash_ok 'git commit -m quoting a header outside sources' \
+  "git commit -m 'docs: mention *** Update File: dossier/HISTORY.md in the guide'"
+bash_ok 'cd dossier && git commit -m quoting a relative header' \
+  "cd dossier && git commit -m \"fix\" -m '*** Update File: HISTORY.md'"
+# R9-3: a one-line ANSI-C string, the patch lines joined by a literal backslash-n.
+bash_deny 'ANSI-C one-liner apply_patch Update File of a source' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: $TRANSCRIPT_REL\\n@@\\n-a\\n+b\\n*** End Patch'"
+bash_deny 'ANSI-C one-liner Delete File of a source' \
+  "apply_patch \$'*** Begin Patch\\n*** Delete File: $TRANSCRIPT_REL\\n*** End Patch'"
+bash_deny 'ANSI-C one-liner Move to a source' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: dossier/HISTORY.md\\n*** Move to: sources/received/m.md\\n*** End Patch'" "$b" 'sources/received/m.md'
+bash_deny 'ANSI-C one-liner after cd sources' \
+  "cd sources && apply_patch \$'*** Begin Patch\\n*** Update File: received/t.md\\n*** End Patch'" "$b" 'sources/received/t.md'
+bash_deny 'ANSI-C one-liner, last header at the end of the string' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: $TRANSCRIPT_REL'"
+bash_ok 'ANSI-C one-liner on dossier/' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: dossier/HISTORY.md\\n@@\\n-a\\n+b\\n*** End Patch'"
+bash_ok 'git commit -m with a literal backslash-n quoting a header outside sources' \
+  "git commit -m 'x\\n*** Update File: dossier/HISTORY.md'"
+# printf with a literal backslash-n shows the patch in the command's text: refused (same cut).
+bash_deny 'printf with literal backslash-n | apply_patch is visible text' \
+  "printf '*** Begin Patch\\n*** Update File: $TRANSCRIPT_REL\\n*** End Patch' | apply_patch"
+# The accepted D-04 class (03 D-17): a patch the command does not show as one string.
+bash_ok 'printf with a %s format and one argument per line | apply_patch is D-04' \
+  "printf '%s\\n' '*** Begin Patch' '*** Update File: $TRANSCRIPT_REL' '*** End Patch' | apply_patch"
+bash_ok 'a patch read from a file is D-04' "apply_patch < /tmp/patch-not-shown.txt"
 
 
 rm -rf "$b"
