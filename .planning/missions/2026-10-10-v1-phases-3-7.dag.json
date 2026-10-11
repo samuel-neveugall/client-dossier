@@ -247,7 +247,7 @@
         "exec-6"
       ],
       "scope": [],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -258,7 +258,7 @@
         "revue-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "uat-6",
@@ -547,6 +547,18 @@
         "tests/"
       ],
       "status": "done"
+    },
+    {
+      "id": "fix-6a",
+      "step": "fix R7 findings + re-review phase 6",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier-status/",
+        "skills/dossier-call/",
+        "tests/"
+      ],
+      "status": "ready"
     }
   ]
 }
