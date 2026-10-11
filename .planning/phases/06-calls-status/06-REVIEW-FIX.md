@@ -30,3 +30,13 @@ node: fix-6a
 ## Follow-up
 
 None. Re-review is the manager's node.
+
+## Re-review round 2 (revue-6b, 2026-10-11) — passed
+
+vf-reviewer, full regime, HEAD 77e8520; persisted by the mission manager. R7-M1, R7-m2..m5, R7-m8..m11
+closed by reproduction (nested staged source, future `Last updated:`, failing `git log` shim, foreign
+linter without plugin marker not executed, quoting). No regression: `status.py` read-only on 20 000
+sources (tree and `.git` snapshot identical), 0.44 s, escaped output, exit 0/2; `tests/run.sh` 24/0;
+selftests 412/532/189/71; `git fsck` clean. Paid replay `deal-status.sh --variant plugin --runs 1`:
+GREEN 1/1 (0.0553 USD, evidence outside the repository). Notes for Phase 7: `dossier-init` still has an
+unquoted `${CLAUDE_SKILL_DIR}`; `.codex-plugin/plugin.json` must exist for the linter marker on Codex.

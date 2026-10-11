@@ -258,7 +258,7 @@
         "revue-6"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "uat-6",
@@ -268,7 +268,7 @@
         "verify-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "discuss-7",
@@ -287,7 +287,7 @@
         "uat-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "exec-7",
@@ -569,7 +569,7 @@
         "skills/",
         "tests/"
       ],
-      "status": "ready"
+      "status": "done"
     }
   ]
 }
