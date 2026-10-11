@@ -511,6 +511,29 @@
         "skills/dossier-ingest/SKILL.md",
         "tests/"
       ],
+      "status": "done"
+    },
+    {
+      "id": "fix-5b",
+      "step": "harden lint E5 (05 D-09)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "scripts/lint.py",
+        "tests/test-lint.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-5b",
+      "step": "re-review round 2 phase 5 (fix-5a + E5 hardening)",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "scripts/lint.py",
+        "skills/",
+        "tests/"
+      ],
       "status": "ready"
     }
   ]
