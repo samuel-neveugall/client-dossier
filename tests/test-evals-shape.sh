@@ -25,7 +25,7 @@ set -u
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 # The case folders, sorted and space-separated. Extended task by task.
-EXPECTED_CASES='call-prepare deal-status draft-reply ingest-transcript init-new-client write-to-client'
+EXPECTED_CASES='call-prepare deal-status draft-reply ingest-transcript init-new-client outside-dossier unrelated write-to-client'
 
 EVALS_DIR="$REPO_ROOT/evals"
 CASES_DIR="$EVALS_DIR/routing"
@@ -275,6 +275,21 @@ case " $EXPECTED_CASES " in
     cleanup_scaffold
     ;;
 esac
+
+# outside-dossier and unrelated start in an empty workspace on purpose: no
+# dossier.yaml may exist, so neither case carries a case.yaml or a scaffold.
+for c in outside-dossier unrelated; do
+  case " $EXPECTED_CASES " in
+    *" $c "*)
+      if [ -e "$CASES_DIR/$c/case.yaml" ] || [ -e "$CASES_DIR/$c/scaffold.sh" ]; then
+        echo "FAIL: $c: must have no case.yaml and no scaffold (empty workspace)" >&2
+        TESTS_FAILED=$((TESTS_FAILED + 1))
+      else
+        TESTS_PASSED=$((TESTS_PASSED + 1))
+      fi
+      ;;
+  esac
+done
 
 # --- evals/results/ (run artefacts) is ignored ---
 assert_grep '^evals/results/$' "$REPO_ROOT/.gitignore"
