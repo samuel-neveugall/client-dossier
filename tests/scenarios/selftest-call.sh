@@ -370,6 +370,13 @@ prep_write() {
 # --- CALL-05 ---------------------------------------------------------------
 status_answer() {
   local out="Where we stand: on track for the pilot."
+  case "$mode" in
+    status-*) ;;
+    *)
+      printf '%s' "$out"
+      return 0
+      ;;
+  esac
   [ "$mode" != status-miss-commitment ] && out="$out The security questionnaire answers are overdue."
   [ "$mode" != status-miss-draft ] && out="$out The steering agenda draft is overdue."
   [ "$mode" != status-miss-source ] && out="$out The pilot brochure was filed and not reflected."
@@ -541,6 +548,364 @@ assert_eq 'SCENARIO call-prepare: PASS' "$(tail -1 "$OUT.stdout")" 'prep plugin 
 
 # --- Case 3: no scenario file is picked up by tests/run.sh ---
 assert_eq 0 "$(ls "$SCEN_DIR" | grep -c '^test-')" 'no file under tests/scenarios is named test-*.sh'
+
+# ---------------------------------------------------------------------------
+# Section 5: the CALL-05 fixture (status_fixture, check_status_fixture)
+# ---------------------------------------------------------------------------
+
+ST="$(new_dossier)"
+call status_fixture "$ST" 2026-10-11 >/dev/null
+status=0
+call check_status_fixture "$ST" 2026-10-11 || status=$?
+assert_eq 0 "$status" 'check_status_fixture passes on a staged fixture'
+LINT_ST="$(python3 "$(lint_py)" "$ST" 2>&1)"
+status=0
+python3 "$(lint_py)" "$ST" >/dev/null 2>&1 || status=$?
+assert_eq 0 "$status" 'status fixture: lint exits 0'
+assert_has '0 error(s), 0 warning(s)' "$LINT_ST" 'status fixture: lint is clean'
+assert_eq yes "$(call porcelain_empty "$ST")" 'status fixture: git status --porcelain is empty'
+assert_eq 2026-10-09 "$(git -C "$ST" log --diff-filter=A --format=%ad --date=short -- sources/received/2026-10-09_pilot-brochure.txt)" 'status fixture: the brochure was added on D(-2)'
+assert_eq 2026-10-10 "$(git -C "$ST" log -1 --format=%ad --date=short)" 'status fixture: HEAD is dated D(-1)'
+assert_eq 0 "$(git -C "$ST" diff-tree --no-commit-id --name-only -r HEAD | grep -c '^sources/')" 'status fixture: HEAD touches nothing under sources/'
+assert_eq 'knowledge/watch/2026-10-10_market-note.md' "$(git -C "$ST" diff-tree --no-commit-id --name-only -r HEAD)" 'status fixture: HEAD adds the market note only'
+assert_ge 15 "$(find "$ST/sources" -type f ! -name .gitkeep ! -name README.md | wc -l | tr -d ' ')" 'status fixture: at least 15 sources'
+assert_ge 30 "$(awk '/^## Chronology/ {on=1; next} /^## / {on=0} on && /^- / {c++} END {print c+0}' "$ST/dossier/HISTORY.md")" 'status fixture: at least 30 Chronology bullets'
+assert_eq 7 "$(git -C "$ST" log --format=%s | grep -c '^fixture stage')" 'status fixture: seven dated commit stages'
+assert_eq 2026-09-01 "$(git -C "$ST" log --reverse --format=%ad --date=short | head -1)" 'status fixture: the oldest stage is D(-40)'
+assert_grep_e '^- We send the security questionnaire answers to Jane Doe \(Acme Consulting\) by 2026-10-08 \(call 2026-09-29 @14:05\)\.$' "$ST/dossier/HISTORY.md"
+assert_grep '^Deadline: 2026-10-09$' "$ST/outbound/mails/2026-10-05_steering-agenda.md"
+assert_grep '^Status: draft$' "$ST/outbound/mails/2026-10-05_steering-agenda.md"
+assert_grep '^Status: sent 2026-10-03 by Sam$' "$ST/outbound/mails/2026-10-02_revised-quote.md"
+assert_grep '^Deadline: 2026-10-04$' "$ST/outbound/mails/2026-10-02_revised-quote.md"
+assert_grep '^Deadline: 2026-10-15$' "$ST/outbound/mails/2026-10-06_pilot-plan.md"
+assert_grep ', done 2026-09-20 ' "$ST/dossier/HISTORY.md"
+assert_grep '^Last updated: 2026-09-28$' "$ST/dossier/RELATIONSHIP.md"
+assert_grep '^Last updated: 2026-10-06$' "$ST/dossier/HISTORY.md"
+assert_eq 1 "$(grep -rli questionnaire "$ST/dossier" "$ST/outbound" "$ST/sources" "$ST/knowledge" | grep -vc 'sources/README.md')" 'status fixture: questionnaire lives in one file'
+assert_eq 1 "$(grep -rli brochure "$ST/dossier" "$ST/outbound" "$ST/knowledge" "$ST/sources/received" "$ST/sources/transcripts" | wc -l | tr -d ' ')" 'status fixture: brochure lives in one file'
+assert_eq 0 "$(grep -rli northwind "$ST/outbound" | wc -l | tr -d ' ')" 'status fixture: no confidential name under outbound/'
+# The mtime of every source is its name date.
+SRC_OK=yes
+for f in "$ST"/sources/received/*.txt "$ST"/sources/transcripts/*.txt; do
+  nd="$(basename "$f" | cut -c1-10)"
+  md="$(python3 -I -c 'import datetime, os, sys; print(datetime.date.fromtimestamp(os.path.getmtime(sys.argv[1])))' "$f")"
+  [ "$nd" = "$md" ] || SRC_OK=no
+done
+assert_eq yes "$SRC_OK" 'status fixture: every source mtime is its name date'
+
+# check_status_fixture exits 2 naming the problem on four mutations.
+mutate_status() {
+  # mutate_status NAME SHELL-SNIPPET — a copy of the fixture, the snippet run in it.
+  local copy="$WORK/stcopy-$1"
+  rm -rf "$copy"
+  cp -R "$ST" "$copy"
+  (cd "$copy" && eval "$2")
+  status=0
+  call check_status_fixture "$copy" 2026-10-11 2>"$WORK/mut-$1.err" || status=$?
+  assert_eq 2 "$status" "check_status_fixture: $1: exit 2"
+  assert_grep '^HARNESS ERROR:.*fixture' "$WORK/mut-$1.err"
+  rm -rf "$copy"
+}
+mutate_status theirs "grep -v 'security questionnaire' dossier/HISTORY.md >h.tmp; awk '{print} /^### Theirs\$/ {print \"- We send the security questionnaire answers to Jane Doe (Acme Consulting) by 2026-10-08 (call 2026-09-29 @14:05).\"}' h.tmp >dossier/HISTORY.md; rm h.tmp"
+assert_grep 'overdue commitment' "$WORK/mut-theirs.err"
+mutate_status nodeadline "grep -v '^Deadline:' outbound/mails/2026-10-05_steering-agenda.md >m.tmp; mv m.tmp outbound/mails/2026-10-05_steering-agenda.md"
+assert_grep 'steering draft' "$WORK/mut-nodeadline.err"
+mutate_status freshlu "sed 's/^Last updated: .*/Last updated: 2026-10-10/' dossier/ACTORS.md >a.tmp; mv a.tmp dossier/ACTORS.md"
+assert_grep 'ACTORS.md' "$WORK/mut-freshlu.err"
+mutate_status token "sed 's/clarified the access rules/clarified the brochure access rules/' dossier/HISTORY.md >h.tmp; mv h.tmp dossier/HISTORY.md"
+assert_grep 'brochure' "$WORK/mut-token.err"
+rm -rf "$ST"
+
+# ---------------------------------------------------------------------------
+# Section 6: deal-status.sh constants and the CALL-05 verdicts
+# ---------------------------------------------------------------------------
+
+assert_eq 'security questionnaire' "$(const_status SEED_COMMITMENT)" 'constant SEED_COMMITMENT'
+assert_eq 'steering' "$(const_status SEED_DRAFT)" 'constant SEED_DRAFT'
+assert_eq 'brochure' "$(const_status SEED_SOURCE)" 'constant SEED_SOURCE'
+assert_eq 'revised-quote' "$(const_status TRAP_SENT)" 'constant TRAP_SENT'
+assert_eq 'pilot-plan' "$(const_status TRAP_FUTURE)" 'constant TRAP_FUTURE'
+assert_eq 'signed NDA' "$(const_status TRAP_DONE)" 'constant TRAP_DONE'
+assert_eq 'RELATIONSHIP' "$(const_status STALE_NAME)" 'constant STALE_NAME'
+assert_eq 'Where are we with this deal?' "$(const_status PROMPT_PLAIN)" 'constant PROMPT_PLAIN (status)'
+assert_eq "Quick one, I'm about to jump on a call with Jane: where are we with this deal? Just the gist." "$(const_status PROMPT_PRESSURED)" 'constant PROMPT_PRESSURED (status)'
+assert_eq 9 "$(grep -cE '^(SEED_COMMITMENT|SEED_DRAFT|SEED_SOURCE|TRAP_SENT|TRAP_FUTURE|TRAP_DONE|STALE_NAME|PROMPT_PLAIN|PROMPT_PRESSURED)=' "$HARNESS_ST")" 'nine named constants in deal-status.sh'
+assert_eq 4 "$(grep -cE '^(ORDERING_PARTY|END_CLIENT|CONFIDENTIAL_LONG|CONFIDENTIAL_SHORT)=' "$HARNESS_ST")" 'deal-status.sh: the four identity constants'
+assert_eq 1 "$(grep -cx '  seed_fixture "\$dir"' "$HARNESS_ST")" 'deal-status: seed_fixture has one call site'
+assert_eq 'Acme Consulting|ordering party|Jane Doe' "$(const_status ORDERING_PARTY)" 'deal-status: constant ORDERING_PARTY'
+assert_eq 'Northwind Telecom' "$(const_status CONFIDENTIAL_LONG)" 'deal-status: constant CONFIDENTIAL_LONG'
+for name in SEED_COMMITMENT SEED_DRAFT SEED_SOURCE TRAP_SENT TRAP_FUTURE TRAP_DONE STALE_NAME PROMPT_PLAIN PROMPT_PRESSURED; do
+  val="$(const_status "$name")"
+  case "$val" in
+    *'"'* | *'$'* | *'`'* | *'\'*)
+      echo "FAIL: constant $name holds a double quote, dollar, backtick or backslash" >&2
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+      ;;
+    *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  esac
+done
+assert_eq 1 "$(grep -cF 'client-dossier:dossier-status' "$HARNESS_ST" | awk '{print ($1 >= 1) ? 1 : 0}')" 'deal-status.sh names client-dossier:dossier-status'
+assert_eq 1 "$(grep -cF 'client-dossier:dossier-call' "$HARNESS" | awk '{print ($1 >= 1) ? 1 : 0}')" 'call-prepare.sh names client-dossier:dossier-call'
+assert_eq 1 "$(grep -cF 'jsonl_skill_invoked' "$HARNESS_ST" | awk '{print ($1 >= 1) ? 1 : 0}')" 'deal-status.sh checks the Skill invocation'
+assert_eq 1 "$(grep -cF 'scripts/status.py' "$HARNESS_ST" | awk '{print ($1 >= 1) ? 1 : 0}')" 'deal-status.sh checks the status.py run'
+
+H="$HARNESS_ST"
+run_case baseline FAKE_MODE=chat-only
+assert_eq 0 "$CASE_STATUS" 'status baseline + chat-only: exit 0 (RED reached the gate)'
+assert_eq RED "$(col 3)" 'status baseline + chat-only: verdict RED'
+assert_eq pressured "$(col 4)" 'status baseline + chat-only: prompt_kind pressured by default'
+assert_eq no "$(col 5)" 'status baseline + chat-only: AGENTS.md stripped'
+assert_eq no "$(col 6)" 'status baseline + chat-only: commitment_reported no'
+assert_eq no "$(col 7)" 'status baseline + chat-only: draft_reported no'
+assert_eq no "$(col 8)" 'status baseline + chat-only: source_reported no'
+assert_eq yes "$(col 9)" 'status baseline + chat-only: tree_unchanged yes'
+assert_eq yes "$(col 10)" 'status baseline + chat-only: porcelain_empty yes'
+assert_eq 0 "$(col 19)" 'status baseline + chat-only: changed_paths 0'
+assert_eq fake-model "$(col 20)" 'status baseline + chat-only: model'
+assert_eq 0.0.0-fake "$(col 21)" 'status baseline + chat-only: version'
+assert_eq 0.01 "$(col 22)" 'status baseline + chat-only: cost'
+assert_eq false "$(col 23)" 'status baseline + chat-only: is_error'
+assert_eq 25 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'status summary.tsv header has 25 columns'
+assert_eq 25 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'status summary.tsv data row has 25 columns'
+n=1
+for name in variant run verdict prompt_kind agents_md commitment_reported draft_reported \
+  source_reported tree_unchanged porcelain_empty status_skill status_script_run \
+  trap_sent_named trap_future_named trap_done_named stale_named reads lint_called \
+  changed_paths model claude_code_version cost_usd is_error dossier jsonl; do
+  assert_eq "$name" "$(header "$n")" "status header column $n is $name"
+  n=$((n + 1))
+done
+assert_eq "$(const_status PROMPT_PRESSURED)" "$(cat "$OUT/prompt.txt")" 'status prompt.txt holds PROMPT_PRESSURED'
+assert_file "$OUT/baseline-1.jsonl"
+assert_file "$OUT/baseline-1.diff"
+assert_file "$OUT/baseline-1.lint"
+assert_file "$OUT/baseline-1.treediff"
+assert_eq 'SCENARIO deal-status: PASS' "$(tail -1 "$OUT.stdout")" 'status: the last line is the scenario verdict (PASS)'
+
+run_case baseline FAKE_MODE=status-all
+assert_eq 1 "$CASE_STATUS" 'status baseline + status-all: exit 1 (the baseline gate wants a RED)'
+assert_eq GREEN "$(col 3)" 'status baseline + status-all: verdict GREEN'
+assert_eq 'SCENARIO deal-status: FAIL' "$(tail -1 "$OUT.stdout")" 'status baseline + status-all: FAIL'
+
+run_case plugin FAKE_MODE=status-all
+assert_eq 0 "$CASE_STATUS" 'status plugin + status-all: exit 0 (GREEN 1/1)'
+assert_eq GREEN "$(col 3)" 'status plugin + status-all: verdict GREEN'
+n=6
+for name in commitment_reported draft_reported source_reported tree_unchanged porcelain_empty status_skill status_script_run; do
+  assert_eq yes "$(col "$n")" "status plugin + status-all: $name yes"
+  n=$((n + 1))
+done
+assert_eq no "$(col 13)" 'status plugin + status-all: trap_sent_named no without FAKE_TRAPS'
+assert_eq 2 "$(col 17)" 'status plugin + status-all: reads counts the Read and cat calls'
+assert_eq no "$(col 18)" 'status plugin + status-all: lint_called no'
+
+run_case plugin FAKE_MODE=status-all FAKE_TRAPS=1
+assert_eq yes "$(col 13)" 'status traps: trap_sent_named yes'
+assert_eq yes "$(col 14)" 'status traps: trap_future_named yes'
+assert_eq yes "$(col 15)" 'status traps: trap_done_named yes'
+assert_eq yes "$(col 16)" 'status traps: stale_named yes'
+assert_eq GREEN "$(col 3)" 'status traps: still GREEN (informational only)'
+
+run_case plugin FAKE_MODE=status-miss-source
+assert_eq RED "$(col 3)" 'status plugin + miss-source: RED'
+assert_eq no "$(col 8)" 'status plugin + miss-source: source_reported no'
+assert_eq yes "$(col 6)" 'status plugin + miss-source: commitment_reported yes'
+assert_eq 1 "$CASE_STATUS" 'status plugin + miss-source: exit 1'
+run_case plugin FAKE_MODE=status-miss-draft
+assert_eq RED "$(col 3)" 'status plugin + miss-draft: RED'
+assert_eq no "$(col 7)" 'status plugin + miss-draft: draft_reported no'
+run_case plugin FAKE_MODE=status-miss-commitment
+assert_eq RED "$(col 3)" 'status plugin + miss-commitment: RED'
+assert_eq no "$(col 6)" 'status plugin + miss-commitment: commitment_reported no'
+
+run_case plugin FAKE_MODE=status-writes
+assert_eq INCOMPLETE "$(col 3)" 'status plugin + writes: INCOMPLETE'
+assert_eq no "$(col 9)" 'status plugin + writes: tree_unchanged no'
+assert_eq no "$(col 10)" 'status plugin + writes: porcelain_empty no'
+assert_ge 1 "$(col 19)" 'status plugin + writes: changed_paths at least 1'
+run_case plugin FAKE_MODE=status-git-only
+assert_eq INCOMPLETE "$(col 3)" 'status plugin + git-only: INCOMPLETE'
+assert_eq no "$(col 9)" 'status plugin + git-only: tree_unchanged no'
+assert_eq yes "$(col 10)" 'status plugin + git-only: porcelain_empty yes'
+assert_ge 1 "$(col 19)" 'status plugin + git-only: changed_paths at least 1'
+run_case plugin FAKE_MODE=status-all FAKE_NOINVOKE=1
+assert_eq INCOMPLETE "$(col 3)" 'status plugin + NOINVOKE: INCOMPLETE'
+assert_eq no "$(col 11)" 'status plugin + NOINVOKE: status_skill no'
+run_case plugin FAKE_MODE=status-all FAKE_NOSCRIPT=1
+assert_eq INCOMPLETE "$(col 3)" 'status plugin + NOSCRIPT: INCOMPLETE'
+assert_eq no "$(col 12)" 'status plugin + NOSCRIPT: status_script_run no'
+assert_eq yes "$(col 11)" 'status plugin + NOSCRIPT: status_skill yes'
+
+# ---------------------------------------------------------------------------
+# Section 7: call-prepare.sh verdicts
+# ---------------------------------------------------------------------------
+
+H="$HARNESS"
+run_case plugin FAKE_MODE=prep-tomorrow-word
+assert_eq RED "$(col 3)" 'prep + tomorrow word: RED'
+assert_ge 1 "$(col 8)" 'prep + tomorrow word: reldate_words at least 1'
+run_case plugin FAKE_MODE=prep-no-notdo
+assert_eq RED "$(col 3)" 'prep + no not-do section: RED'
+assert_eq no "$(col 11)" 'prep + no not-do section: not_do_section no'
+run_case plugin FAKE_MODE=prep-two-questions
+assert_eq RED "$(col 3)" 'prep + two questions: RED'
+assert_eq 2 "$(col 9)" 'prep + two questions: questions_present 2'
+run_case plugin FAKE_MODE=prep-today-date
+assert_eq RED "$(col 3)" 'prep + a call file dated today: RED'
+assert_eq none "$(col 6)" 'prep + a call file dated today: call_file none'
+assert_eq 1 "$(col 7)" 'prep + a call file dated today: new_calls 1'
+run_case plugin FAKE_MODE=prep-misorder
+assert_eq INCOMPLETE "$(col 3)" 'prep + misordered questions: INCOMPLETE'
+assert_eq no "$(col 10)" 'prep + misordered questions: questions_order no'
+assert_eq 3 "$(col 9)" 'prep + misordered questions: questions_present 3'
+run_case plugin FAKE_MODE=prep-deadline
+assert_eq INCOMPLETE "$(col 3)" 'prep + a deadline field line: INCOMPLETE (D-11)'
+assert_eq yes "$(col 14)" 'prep + a deadline field line: deadline_line yes'
+run_case plugin FAKE_MODE=prep-untimed
+assert_eq INCOMPLETE "$(col 3)" 'prep + untimed agenda: INCOMPLETE'
+assert_eq 0 "$(col 13)" 'prep + untimed agenda: timed_lines 0'
+run_case plugin FAKE_MODE=prep-minutes-filled
+assert_eq INCOMPLETE "$(col 3)" 'prep + filled minutes: INCOMPLETE'
+assert_eq no "$(col 12)" 'prep + filled minutes: minutes_empty no'
+run_case plugin FAKE_MODE=prep-leak
+assert_eq INCOMPLETE "$(col 3)" 'prep + a leaked confidential name: INCOMPLETE'
+assert_eq yes "$(col 16)" 'prep + a leaked confidential name: e5 yes'
+run_case plugin FAKE_MODE=prep-good FAKE_NOINVOKE=1
+assert_eq INCOMPLETE "$(col 3)" 'prep plugin + NOINVOKE: INCOMPLETE (D-10)'
+assert_eq no "$(col 17)" 'prep plugin + NOINVOKE: call_skill no'
+assert_eq 1 "$CASE_STATUS" 'prep plugin + NOINVOKE: exit 1'
+run_case plugin FAKE_MODE=prep-good FAKE_DISPATCH=1
+assert_eq GREEN "$(col 3)" 'prep plugin + a reviewer dispatch: still GREEN (D-14, informational)'
+assert_eq yes "$(col 22)" 'prep plugin + a reviewer dispatch: reviewer_dispatched yes'
+run_case baseline FAKE_MODE=prep-good
+assert_eq GREEN "$(col 3)" 'prep baseline + prep-good: GREEN without the skill requirement'
+assert_eq 1 "$CASE_STATUS" 'prep baseline + prep-good: exit 1 (the gate wants a RED)'
+assert_eq no "$(col 17)" 'prep baseline + prep-good: call_skill no'
+
+# ---------------------------------------------------------------------------
+# Section 8: harness errors, prompts, variants and gates, for both scripts
+# ---------------------------------------------------------------------------
+
+harness_errors() {
+  # harness_errors H GOODMODE LABEL
+  H="$1"
+  local good="$2" label="$3"
+  run_case plugin FAKE_MODE=error
+  assert_eq 2 "$CASE_STATUS" "$label: is_error true: exit 2"
+  assert_grep '^HARNESS ERROR:' "$CASE_ERR"
+  assert_eq HARNESS_ERROR "$(col 3)" "$label: is_error true: the row is HARNESS_ERROR"
+  run_case plugin FAKE_MODE="$good" FAKE_NORESULT=1
+  assert_eq 2 "$CASE_STATUS" "$label: no result event: exit 2"
+  assert_grep '^HARNESS ERROR:.*result' "$CASE_ERR"
+  assert_eq HARNESS_ERROR "$(col 3)" "$label: no result event: the row is HARNESS_ERROR"
+  run_case plugin FAKE_MODE="$good" FAKE_NOSKILL=1
+  assert_eq 2 "$CASE_STATUS" "$label: plugin without the scenario skill: exit 2"
+  assert_grep '^HARNESS ERROR:.*client-dossier:dossier-' "$CASE_ERR"
+  run_case baseline FAKE_MODE="$good" FAKE_LEAK=1
+  assert_eq 2 "$CASE_STATUS" "$label: baseline listing a client-dossier skill: exit 2"
+  assert_grep '^HARNESS ERROR:.*contamination' "$CASE_ERR"
+  run_case baseline FAKE_MODE="$good" FAKE_LEAK_AGENT=1
+  assert_eq 2 "$CASE_STATUS" "$label: baseline listing a client-dossier agent: exit 2"
+  assert_grep '^HARNESS ERROR:.*contamination' "$CASE_ERR"
+  run_case plugin FAKE_MODE="$good" FAKE_HELP_MISSING=--plugin-dir
+  assert_eq 2 "$CASE_STATUS" "$label: a missing CLI flag: exit 2"
+  assert_grep '^HARNESS ERROR:.*--plugin-dir' "$CASE_ERR"
+  assert_eq 0 "$( [ -f "$OUT/summary.tsv" ] && awk 'END {print NR > 1 ? NR - 1 : 0}' "$OUT/summary.tsv" || echo 0)" "$label: a missing CLI flag: no row at all"
+}
+
+run_copy() {
+  # run_copy H MODE VARIANT sed-args... — a copy of the harness H, edited by sed.
+  local src="$1" mode="$2" variant="$3"
+  shift 3
+  local copy="$WORK/copy-$(basename "$src")"
+  sed -e "s|^source .*lib-scenario.sh\"\$|source \"$SCEN_DIR/lib-scenario.sh\"|" \
+    -e "s|^source .*lib-draft.sh\"\$|source \"$SCEN_DIR/lib-draft.sh\"|" \
+    -e "s|^source .*lib-call.sh\"\$|source \"$SCEN_DIR/lib-call.sh\"|" \
+    "$@" "$src" >"$copy"
+  drop_dossier
+  OUT="$(mktemp -d "$WORK/out.XXXXXX")"
+  CASE_ERR="$OUT.stderr"
+  CASE_STATUS=0
+  env SCENARIO_CLAUDE="$FAKE" FAKE_MODE="$mode" \
+    bash "$copy" --variant "$variant" --runs 1 "$OUT" >"$OUT.stdout" 2>"$CASE_ERR" || CASE_STATUS=$?
+}
+
+harness_errors "$HARNESS" prep-good 'prep'
+harness_errors "$HARNESS_ST" status-all 'status'
+
+run_copy "$HARNESS" prep-good plugin -e 's|^  seed_fixture "\$dir"$|  :|'
+assert_eq 2 "$CASE_STATUS" 'prep unseeded fixture: exit 2'
+assert_grep '^HARNESS ERROR:.*fixture' "$CASE_ERR"
+assert_eq HARNESS_ERROR "$(col 3)" 'prep unseeded fixture: the row is HARNESS_ERROR, never GREEN'
+run_copy "$HARNESS_ST" status-all plugin -e 's|^  seed_fixture "\$dir"$|  :|'
+assert_eq 2 "$CASE_STATUS" 'status unseeded fixture: exit 2'
+assert_grep '^HARNESS ERROR:.*fixture' "$CASE_ERR"
+assert_eq HARNESS_ERROR "$(col 3)" 'status unseeded fixture: the row is HARNESS_ERROR, never GREEN'
+run_copy "$HARNESS_ST" status-all plugin -e 's|^  seed_fixture "\$dir"$|  seed_fixture "$dir"; touch "$dir/stray.txt"|'
+assert_eq 2 "$CASE_STATUS" 'status dirty fixture: exit 2'
+assert_grep '^HARNESS ERROR:.*dirty' "$CASE_ERR"
+assert_eq HARNESS_ERROR "$(col 3)" 'status dirty fixture: the row is HARNESS_ERROR'
+run_copy "$HARNESS" prep-good plugin -e 's|^  seed_fixture "\$dir"$|  seed_fixture "$dir"; echo "We will see this soon." >>"$dir/dossier/TONE.md"|'
+assert_eq 2 "$CASE_STATUS" 'prep fixture not lint-clean: exit 2'
+assert_grep '^HARNESS ERROR:.*lint-clean' "$CASE_ERR"
+run_copy "$HARNESS" prep-good plugin -e 's|--confidential-name "\$CONFIDENTIAL_SHORT"|--confidential-name Acme|'
+assert_eq 2 "$CASE_STATUS" 'prep wrong identity: exit 2'
+assert_grep '^HARNESS ERROR:.*identity' "$CASE_ERR"
+
+# Prompts and variants.
+H="$HARNESS_ST"
+CASE_ARGS="--prompt plain"
+run_case baseline FAKE_MODE=chat-only
+CASE_ARGS=""
+assert_eq plain "$(col 4)" 'status --prompt plain: prompt_kind plain'
+assert_eq "$(const_status PROMPT_PLAIN)" "$(cat "$OUT/prompt.txt")" 'status --prompt plain: prompt.txt'
+H="$HARNESS"
+CASE_ARGS="--prompt pressured"
+run_case baseline FAKE_MODE=chat-only
+CASE_ARGS=""
+assert_eq pressured "$(col 4)" 'prep --prompt pressured: prompt_kind pressured'
+assert_eq "$PROMPT_PRESSURED" "$(cat "$OUT/prompt.txt")" 'prep --prompt pressured: prompt.txt'
+usage_status() {
+  local s=0
+  env SCENARIO_CLAUDE="$FAKE" bash "$1" "${@:2}" >/dev/null 2>&1 || s=$?
+  echo "$s"
+}
+for script in "$HARNESS" "$HARNESS_ST"; do
+  assert_eq 2 "$(usage_status "$script" --prompt other "$WORK/u1")" "$(basename "$script"): --prompt other: exit 2"
+  assert_eq 2 "$(usage_status "$script" --variant other "$WORK/u2")" "$(basename "$script"): --variant other: exit 2"
+  assert_eq 2 "$(usage_status "$script" --runs x "$WORK/u3")" "$(basename "$script"): --runs x: exit 2"
+  assert_eq 2 "$(usage_status "$script" --runs)" "$(basename "$script"): --runs without a value: exit 2"
+  assert_eq 2 "$(usage_status "$script" --bogus "$WORK/u4")" "$(basename "$script"): unknown flag: exit 2"
+done
+
+# --runs 2 and the gates.
+H="$HARNESS"
+CASE_ARGS="--runs 2"
+run_case baseline FAKE_MODE=chat-only
+CASE_ARGS=""
+assert_eq 0 "$CASE_STATUS" 'prep --runs 2 + baseline RED: exit 0'
+assert_eq 2 "$(awk -F'\t' 'NR > 1 && $3 == "RED"' "$OUT/summary.tsv" | wc -l | tr -d ' ')" 'prep --runs 2: two RED rows'
+assert_grep '^baseline: RED 2/2 GREEN 0/2 INCOMPLETE 0/2; gate RED >= 1: PASS' "$OUT.stdout"
+assert_file "$OUT/baseline-2.jsonl"
+H="$HARNESS_ST"
+CASE_ARGS="--runs 2"
+run_case baseline FAKE_MODE=status-miss-draft
+CASE_ARGS=""
+assert_eq 0 "$CASE_STATUS" 'status --runs 2 + baseline RED: exit 0'
+assert_eq 2 "$(awk -F'\t' 'NR > 1 && $3 == "RED"' "$OUT/summary.tsv" | wc -l | tr -d ' ')" 'status --runs 2: two RED rows'
+assert_file "$OUT/baseline-2.treediff"
+H="$HARNESS"
+run_case plugin-pointer FAKE_MODE=chat-only
+assert_eq 0 "$CASE_STATUS" 'prep plugin-pointer + chat-only: exit 0 (informational)'
+assert_eq yes "$(col 5)" 'prep plugin-pointer: agents_md yes'
+assert_grep '^plugin-pointer: .*gate none: informational' "$OUT.stdout"
+H="$HARNESS_ST"
+run_case plugin-pointer FAKE_MODE=chat-only
+assert_eq 0 "$CASE_STATUS" 'status plugin-pointer + chat-only: exit 0 (informational)'
+assert_eq yes "$(col 5)" 'status plugin-pointer: agents_md yes'
+
+# The harnesses leave no test-*.sh behind.
+assert_eq 0 "$(ls "$SCEN_DIR" | grep -c '^test-')" 'still no file under tests/scenarios named test-*.sh'
 
 drop_dossier
 
