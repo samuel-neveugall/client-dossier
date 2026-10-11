@@ -88,7 +88,8 @@ Add `--ref v1.0.0` to the first command to pin a release.
 - Codex's custom agents are not plugin-bundled, so `fact-extractor` and `doctrine-reviewer` are not
   used there: the skills run the same extraction and the same review inline.
 - File edits made through `apply_patch` are judged by the sources guard like Claude Code's Write
-  family.
+  family: a patch that adds, updates, deletes or moves a file under `sources/` is denied. This is
+  checked against the guard's input contract, not on a live Codex run.
 - OpenAI's public plugin directory does not list plugins with lifecycle hooks, so this plugin is
   installed from its own marketplace, as above.
 
@@ -124,3 +125,101 @@ installed at all: read `dossier/` and `knowledge/CONTEXT.md` before acting, upda
 before handing back, write each fact as one dated, sourced sentence, never edit `sources/`, never send
 anything, never name a confidential party in `outbound/`. This is the lightest install and the weakest
 one: the pointer is all there is, with no skill to carry the detail, no linter and no hook.
+
+## Usage
+
+In Claude Code the five task skills are slash commands, and arguments are passed through:
+
+- `/client-dossier:dossier-init` scaffolds a dossier, or adopts an existing repository.
+- `/client-dossier:dossier-ingest` files a source and extracts dated, sourced facts from it.
+- `/client-dossier:dossier-draft` writes an outbound draft with its status header, then has it reviewed.
+- `/client-dossier:dossier-call` prepares a call and writes it up afterwards.
+- `/client-dossier:dossier-status` reports where things stand: what is due, overdue, stale or waiting.
+
+They also trigger on plain requests ("where do we stand with the client?"), so you rarely need the
+slash form. The `dossier` skill carries the protocol and loads itself inside a dossier: at the start
+of a session a reminder points the agent to it when a `dossier.yaml` is found in the working directory
+or above.
+
+From a clone of this repository the linter runs on its own:
+
+```bash
+python3 scripts/lint.py [PATH]
+```
+
+It lints the dossier holding `PATH` (the current directory by default), walking upward to the nearest
+`dossier.yaml`. It is read-only and has no repair mode. Exit codes: 0 no error (warnings allowed),
+1 at least one error, 2 no `dossier.yaml` found upward or unreadable, 3 internal error.
+
+## Limits
+
+Two protections are heuristics. This section says where they stop, so you do not rely on them past
+that point.
+
+### The sources guard
+
+In Claude Code a PreToolUse hook denies the likely shortcuts for changing a file under `sources/`. It
+denies:
+
+- in-place edits such as `sed -i`, `gsed -i`, `perl -i`, `awk -i inplace`, `ed`, `vim -es`, `sponge`
+  and `patch`;
+- `rm`, and `mv` out of `sources/`;
+- a redirection (`>` or `>>`) or `tee` onto a path under `sources/`, and `truncate`;
+- the same verbs behind the wrappers `timeout`, `nice`, `ionice`, `stdbuf` and `caffeinate`, and
+  inside `bash -c` strings;
+- the Write, Edit, MultiEdit and NotebookEdit tools on a path under `sources/`.
+
+Copying a new file into `sources/` is allowed: that is how a source is filed.
+
+The guard reads the command text and nothing else, so it does not see what the text only builds at
+run time: `eval`, interpreters such as `python3 -c`, command substitutions and process
+substitutions, variables, loops over globs, shells nested deeper than two levels, and very large
+commands (past its size bounds it only refuses a visible `sources` component). A `cd` through a
+variable is guessed, not followed, and a `cp` onto the name of an existing source is not told apart
+from filing a new one.
+
+On Codex, edits made through `apply_patch` are judged too, by the headers of the patch.
+
+So the skill's rule is the real boundary: nothing under `sources/` is ever modified by any route, seen
+by the guard or not. The guard catches the shortcut an agent is likely to take under pressure; it is
+not a security control. A correction goes in a living file as a dated, sourced line that quotes the
+source as received.
+
+### Confidential names
+
+`dossier.yaml` can list confidential names that must not appear under `outbound/` unless consent is
+recorded with its source. `scripts/lint.py` matches those names tolerantly (markup between words,
+apostrophe look-alikes, a hyphen at the end of a line, percent-encoded file names, a small table of
+Cyrillic and Greek homoglyphs). It does not catch abbreviations, acronyms, nicknames or translations of
+a name (`BT` for `British Telecom`), nor homoglyphs outside that table. The `doctrine-reviewer` agent,
+reading a draft, is the only net for those cases, so a draft that might mention a confidential party
+under another name still needs a human read before it is sent.
+
+## Requirements
+
+- `python3` 3.8 or newer, standard library only. The linter, the hooks and the bundled scripts need
+  nothing else.
+- `git`.
+- Optional: `pdftotext` (from poppler) to read PDFs. Without it a PDF is still filed under
+  `sources/`, and the extraction is reported as skipped.
+
+## Versioning
+
+The plugin follows semantic versioning. `CHANGELOG.md` records every release in the Keep a Changelog
+format. Each release is one git tag `vX.Y.Z`, and the Claude Code and Codex manifests are always at the
+same version.
+
+`scripts/release.sh <version>` cuts a release from a clean checkout: it sets the version in both
+manifests, adds the changelog heading and creates the annotated tag locally. It never pushes: pushing
+the tag, publishing to a marketplace and making the repository public are done by hand.
+
+## License
+
+MIT, Copyright (c) 2026 Samuel Neveu. See [LICENSE](LICENSE).
+
+## Privacy
+
+The plugin never sends anything: no dossier content is uploaded or posted anywhere by it. Everything
+stays in your git repository, and what you do with a remote is up to you. The only network access is
+the download of a link you ask `dossier-ingest` to file. Install from GitHub or from a clean clone: a
+local-path install copies the working tree as it is, uncommitted files included.

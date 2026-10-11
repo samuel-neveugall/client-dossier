@@ -142,6 +142,50 @@ PY
 )"
 assert_eq 'ok' "$COHERENCE" 'CHANGELOG newest released heading equals the manifest version (else 0.1.0)'
 
-# PART2-CHECKS (limits, Codex directory, versioning, licence, privacy: task 2)
+# --- Headings of the second half of the outline -----------------------------
+has_heading '## Usage'
+has_heading '## Limits'
+has_heading '### The sources guard'
+has_heading '### Confidential names'
+has_heading '## Requirements'
+has_heading '## Versioning'
+has_heading '## License'
+has_heading '## Privacy'
+
+# --- Usage: the five task skills and the linter's exit codes -----------------
+for s in '/client-dossier:dossier-init' '/client-dossier:dossier-ingest' \
+  '/client-dossier:dossier-draft' '/client-dossier:dossier-call' \
+  '/client-dossier:dossier-status' 'python3 scripts/lint.py [PATH]' \
+  'no `dossier.yaml` found' 'internal error'; do
+  has_fixed "$s" "$README" "README usage"
+done
+
+# --- Limits of the sources guard and of the confidential-name check ----------
+# (03 D-04, 03 D-17, 05 D-09; case-insensitive phrases of the contract)
+for s in 'eval' 'python3 -c' 'command substitution' 'variable' 'loop' \
+  "the skill's rule is the real boundary" 'apply_patch' 'abbreviation' \
+  'acronym' 'nickname' 'translation' 'homoglyph'; do
+  has_fixed_i "$s" "$README" "README limits"
+done
+# What the guard denies, named so the prose cannot drift to a vaguer claim.
+for s in 'sed -i' 'perl -i' '`rm`' '`mv`' '`tee`' '`truncate`' 'deeper than two levels'; do
+  has_fixed_i "$s" "$README" "README guard denies"
+done
+
+# --- Codex: hook trust, agents, public directory (D-13) ----------------------
+has_fixed_i 'public plugin directory' "$README" 'README Codex directory'
+has_fixed_i 'lifecycle hooks' "$README" 'README Codex lifecycle hooks'
+
+# --- Requirements ------------------------------------------------------------
+has_fixed '3.8' "$README" 'README python version'
+has_fixed 'pdftotext' "$README" 'README optional dependency'
+
+# --- Versioning, licence, privacy --------------------------------------------
+for s in 'CHANGELOG.md' 'vX.Y.Z' 'scripts/release.sh' 'never pushes' 'MIT' \
+  'Samuel Neveu' '[LICENSE](LICENSE)' 'never sends anything'; do
+  has_fixed "$s" "$README" "README versioning/licence/privacy"
+done
+has_fixed_i 'semantic versioning' "$README" 'README versioning'
+has_fixed_i 'clean clone' "$README" 'README privacy install advice'
 
 finish
