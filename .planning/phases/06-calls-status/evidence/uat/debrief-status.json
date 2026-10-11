@@ -1,0 +1,49 @@
+{
+  "root": "/private/var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.t850INjhF7",
+  "today": "2026-10-11",
+  "status_line": "- Pilot price raised to 18,000 euros and accepted on 2026-10-10; revised quote due 2026-10-14 (call 2026-10-10 @12:05).",
+  "commitments": [
+    {
+      "file": "dossier/HISTORY.md",
+      "line": 28,
+      "side": "ours",
+      "heading": "Ours",
+      "date": "2026-10-10",
+      "state": "overdue",
+      "text": "We send the revised quote for the pilot to Jane Doe (Acme Consulting) by 2026-10-14 (call 2026-10-10 @09:05) (corrects a line dated 2026-10-01)."
+    },
+    {
+      "file": "dossier/HISTORY.md",
+      "line": 26,
+      "side": "ours",
+      "heading": "Ours",
+      "date": "2026-10-13",
+      "state": "due_soon",
+      "text": "2026-10-08: draft mail 'revised-quote' written, to be sent by Sam, deadline 2026-10-13 (outbound/mails/2026-10-08_revised-quote.md)."
+    },
+    {
+      "file": "dossier/HISTORY.md",
+      "line": 32,
+      "side": "theirs",
+      "heading": "Theirs",
+      "date": "2026-10-17",
+      "state": "due_soon",
+      "text": "Jane Doe (Acme Consulting) sends the list of pilot sites by 2026-10-17 (call 2026-10-10 @07:30)."
+    }
+  ],
+  "upcoming": [],
+  "last_reflected": "2026-10-11",
+  "unreflected_sources": [],
+  "overdue_drafts": [],
+  "stale_files": [],
+  "staleness_days": 7,
+  "lint": {
+    "available": true,
+    "exit": 0,
+    "errors": 0,
+    "warnings": 0,
+    "findings": [],
+    "info": []
+  },
+  "notes": []
+}
