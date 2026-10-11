@@ -25,7 +25,7 @@ set -u
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 # The case folders, sorted and space-separated. Extended task by task.
-EXPECTED_CASES='write-to-client'
+EXPECTED_CASES='call-prepare deal-status draft-reply ingest-transcript init-new-client write-to-client'
 
 EVALS_DIR="$REPO_ROOT/evals"
 CASES_DIR="$EVALS_DIR/routing"
@@ -241,7 +241,7 @@ cleanup_scaffold() {
   rm -rf "$SC_WS" "$SC_HOME"
 }
 
-SEEDED_CASES='write-to-client'
+SEEDED_CASES='call-prepare deal-status draft-reply ingest-transcript write-to-client'
 for c in $EXPECTED_CASES; do
   case " $SEEDED_CASES " in
     *" $c "*)
@@ -250,10 +250,31 @@ for c in $EXPECTED_CASES; do
       assert_file "$SC_WS/dossier.yaml"
       assert_eq 1 "$(git -C "$SC_WS" rev-list --count HEAD 2>/dev/null || echo none)" "$c: the seed is one commit"
       assert_lint "$SC_WS" 0 "$c: the seeded dossier is lint-clean"
+      if [ "$c" = ingest-transcript ]; then
+        # the transcript sits beside the dossier, written after the seed commit
+        assert_eq '?? call-2026-10-10.txt' "$(git -C "$SC_WS" status --porcelain 2>/dev/null)" "$c: the transcript is the only untracked file"
+        assert_eq 4 "$(wc -l < "$SC_WS/call-2026-10-10.txt" | tr -d ' ')" "$c: the transcript has four lines"
+      fi
       cleanup_scaffold
       ;;
   esac
 done
+
+# init-new-client: a bare repository, no dossier yet (the skill under test creates it)
+case " $EXPECTED_CASES " in
+  *" init-new-client "*)
+    run_scaffold init-new-client
+    assert_eq 0 "$SC_STATUS" 'init-new-client: the scaffold exits 0'
+    assert_dir "$SC_WS/.git"
+    if [ -e "$SC_WS/dossier.yaml" ]; then
+      echo 'FAIL: init-new-client: the scaffold must not seed a dossier.yaml' >&2
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+    else
+      TESTS_PASSED=$((TESTS_PASSED + 1))
+    fi
+    cleanup_scaffold
+    ;;
+esac
 
 # --- evals/results/ (run artefacts) is ignored ---
 assert_grep '^evals/results/$' "$REPO_ROOT/.gitignore"
