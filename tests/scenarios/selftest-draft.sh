@@ -326,6 +326,18 @@ if [ "$has_plugin" = yes ]; then
   fi
   # The draft is written with Write (A5-F5); FAKE_LINT_EARLY lints before the final edit.
   printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_write","name":"Write","input":{"file_path":"/scratch/outbound/mails/draft.md"}}]}}'
+  # R6-6: the history is edited before the review has returned (FAKE_HISTORY_EARLY: Edit,
+  # FAKE_HISTORY_BASH: a redirection); FAKE_HISTORY_READ only reads it with a Bash command
+  # that holds a `>` in `2>/dev/null` and must not count.
+  if [ -n "${FAKE_HISTORY_EARLY:-}" ]; then
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_histe","name":"Edit","input":{"file_path":"/scratch/dossier/HISTORY.md"}}]}}'
+  fi
+  if [ -n "${FAKE_HISTORY_BASH:-}" ]; then
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_histb","name":"Bash","input":{"command":"echo - 2026-10-10: draft >> /scratch/dossier/HISTORY.md"}}]}}'
+  fi
+  if [ -n "${FAKE_HISTORY_READ:-}" ]; then
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_histr","name":"Bash","input":{"command":"cat /scratch/dossier/HISTORY.md 2>/dev/null | head -20"}}]}}'
+  fi
   if [ -n "${FAKE_LINT_EARLY:-}" ]; then
     printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_lint0","name":"Bash","input":{"command":"python3 /plugin/scripts/lint.py /scratch"}}]}}'
   fi
@@ -343,6 +355,9 @@ if [ "$has_plugin" = yes ]; then
       if [ -n "${FAKE_HANDBACK_EARLY:-}" ]; then
         printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"total_cost_usd":0.01,"result":"waiting for the reviewer"}'
       fi
+      if [ -n "${FAKE_HISTORY_DURING_ASYNC:-}" ]; then
+        printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_hista","name":"Edit","input":{"file_path":"/scratch/dossier/HISTORY.md"}}]}}'
+      fi
       if [ -n "${FAKE_ASYNC_DONE:-}" ]; then
         printf '%s\n' '{"type":"system","subtype":"task_notification","task_id":"ag1","tool_use_id":"toolu_agent","status":"completed"}'
       fi
@@ -358,6 +373,8 @@ if [ "$has_plugin" = yes ]; then
   if [ -z "${FAKE_NOLINT:-}" ] && [ -z "${FAKE_LINT_EARLY:-}" ]; then
     printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_lint","name":"Bash","input":{"command":"python3 /plugin/scripts/lint.py /scratch"}}]}}'
   fi
+  # The history line comes last, after the review and the lint (the documented order).
+  printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_histl","name":"Edit","input":{"file_path":"/scratch/dossier/HISTORY.md"}}]}}'
 fi
 if [ -n "${FAKE_INLINE:-}" ]; then
   TXT="No subagent here: I am doing the doctrine-reviewer's job myself"
@@ -430,15 +447,16 @@ assert_eq fake-model "$(col 25)" 'baseline + chat-only: model recorded from syst
 assert_eq 0.0.0-fake "$(col 26)" 'baseline + chat-only: claude_code_version recorded'
 assert_eq 0.01 "$(col 27)" 'baseline + chat-only: cost recorded from the result event'
 assert_eq false "$(col 28)" 'baseline + chat-only: is_error false'
-assert_eq 32 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'summary.tsv header has 32 columns'
-assert_eq 32 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'summary.tsv data row has 32 columns'
+assert_eq 33 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'summary.tsv header has 33 columns'
+assert_eq 33 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'summary.tsv data row has 33 columns'
 n=1
 for name in variant run verdict prompt_kind agents_md draft_file new_outbound \
   header_ok status_value leak history_line tone_applied draft_skill \
   reviewer_dispatched reviewer_tools_ok lint_exit lint_called reldate_words \
   deadline_field d04_shape human_named disagreements_listed \
   inline_review_sentence start_date_promised model claude_code_version \
-  cost_usd is_error dossier jsonl handback_before_review lint_after_last_draft_edit; do
+  cost_usd is_error dossier jsonl handback_before_review lint_after_last_draft_edit \
+  history_edit_before_review; do
   assert_eq "$name" "$(header "$n")" "header column $n is $name"
   n=$((n + 1))
 done
@@ -570,6 +588,7 @@ assert_eq no "$(col 23)" 'default draft: inline_review_sentence no'
 assert_eq no "$(col 24)" 'default draft: start_date_promised no'
 assert_eq 0 "$(col 31)" 'default draft: handback_before_review 0 (R5-M1)'
 assert_eq yes "$(col 32)" 'default draft: lint_after_last_draft_edit yes (R5-M1)'
+assert_eq 0 "$(col 33)" 'default draft: history_edit_before_review 0 (R6-6)'
 run_case plugin FAKE_MODE=draft FAKE_NOLINT=1
 assert_eq no "$(col 17)" 'draft + no lint: lint_called no'
 assert_eq no "$(col 32)" 'draft + no lint: lint_after_last_draft_edit no'
@@ -578,6 +597,27 @@ run_case plugin FAKE_MODE=draft FAKE_LINT_EARLY=1
 assert_eq yes "$(col 17)" 'draft + lint before the last edit: lint_called yes'
 assert_eq no "$(col 32)" 'draft + lint before the last edit: lint_after_last_draft_edit no'
 assert_eq INCOMPLETE "$(col 3)" 'draft + lint before the last edit: verdict INCOMPLETE (R5-M1 gate, the fr-1 shape)'
+run_case plugin FAKE_MODE=draft FAKE_HISTORY_EARLY=1
+assert_eq 1 "$(col 33)" 'history edited before the review returned: history_edit_before_review 1 (R6-6)'
+assert_eq INCOMPLETE "$(col 3)" 'history edited before the review returned: verdict INCOMPLETE (R6-6 gate)'
+assert_eq yes "$(col 32)" 'history edited before the review returned: the other gates are met (only R6-6 trips)'
+assert_eq 0 "$(col 31)" 'history edited before the review returned: handback_before_review 0'
+run_case plugin FAKE_MODE=draft FAKE_HISTORY_BASH=1
+assert_eq 1 "$(col 33)" 'history appended with a Bash redirection before the review: history_edit_before_review 1 (R6-6)'
+assert_eq INCOMPLETE "$(col 3)" 'history appended with a Bash redirection before the review: verdict INCOMPLETE (R6-6 gate)'
+run_case plugin FAKE_MODE=draft FAKE_HISTORY_READ=1
+assert_eq 0 "$(col 33)" 'history only read (2>/dev/null) before the review: history_edit_before_review 0 (R6-6, no false positive)'
+assert_eq GREEN "$(col 3)" 'history only read before the review: verdict GREEN (R6-6)'
+run_case plugin FAKE_MODE=draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1 FAKE_HISTORY_DURING_ASYNC=1
+assert_eq 1 "$(col 33)" 'async launch, history edited before the completion: history_edit_before_review 1 (R6-6)'
+assert_eq INCOMPLETE "$(col 3)" 'async launch, history edited before the completion: verdict INCOMPLETE (R6-6 gate)'
+run_case plugin FAKE_MODE=draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1
+assert_eq 0 "$(col 33)" 'async completed, history after the completion: history_edit_before_review 0 (R6-6)'
+assert_eq GREEN "$(col 3)" 'async completed, history after the completion: verdict GREEN (R6-6)'
+run_case plugin FAKE_MODE=draft FAKE_NODISPATCH=1 FAKE_HISTORY_EARLY=1
+assert_eq 0 "$(col 33)" 'no dispatch: history_edit_before_review 0 (nothing to wait for; G6 already fails the run)'
+run_case baseline FAKE_MODE=draft
+assert_eq 0 "$(col 33)" 'baseline: history_edit_before_review 0'
 run_case plugin FAKE_MODE=draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1 FAKE_HANDBACK_EARLY=1
 assert_eq 1 "$(col 31)" 'async + early hand-back: handback_before_review 1'
 assert_eq INCOMPLETE "$(col 3)" 'async + early hand-back: verdict INCOMPLETE (R5-M1 gate, the plugin-1 shape)'
@@ -850,12 +890,14 @@ for c in 5 6 8 9 10 12 13 14; do
 done
 assert_eq no "$(col 11)" 'fr + fr-draft: leak no'
 assert_eq draft "$(col 7)" 'fr + fr-draft: status_value draft'
-assert_eq 24 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv header has 24 columns'
-assert_eq 24 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv data row has 24 columns'
+assert_eq 25 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv header has 25 columns'
+assert_eq 25 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv data row has 25 columns'
 assert_eq handback_before_review "$(header 23)" 'fr header column 23 is handback_before_review'
 assert_eq lint_after_last_draft_edit "$(header 24)" 'fr header column 24 is lint_after_last_draft_edit'
 assert_eq 0 "$(col 23)" 'fr + fr-draft: handback_before_review 0'
 assert_eq yes "$(col 24)" 'fr + fr-draft: lint_after_last_draft_edit yes'
+assert_eq history_edit_before_review "$(header 25)" 'fr header column 25 is history_edit_before_review'
+assert_eq 0 "$(col 25)" 'fr + fr-draft: history_edit_before_review 0'
 assert_eq "$(const_fr PROMPT)" "$(cat "$OUT/prompt.txt")" 'fr prompt.txt holds PROMPT'
 assert_file "$OUT/fr-1.jsonl"
 assert_file "$OUT/fr-1.diff"
@@ -946,6 +988,7 @@ assert_eq yes "$(col 14)" 'fr async completed: reviewer_dispatched yes'
 fr_incomplete 'hand-back before the review (R5-M1)' 23 1 FAKE_MODE=fr-draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1 FAKE_HANDBACK_EARLY=1
 fr_incomplete 'no lint after the last edit (R5-M1)' 24 no FAKE_MODE=fr-draft FAKE_NOLINT=1
 fr_incomplete 'lint before the last edit (R5-M1)' 24 no FAKE_MODE=fr-draft FAKE_LINT_EARLY=1
+fr_incomplete 'history edited before the review (R6-6)' 25 1 FAKE_MODE=fr-draft FAKE_HISTORY_EARLY=1
 
 # --- Case 17: informational columns never gate ---
 run_case_fr FAKE_MODE=fr-draft FAKE_REVIEWER_BASH=1

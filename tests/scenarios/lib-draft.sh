@@ -427,3 +427,89 @@ with fh:
 print("yes" if last_edit is not None and last_lint is not None and last_lint > last_edit else "no")
 ' "$1"
 }
+
+# draft_history_edit_before_review JSONL — the number of edits of dossier/HISTORY.md
+# made by the main agent BEFORE the doctrine-reviewer's review has returned (R6-6,
+# Phase 5 re-review): a Write, Edit or MultiEdit whose file_path ends with
+# dossier/HISTORY.md, or a Bash command that writes it (a redirection into it, sed -i, tee,
+# perl -pi, mv, cp, a python one-liner that opens it). The review has returned at the same event
+# draft_handback_before_review uses (the tool_result of a foreground dispatch, the
+# completing task_notification of an async one). 0 when no reviewer was dispatched
+# (nothing to wait for). When a dispatch never completes, every edit counts. Gates
+# the plugin variants: GREEN needs 0, because the history line is the commitment and
+# must come after the findings are applied.
+draft_history_edit_before_review() {
+  python3 -I -c '
+import json, re, sys
+path = sys.argv[1]
+suffix = "doctrine-reviewer"
+dispatch = []
+edits = []
+tool_result = {}
+notified = {}
+try:
+    fh = open(path, encoding="utf-8", errors="replace")
+except OSError:
+    print(0)
+    sys.exit(0)
+with fh:
+    for i, line in enumerate(fh):
+        line = line.strip()
+        if not line.startswith("{"):
+            continue
+        try:
+            ev = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(ev, dict):
+            continue
+        t = ev.get("type")
+        if t == "system":
+            if ev.get("subtype") == "task_notification" and ev.get("status") == "completed":
+                for key in ("tool_use_id", "task_id"):
+                    if isinstance(ev.get(key), str) and ev[key] not in notified:
+                        notified[ev[key]] = i
+            continue
+        if t not in ("assistant", "user"):
+            continue
+        msg = ev.get("message")
+        content = msg.get("content") if isinstance(msg, dict) else None
+        if not isinstance(content, list):
+            continue
+        main = not isinstance(ev.get("parent_tool_use_id"), str)
+        for block in content:
+            if not isinstance(block, dict):
+                continue
+            if t == "assistant" and block.get("type") == "tool_use" and isinstance(block.get("input"), dict):
+                inp = block["input"]
+                name = block.get("name")
+                if name in ("Agent", "Task") and str(inp.get("subagent_type", "")).endswith(suffix) \
+                        and isinstance(block.get("id"), str) and main:
+                    dispatch.append((i, block["id"]))
+                elif main and name in ("Write", "Edit", "MultiEdit") \
+                        and str(inp.get("file_path", "")).endswith("dossier/HISTORY.md"):
+                    edits.append(i)
+                elif main and name == "Bash":
+                    cmd = str(inp.get("command", ""))
+                    if re.search(r"(>>?[ \t]*[\"\x27]?[^ \t|;&]*HISTORY\.md)"
+                                 r"|((sed[ \t]+-i|tee|perl[ \t]+-pi|mv|cp)[^|;&]*HISTORY\.md)"
+                                 r"|(python[^|;&]*HISTORY\.md[^|;&]*(write|open\())", cmd):
+                        edits.append(i)
+            elif t == "user" and block.get("type") == "tool_result" and isinstance(block.get("tool_use_id"), str):
+                tur = ev.get("tool_use_result")
+                is_async = (isinstance(tur, dict) and tur.get("isAsync") is True) or "Async agent launched" in json.dumps(block.get("content"))
+                tool_result[block["tool_use_id"]] = (i, is_async, block.get("is_error") is True)
+if not dispatch:
+    print(0)
+    sys.exit(0)
+done = None
+for _, tid in dispatch:
+    res = tool_result.get(tid)
+    if res is None or res[2]:
+        continue
+    idx = notified.get(tid) if res[1] else res[0]
+    if idx is not None and (done is None or idx < done):
+        done = idx
+print(len(edits) if done is None else sum(1 for e in edits if e < done))
+' "$1"
+}
