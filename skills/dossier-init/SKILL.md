@@ -114,6 +114,15 @@ status-header field names and values) stay exactly as the script wrote them.
 
 ## Step 6 — Run the script, or do its job by hand
 
+Quoting rule, for every value in every call of this skill (`--target`, `--counterpart`,
+`--confidential-name`, `--consent-source`, and the rest): put the value between single quotes,
+and write each single quote inside it as `'\''` (close the quote, an escaped quote, reopen).
+`L'Oréal` becomes `'L'\''Oréal'`, so a counterpart is `'L'\''Oréal|CEO|a@b.fr'` and a consent
+source is `'accord de l'\''intéressé'`. Never leave a bare `'` inside a value: the shell would
+end the quote early, split the call at the next `|` or `;`, and the script would receive a
+mangled name (`LOréal`) that silently protects nothing. A value holding a line break is refused:
+ask for it on one line. Double quotes would let `$(...)` and backticks run.
+
 Run the bundled script with every value collected above spelled out as its own flag, so a
 reader can reproduce the exact call. If the `test -x` check of step 4 failed, the next
 subsection applies instead:
