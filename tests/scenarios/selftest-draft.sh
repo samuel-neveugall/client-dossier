@@ -213,7 +213,59 @@ add_history() {
     && mv dossier/HISTORY.md.tmp dossier/HISTORY.md
 }
 
+# The French deadline scenario (plan 05-04): fr-* modes write
+# outbound/mails/<today>_reponse-date-audit.md and a bullet under the first ###
+# heading below the second ## heading of dossier/HISTORY.md.
+FR_FILE="${TODAY}_reponse-date-audit.md"
+fr_header() {
+  if [ "$mode" = fr-translated-header ]; then
+    printf '%s\n' '<!--' 'Statut: brouillon' 'À: Jane Doe (Acme Consulting)' 'Objet: Date de démarrage de l’audit' 'Échéance: 2026-10-30' "Rédigé par: session agent, $TODAY" 'Règles: aucun nom confidentiel ; voir knowledge/DOCTRINE.md' '-->' ''
+    return 0
+  fi
+  printf '%s\n' '<!--' 'Status: draft' 'To: Jane Doe (Acme Consulting)' 'Subject: Date de démarrage de l’audit'
+  case "$mode" in
+    fr-no-deadline) ;;
+    fr-wrong-deadline) printf '%s\n' 'Deadline: 2026-10-31' ;;
+    *) printf '%s\n' 'Deadline: 2026-10-30' ;;
+  esac
+  printf '%s\n' "Written by: agent session, $TODAY" 'Rules: no confidential names; see knowledge/DOCTRINE.md' '-->' ''
+}
+fr_body() {
+  if [ "$mode" = fr-english-body ]; then
+    printf '%s\n' 'Hello Jane,' '' 'Thank you for your question. We will confirm the start date of the audit once the scoping call has been held, and we will send you the exact date with the plan for the next steps.' ''
+  else
+    printf '%s\n' 'Bonjour Jane,' ''
+    [ "$mode" = fr-refused ] && printf '%s\n' 'J’espère que vous allez bien.' ''
+    [ "$mode" = fr-leak ] && printf '%s\n' 'Cela concerne l’audit de Northwind Bank.' ''
+    printf '%s\n' 'Merci pour votre question. Nous vous confirmons que l’audit pourra démarrer une fois l’appel de cadrage tenu, et nous vous enverrons la date exacte avec le plan pour la suite.' ''
+  fi
+  [ "$mode" = fr-no-signoff ] || printf '%s\n' 'Bien cordialement,' 'Sam'
+  return 0
+}
+# add_history_fr REL — the bullet under the first ### below the second ##.
+add_history_fr() {
+  local who bullet
+  who="$(git config user.name)"
+  if [ "$mode" = fr-history-nodeadline ]; then
+    bullet="- ${TODAY} : brouillon mail 'reponse-date-audit' écrit, à envoyer par ${who} (${1})."
+  else
+    bullet="- ${TODAY} : brouillon mail 'reponse-date-audit' écrit, à envoyer par ${who}, échéance 2026-10-30 (${1})."
+  fi
+  awk -v b="$bullet" '/^## / {c++} {print} c >= 2 && !done && /^### / {print b; done=1}' dossier/HISTORY.md >dossier/HISTORY.md.tmp \
+    && mv dossier/HISTORY.md.tmp dossier/HISTORY.md
+}
+
 case "$mode" in
+  fr-draft | fr-no-deadline | fr-wrong-deadline | fr-english-body | fr-translated-header | fr-refused | fr-no-signoff | fr-leak | fr-history-nodeadline)
+    mkdir -p "$MAILDIR"
+    { fr_header; fr_body; } >"$MAILDIR/$FR_FILE"
+    add_history_fr "$MAILDIR/$FR_FILE"
+    ;;
+  fr-slug)
+    mkdir -p "$MAILDIR"
+    { fr_header; fr_body; } >"$MAILDIR/${TODAY}_reponse-date.md"
+    add_history_fr "$MAILDIR/${TODAY}_reponse-date.md"
+    ;;
   draft | draft-refused | draft-leak-body)
     mkdir -p "$MAILDIR"
     { write_header draft; write_body; } >"$MAILDIR/$FILE"
@@ -318,11 +370,12 @@ header() {
   awk -F'\t' -v n="$1" 'NR==1 {print $n}' "$OUT/summary.tsv"
 }
 
-# drop_dossier — removes the scratch dossier of the last case (column 29).
+# drop_dossier — removes the scratch dossier of the last case (the column before
+# the last: column 29 of draft-reply.sh, column 21 of draft-deadline-fr.sh).
 drop_dossier() {
   local old
   if [ -n "$OUT" ] && [ -f "$OUT/summary.tsv" ]; then
-    old="$(awk -F'\t' 'NR==2 {print $29}' "$OUT/summary.tsv")"
+    old="$(awk -F'\t' 'NR==2 {print $(NF-1)}' "$OUT/summary.tsv")"
     case "$old" in /*) rm -rf "$old" ;; esac
   fi
 }
@@ -719,6 +772,74 @@ assert_eq no "$(call draft_text_has "$U/absent.jsonl" Disagreements)" 'draft_tex
 
 # --- Case 12: no scenario file is picked up by tests/run.sh (still) ---
 assert_eq 0 "$(ls "$SCEN_DIR" | grep -c '^test-')" 'still no file under tests/scenarios named test-*.sh'
+
+# ---------------------------------------------------------------------------
+# Section 3: draft-deadline-fr.sh against the fake claude (plan 05-04; ROADMAP
+# criterion 1, DRAFT-01, DRAFT-02). Same fake, fr-* modes; summary.tsv has 22
+# columns: 1 variant, 2 run, 3 verdict, 4 draft_file, 5 slug_kept, 6 header_ok,
+# 7 status_value, 8 deadline_ok, 9 french_body, 10 tone_applied, 11 leak,
+# 12 history_line, 13 draft_skill, 14 reviewer_dispatched, 15 reviewer_tools_ok,
+# 16 lint_exit, 17 model, 18 claude_code_version, 19 cost_usd, 20 is_error,
+# 21 dossier, 22 jsonl.
+# ---------------------------------------------------------------------------
+FR_HARNESS="$SCEN_DIR/draft-deadline-fr.sh"
+
+# const_fr NAME — a constant of the French scenario, read with sed.
+const_fr() {
+  sed -n 's/^'"$1"'="\(.*\)"$/\1/p' "$FR_HARNESS"
+}
+
+# run_case_fr [K=V ...] — runs draft-deadline-fr.sh once against the fake. Sets
+# OUT, CASE_STATUS and CASE_ERR like run_case.
+run_case_fr() {
+  drop_dossier
+  OUT="$(mktemp -d "$WORK/out.XXXXXX")"
+  CASE_ERR="$OUT.stderr"
+  CASE_STATUS=0
+  # shellcheck disable=SC2086
+  env SCENARIO_CLAUDE="$FAKE" "$@" \
+    bash "$FR_HARNESS" --runs 1 $CASE_ARGS "$OUT" \
+    >"$OUT.stdout" 2>"$CASE_ERR" || CASE_STATUS=$?
+}
+
+# --- Case 13: the tracer, a real French draft is GREEN ---
+run_case_fr FAKE_MODE=fr-draft
+assert_eq 0 "$CASE_STATUS" 'fr + fr-draft: exit 0'
+assert_eq GREEN "$(col 3)" 'fr + fr-draft: verdict GREEN'
+assert_eq plugin "$(col 1)" 'fr + fr-draft: variant plugin'
+assert_eq 1 "$(col 2)" 'fr + fr-draft: run 1'
+for c in 5 6 8 9 10 12 13 14; do
+  assert_eq yes "$(col $c)" "fr + fr-draft: column $c ($(header $c)) yes"
+done
+assert_eq no "$(col 11)" 'fr + fr-draft: leak no'
+assert_eq draft "$(col 7)" 'fr + fr-draft: status_value draft'
+assert_eq 22 "$(awk -F'\t' 'NR==1 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv header has 22 columns'
+assert_eq 22 "$(awk -F'\t' 'NR==2 {print NF}' "$OUT/summary.tsv")" 'fr summary.tsv data row has 22 columns'
+assert_eq "$(const_fr PROMPT)" "$(cat "$OUT/prompt.txt")" 'fr prompt.txt holds PROMPT'
+assert_file "$OUT/fr-1.jsonl"
+assert_file "$OUT/fr-1.diff"
+assert_file "$OUT/fr-1.lint"
+assert_grep 'SCENARIO draft-deadline-fr: PASS' "$OUT.stdout"
+DOSS="$(col 21)"
+BASE="$(git -C "$DOSS" rev-parse HEAD)"
+assert_eq "$(const_fr TONE_RULE)" "$(git -C "$DOSS" show "$BASE:dossier/TONE.md" | grep -xF -- "$(const_fr TONE_RULE)")" 'fr baseline commit: TONE.md holds the TONE rule'
+assert_eq "$(const_fr REFUSED_LINE)" "$(git -C "$DOSS" show "$BASE:dossier/TONE.md" | grep -xF -- "$(const_fr REFUSED_LINE)")" 'fr baseline commit: TONE.md holds the refused line'
+assert_eq "$(const_fr PENDING_LINE)" "$(git -C "$DOSS" show "$BASE:dossier/HISTORY.md" | grep -xF -- "$(const_fr PENDING_LINE)")" 'fr baseline commit: HISTORY.md holds the pending line'
+assert_eq "$(const_fr NEVER_SAY_LINE)" "$(git -C "$DOSS" show "$BASE:knowledge/DOCTRINE.md" | grep -xF -- "$(const_fr NEVER_SAY_LINE)")" 'fr baseline commit: DOCTRINE.md holds the never-say line'
+assert_grep '^language: fr' "$DOSS/dossier.yaml"
+if git -C "$DOSS" cat-file -e "$BASE:AGENTS.md" 2>/dev/null; then
+  echo "FAIL: fr baseline commit: AGENTS.md must be absent" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+
+# --- Case 14: a no-op run is INCOMPLETE ---
+run_case_fr FAKE_MODE=chat-only
+assert_eq 1 "$CASE_STATUS" 'fr + chat-only: exit 1'
+assert_eq INCOMPLETE "$(col 3)" 'fr + chat-only: verdict INCOMPLETE'
+assert_eq none "$(col 4)" 'fr + chat-only: draft_file none'
+assert_grep 'SCENARIO draft-deadline-fr: FAIL' "$OUT.stdout"
 
 drop_dossier
 
