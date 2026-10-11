@@ -65,6 +65,28 @@ README and eval are Phase 7.
   self-adapting skill test then verifies PROTO-02 in full; PROTO-08 (task skills stop outside a
   dossier) is verified for all task skills at this phase.
 
+### Manager decisions after research (tier 2, reversible, 2026-10-11)
+- **D-10 — GREEN proves the new skills** (Phase 4/5 lesson): with the current plugin the call-prep
+  file criteria are already met, so GREEN also requires a successful `Skill` invocation of
+  `dossier-call` (CALL-04) / `dossier-status` plus a run of `status.py` (CALL-05); the timed agenda
+  becomes a CALL-04 gate.
+- **D-11 — No `Deadline:` in a call file** (a call prep would otherwise be reported overdue forever
+  by `dossier-status`); the call date lives in the file name and the context section.
+- **D-12 — `status.py` details:** finds `scripts/lint.py` from its own location (two levels up), never
+  from `CLAUDE_PLUGIN_ROOT` (empty in the shell), runs it as a subprocess; filing time of a source =
+  the earlier of its first `git log --no-renames --diff-filter=A` commit time and its mtime;
+  `sources/README.md` excluded; a commitment's due date is the LAST absolute date on its line; a line
+  citing an outbound file whose status is `sent`, or marked done, is skipped; dated "Upcoming" lines
+  are listed as upcoming; exit 2 outside a dossier (PROTO-08).
+- **D-13 — Closing a commitment** is a correction in place (fact-line rule): the line gains
+  "done <date> (<source>)" and `status.py` skips it.
+- **D-14 — A call prep does not go through `doctrine-reviewer`** (it is preparation, not a message);
+  `lint.py` (E5 included) still runs on it.
+- **D-15 — Two existing tests are rewritten in the pointer commit** (`test-skill-ingest.sh` and
+  `test-skill-draft.sh` currently assert that `dossier-call`/`dossier-status` are not named).
+- **D-16 — CALL-05 baseline:** pending Samuel (Q14, asked 2026-10-11): harden the fixture and use a
+  pressured prompt; fallback to "baseline recorded" if still 0 RED.
+
 ### Claude's Discretion
 - Output format of `status.py` (plain text sections, plus `--json` for tests), file names of
   tests, agenda timing granularity.
