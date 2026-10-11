@@ -122,22 +122,22 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Draft (dossier-draft, doctrine-reviewer agent)
 
-- [ ] **DRAFT-01**: `dossier-draft <kind> <slug>` (kinds: mail, message, deliverable, note)
+- [x] **DRAFT-01**: `dossier-draft <kind> <slug>` (kinds: mail, message, deliverable, note)
       reads tone, learnings, doctrine, decisions, and the last outbound files of the same
       kind, then writes the draft under the right outbound folder with a complete status
       header, in the dossier's language, following the tone file's recorded structure
-- [ ] **DRAFT-02**: `dossier-draft` dispatches `doctrine-reviewer`, applies its findings or
+- [x] **DRAFT-02**: `dossier-draft` dispatches `doctrine-reviewer`, applies its findings or
       explicitly lists disagreements, runs `lint.py` on the resulting file, writes the
       deadline (when there is one) in the `Deadline:` field of the status header, and updates
       history with a commitment line — and never sets the draft's status to "sent"
-- [ ] **DRAFT-03**: The `doctrine-reviewer` agent (read-only) takes a draft path, the
+- [x] **DRAFT-03**: The `doctrine-reviewer` agent (read-only) takes a draft path, the
       doctrine, the tone file (including the Refused log), and the confidential names, and
       returns severity-ranked findings (confidential name, forbidden claim, refused pattern,
       unsourced promise, relative date, structural departure) without rewriting the draft
-- [ ] **DRAFT-04**: The "write a quick reply to the client" baseline pressure scenario is
+- [x] **DRAFT-04**: The "write a quick reply to the client" baseline pressure scenario is
       recorded RED (writes inline, never reads tone, never updates history, may name the
       confidential party) before `dossier-draft` exists, and re-run GREEN after
-- [ ] **DRAFT-05**: `dossier-draft` contains the inline review procedure for harnesses
+- [x] **DRAFT-05**: `dossier-draft` contains the inline review procedure for harnesses
       without subagents, says when the main agent is doing the reviewer's job itself, and
       when `lint.py` is absent (bare-skills install) says so and states the rules it would
       have checked
@@ -232,11 +232,11 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | INGEST-04 | Phase 4 | Complete |
 | INGEST-05 | Phase 4 | Complete |
 | INGEST-06 | Phase 4 | Complete |
-| DRAFT-01 | Phase 5 | Pending |
-| DRAFT-02 | Phase 5 | Pending |
-| DRAFT-03 | Phase 5 | Pending |
-| DRAFT-04 | Phase 5 | Pending |
-| DRAFT-05 | Phase 5 | Pending |
+| DRAFT-01 | Phase 5 | Complete |
+| DRAFT-02 | Phase 5 | Complete |
+| DRAFT-03 | Phase 5 | Complete |
+| DRAFT-04 | Phase 5 | Complete |
+| DRAFT-05 | Phase 5 | Complete |
 | CALL-01 | Phase 6 | Pending |
 | CALL-02 | Phase 6 | Pending |
 | CALL-03 | Phase 6 | Pending |

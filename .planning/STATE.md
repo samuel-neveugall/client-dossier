@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: drafting-doctrine-review
 status: ready_to_plan
-stopped_at: Phase 4 closed (verification passed 5/5, UAT complete 6/6, agent-run)
+stopped_at: Phase 5 executed (verification passed, GREEN 3/3, fr run GREEN, 0.858 USD)
 last_updated: "2026-10-10T22:16:24.592Z"
 last_activity: 2026-10-10
-last_activity_desc: Phase 04 executed (5/5 plans), verifier human_needed
+last_activity_desc: Phase 05 executed (5/5 plans), verifier passed
 state_head: 7bc1bf3ddfadf492ab5dede67cc44af1d6c2db07
 progress:
   total_phases: 7
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 31
-  completed_plans: 26
-  percent: 57
+  completed_plans: 31
+  percent: 71
 ---
 
 # Project State
@@ -25,17 +25,17 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 05 — Drafting & Doctrine Review (ready to plan)
+**Current focus:** Phase 05 — Drafting & Doctrine Review (executed; review/audit pending)
 
 ## Current Position
 
-Phase: 05 (drafting-doctrine-review) — READY TO EXECUTE
+Phase: 05 (drafting-doctrine-review) — EXECUTED, verified passed
 Status: Phase 4 done: `04-VERIFICATION.md` passed 5/5 (iter1 human_needed kept as `04-VERIFICATION.iter1.md`),
 `04-UAT.md` complete 6/6 (agent-run, evidence `evidence/uat/`, 0.660 USD). Dispatch of `fact-extractor`
 is mandatory and observed live (r2 runs + UAT). `tests/run.sh` 17 files, 0 failed; INGEST-01..06 complete.
-Last activity: 2026-10-10 — Phase 4 closure (fix-4b, verification, recette)
+Last activity: 2026-10-11 — Phase 5 executed: RED 3/3, GREEN 3/3, fr run GREEN, run.sh 20 files 0 failed
 
-Progress: [██████░░░░] 57%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
