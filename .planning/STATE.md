@@ -49,7 +49,9 @@ Progress: [████████░░] 80%
 
 ### Pending Todos
 
-- Phase 3 executed 2026-10-10: Q6 settled by D-15 (pressured prompt, RED 3/3), Q7 by D-16 (guard hardened); GREEN 3/3 with the plugin. Phase 4 closed. Details: `.planning/missions/2026-10-10-v1-phases-3-7.md`, `03-REVIEW.md`, `03-SECURITY.md`.
+- **Phase 7 paused on Samuel (Q15, 2026-10-11):** slash commands (DIST-04) — one `dossier-lint`
+  command (recommended) vs six distinct-stem commands; same-named commands shadow the skills.
+  Plans 07-01..07-07 done and reviewed (3 rounds); 07-08 (P-01) and 07-09 (close) wait for the answer.
 
 ### Blockers/Concerns
 
