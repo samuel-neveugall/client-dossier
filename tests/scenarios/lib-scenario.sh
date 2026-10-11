@@ -133,6 +133,39 @@ commit_baseline() {
   git -C "$dir" rev-parse HEAD
 }
 
+# --- Phase 6 additions (plan 06-01) ---
+
+# commit_at DIR ISO_DATE MSG — like commit_baseline, but the commit carries
+# ISO_DATE (YYYY-MM-DD, 10:00 local) as author and committer date, so a fixture
+# can hold a history in the past (the dossier-status scenario, D-04). Echoes the
+# new HEAD.
+commit_at() {
+  local dir="$1" iso="$2" msg="$3"
+  case "$iso" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+    *) scenario_die "commit_at: '$iso' is not a YYYY-MM-DD date" ;;
+  esac
+  git -C "$dir" add -A >/dev/null 2>&1 || scenario_die "git add failed in $dir"
+  GIT_AUTHOR_DATE="${iso}T10:00:00" GIT_COMMITTER_DATE="${iso}T10:00:00" \
+    git -C "$dir" commit -q -m "$msg" >/dev/null 2>&1 \
+    || scenario_die "git commit failed in $dir"
+  git -C "$dir" rev-parse HEAD
+}
+
+# set_mtime PATH ISO_DATE — the modification time of PATH becomes ISO_DATE at
+# 10:00 (touch -t, portable BSD and GNU form).
+set_mtime() {
+  local path="$1" iso="$2"
+  case "$iso" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+    *) scenario_die "set_mtime: '$iso' is not a YYYY-MM-DD date" ;;
+  esac
+  touch -t "$(printf '%s' "$iso" | tr -d '-')1000" "$path" \
+    || scenario_die "touch -t failed on $path"
+}
+
+# --- end Phase 6 additions ---
+
 # run_claude DIR OUTFILE PROMPT WITH_PLUGIN — one headless run from DIR,
 # stdout and stderr into OUTFILE (an absolute path). WITH_PLUGIN is yes or no.
 #   --setting-sources project,local  no user settings: no global hooks, plugins
