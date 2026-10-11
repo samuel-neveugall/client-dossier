@@ -287,7 +287,7 @@
         "uat-6"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-7",
@@ -298,7 +298,7 @@
         "uat-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-7",
