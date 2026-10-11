@@ -534,6 +534,18 @@
         "skills/",
         "tests/"
       ],
+      "status": "done"
+    },
+    {
+      "id": "fix-5c",
+      "step": "round 3: R6-1..R6-6, then verify + UAT phase 5",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "scripts/lint.py",
+        "skills/dossier-draft/",
+        "tests/"
+      ],
       "status": "ready"
     }
   ]
