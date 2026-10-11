@@ -44,12 +44,32 @@ scenario_preflight() {
   done
 }
 
-# build_dossier — a fresh scratch dossier, built by the real init.py, in a
-# `mktemp -d` outside any memory-file ancestor. Echoes its path. Callers use
-# DIR=$(build_dossier) || exit 2: the die below exits only the command
-# substitution, the caller's `|| exit 2` stops the run.
+# build_dossier [INIT_ARG...] — a fresh scratch dossier, built by the real
+# init.py, in a `mktemp -d` outside any memory-file ancestor. Echoes its path.
+# Callers use DIR=$(build_dossier) || exit 2: the die below exits only the
+# command substitution, the caller's `|| exit 2` stops the run.
+#
+# D-07 (Phase 5): the arguments, when there are any, replace the four identity
+# arguments of init.py (--language, --counterpart, --confidential-name). With
+# no argument the identity is exactly the one the Phase 3 and 4 scenarios were
+# recorded on (English, Acme Consulting as ordering party AND confidential), so
+# fix-typo.sh, ingest-transcript.sh and ingest-pdf.sh behave as before. The
+# draft scenario needs another identity: Acme Consulting is the ordering party
+# and is NOT confidential, a separate end-client name is. `--target` is set
+# here, so one among the arguments is a harness error.
 build_dossier() {
-  local d parent
+  local d parent a
+  for a in "$@"; do
+    case "$a" in
+      --target | --target=*) scenario_die "build_dossier: --target is set by the function, not by the caller" ;;
+    esac
+  done
+  if [ $# -eq 0 ]; then
+    set -- --language en \
+      --counterpart 'Acme Consulting|ordering party|Jane Doe' \
+      --confidential-name Acme \
+      --confidential-name 'Acme Consulting'
+  fi
   d="$(mktemp -d)" || scenario_die "mktemp -d failed"
   # A parent CLAUDE.md or AGENTS.md would be loaded into the run's context and
   # contaminate it.
@@ -67,11 +87,7 @@ build_dossier() {
   git -C "$d" config user.email "scenario@example.invalid"
   git -C "$d" config commit.gpgsign false
   python3 "$REPO_ROOT/skills/dossier-init/scripts/init.py" \
-    --target "$d" \
-    --language en \
-    --counterpart 'Acme Consulting|ordering party|Jane Doe' \
-    --confidential-name Acme \
-    --confidential-name 'Acme Consulting' >/dev/null 2>&1 \
+    --target "$d" "$@" >/dev/null 2>&1 \
     || scenario_die "init.py failed to scaffold $d"
   [ ! -e "$d/.claude" ] || scenario_die "the scaffold holds a .claude/ folder (workspace trust, T-03-09)"
   echo "$d"

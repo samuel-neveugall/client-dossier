@@ -58,6 +58,14 @@ draft as sent. Requirements DRAFT-01..DRAFT-05. The `dossier` skill gains its po
 - **D-08 — `dossier` skill pointer** to `dossier-draft` lands in this phase; the self-adapting
   skill test picks it up.
 
+### Settled by Samuel after the security audit
+- **D-09 — Harden E5 for every mechanical case** (audit A5-F2, A5-F3, A5-F8), with tests: markup
+  between words (`**`, `<b>`, `<wbr>`, spans, Markdown links), apostrophe variants, the end-of-line
+  hyphenation dash inside a word, `%20`/`+` in file names, a small Cyrillic/Greek homoglyph table,
+  and a non-empty `.gitkeep` under `outbound/`. Abbreviations and acronyms are documented v1 debt,
+  covered by `doctrine-reviewer` alone.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11, option (a))
+
 ### Claude's Discretion
 - Exact reviewer output markup, test file names, how TONE's "structure of a short message" is
   located (heading text in the dossier's language: match by position of the heading under the

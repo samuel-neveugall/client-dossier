@@ -22,6 +22,7 @@ FIXTURES=""
 EMPTY=""
 READONLY=""
 GEN_TMP=""
+E5H=""
 # Folders this file chmod 000s to exercise the unreadable-folder checks
 # (G-02-4e, T-02-28): newline-separated, appended to as each one is locked
 # -- never space-separated (IN-02 of the iteration-4 review): unquoted `for
@@ -49,7 +50,7 @@ EOF
 # assertion anywhere below still leaks nothing. Unlocking runs first: rm -rf
 # on a mode-000 folder fails silently and leaks it.
 trap 'unlock_locked_dirs
-rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP"' EXIT
+rm -rf "$CLEAN" "$CLEAN_FR" "$FIXTURES" "$EMPTY" "$READONLY" "$GEN_TMP" "$E5H"' EXIT
 
 # Every identifier the linter can print. A case asserts its own identifier
 # fires and every other one stays silent.
@@ -1134,6 +1135,207 @@ assert_lint "$rt" 0 'round-trip: the unreserved unknown language exits 0'
 assert_eq 1 "$(count_out_lines "^info: language 'it' ")" "round-trip: the info line names 'it'"
 assert_clean 'round-trip: the unreserved unknown-language dossier'
 rm -rf "$rt"
+
+# --- E5 hardening (05 D-09; A5-F2, A5-F3, A5-F8): markup between the words, apostrophe
+# look-alikes, an end-of-line hyphen inside a word, percent-encoded file names, homoglyphs and a
+# non-empty .gitkeep. One scratch copy of a dossier configured with `Big Telco` and `O'Brien`
+# per case; the body and the file name are written from ASCII-only text (\uXXXX and \n are
+# decoded by python), so the table below stays readable in any terminal. Each row is
+# KIND|LABEL|BODY|FILENAME: `hit` expects an [E5], `miss` expects none (the negative cases: a
+# word that merely CONTAINS the name, a name one letter off). An empty FILENAME is the
+# conforming 2026-09-17_relance.md; rows with a name in FILENAME carry a harmless body. Only
+# [E5] is asserted: a non-conforming slug is an [E4] on purpose.
+E5H="$(scratch_repo)"
+python3 "$(init_py)" --target "$E5H" --language en --confidential-name 'Big Telco' \
+  --confidential-name "O'Brien" >/dev/null || echo "FAIL: e5-hard: init.py could not scaffold" >&2
+
+# e5_hard_case KIND LABEL BODY FILENAME — one row of the table.
+e5_hard_case() {
+  local kind="$1" label="$2" body="$3" fname="${4:-2026-09-17_relance.md}" work
+  work="$(mktemp -d)"
+  cp -R "$E5H/." "$work/"
+  python3 - "$work/outbound/mails/$(python3 -c 'import sys;print(sys.argv[1].encode("ascii").decode("unicode_escape"))' "$fname")" "$body" <<'PY'
+import sys
+path, body = sys.argv[1], sys.argv[2].encode("ascii").decode("unicode_escape")
+head = "Status: draft\nTo: Jane Doe\nSubject: x\nWritten by: agent session, 2026-09-17\n\n"
+with open(path, "w", encoding="utf-8") as handle:
+    handle.write(head + body + "\n")
+PY
+  LINT_OUT="$(python3 "$(lint_py)" "$work" 2>/dev/null)" || true
+  if [ "$kind" = hit ]; then
+    assert_finding E5 "e5-hard $label: found"
+  else
+    assert_no_finding E5 "e5-hard $label: not a leak"
+  fi
+  rm -rf "$work"
+}
+
+while IFS='|' read -r kind label body fname; do
+  [ -n "$kind" ] && e5_hard_case "$kind" "$label" "$body" "$fname"
+done <<'EOF'
+hit|bold between words|We met **Big** Telco today.|
+hit|bold whole name|We met **Big Telco** today.|
+hit|underscore emphasis|We met __Big__ Telco today.|
+hit|html bold|We met <b>Big</b> Telco today.|
+hit|wbr between words|We met Big<wbr>Telco today.|
+hit|spans|We met <span>Big</span><span>Telco</span> today.|
+hit|table cells|<td>Big</td><td>Telco</td>|
+hit|tag inside a word|We met Big Te<b>lco</b> today.|
+hit|html comment|We met Big<!-- x --> Telco today.|
+hit|tag over two lines|We met Big <span\nclass="x">Telco</span>|
+hit|markdown links|We met [Big](http://u.example/a) [Telco](http://v.example/b) today.|
+hit|link with title|We met [Big](http://u.example "t") [Telco](http://v.example) today.|
+hit|reference links|We met [Big][1] [Telco][2] today.|
+hit|inline code|We met `Big` `Telco` today.|
+hit|double-encoded tag|We met &amp;lt;b&amp;gt;Big&amp;lt;/b&amp;gt; Telco today.|
+hit|double-encoded space|We met Big&amp;#32;Telco today.|
+hit|single-encoded space|We met Big&#32;Telco today.|
+hit|apostrophe U+0027|We met O'Brien today.|
+hit|apostrophe U+2018|We met O\u2018Brien today.|
+hit|apostrophe U+2019|We met O\u2019Brien today.|
+hit|apostrophe U+02BC|We met O\u02bcBrien today.|
+hit|apostrophe U+0060|We met O`Brien today.|
+hit|apostrophe U+00B4|We met O\u00b4Brien today.|
+hit|apostrophe U+2032|We met O\u2032Brien today.|
+hit|no apostrophe|We met OBrien today.|
+hit|apostrophe and a space|We met O\u2018 Brien today.|
+hit|hyphen break inside a word|We met Big Tel-\nco today.|
+hit|hyphen break, indented continuation|We met Big Tel-\n   co today.|
+hit|hyphen break U+2010|We met Big Tel\u2010\nco today.|
+hit|hyphen break in the first word|We met Bi-\ng Telco today.|
+hit|hyphen break between the words|We met Big-\nTelco today.|
+hit|Cyrillic es in Telco|We met Big Tel\u0441o today.|
+hit|Cyrillic i in Big|We met B\u0456g Telco today.|
+hit|Greek omicron|We met Big Telc\u03bf today.|
+hit|Cyrillic capital O|We met BIG TELC\u041e today.|
+hit|Cyrillic a and e|We met Big T\u0435lco today.|
+hit|Greek upsilon in O'Brien|We met O'Br\u03b9en today.|
+hit|file name %20|Hello.|2026-09-17_big%20telco.md
+hit|file name plus|Hello.|2026-09-17_big+telco.md
+hit|file name double %25|Hello.|2026-09-17_big%2520telco.md
+hit|file name %27 apostrophe|Hello.|2026-09-17_o%27brien.md
+hit|file name %E2%80%99 apostrophe|Hello.|2026-09-17_o%E2%80%99brien.md
+hit|file name Cyrillic|Hello.|2026-09-17_big-tel\u0441o.md
+hit|file name uppercase %20|Hello.|2026-09-17_Big%20Telco.md
+miss|bigger name|We met Bigger Telco today.|
+miss|name contained in a longer word|We met Big Telcom today.|
+miss|plural suffix|We met Big Telcos today.|
+miss|prefix glued on|We met Pigbig Telco today.|
+miss|different first word|We met Pig Telco today.|
+miss|comma between words|We met Big, Telco today.|
+miss|bold on unrelated words|We met **Big** and Telco today.|
+miss|links on unrelated words|We met [Big](http://u.example) and [Telco](http://v.example) today.|
+miss|tag around a near name|We met Big <b>Tel</b> co today.|
+miss|html tag around a longer word|We met <b>Big</b> Telcom today.|
+miss|hyphen break in a near name|We met Big Tel-\ncom today.|
+miss|hyphen break over a blank line|We met Big Tel-\n\nco today.|
+miss|OBrien inside a longer word|We met Obrienne today.|
+miss|O'Brien plus letters|We met O'Brienne today.|
+miss|homoglyph near name|We met Big Tel\u0441om today.|
+miss|a lone tag|We met Big <wbr> and others, Telco not.|
+miss|file name near name|Hello.|2026-09-17_big%20telcom.md
+miss|file name unrelated|Hello.|2026-09-17_big%20bank.md
+miss|file name longer word|Hello.|2026-09-17_bigger%20telco.md
+hit|R6-1 br then wbr inside the name|Hello<br>Big Tel<wbr>co today.|
+hit|R6-1 wbr then br after the name|We met Big Tel<wbr>co<br>Corp today.|
+hit|R6-1 br before and wbr inside|Hello<br>Big Tel<wbr>co<br>Corp.|
+hit|R6-1 ZWSP before and inside|Hello\u200bBig Tel\u200bco today.|
+hit|R6-1 tag before and soft hyphen inside|Hello<br>Big Te\u00adlco today.|
+hit|R6-1 emphasis before and tag inside|Hello**Big Tel<wbr>co** today.|
+hit|R6-1 ZWSP between and tag inside|Big\u200bTe<b>lco</b> today.|
+hit|R6-1 link target then tag inside|[Hi](http://u.example)Big Tel<wbr>co today.|
+hit|R6-1 apostrophe name with mixed|Hello<br>O<wbr>'Brien today.|
+miss|R6-1 br then a spaced wbr|Hello<br>Big Tel<wbr> co today.|
+miss|R6-1 br then a longer word|Hello<br>Big Tel<wbr>com today.|
+miss|R6-1 br then a longer first word|Hello<br>Bigger Tel<wbr>co today.|
+miss|R6-1 ZWSP then a near name|Hello\u200bBig Tel\u200bcom today.|
+miss|R6-1 gap glued to a longer word|Hello<br>Pigbig Tel<wbr>co today.|
+hit|R6-2 single-quoted title|We met [Big](http://u.example 'the title') [Telco](http://v.example) today.|
+hit|R6-2 parenthesised title|We met [Big](http://u.example (the title)) [Telco](http://v.example) today.|
+hit|R6-2 angle-bracket target with a space|We met [Big](<http://u.example/a b>) [Telco](http://v.example) today.|
+hit|R6-2 blanks inside the parentheses|We met [Big]( http://u.example ) [Telco](  http://v.example  ) today.|
+hit|R6-2 nested parentheses|We met [Big](http://u.example/a_(b)) [Telco](http://v.example) today.|
+hit|R6-2 doubly nested parentheses|We met [Big](http://u.example/(a(b))) [Telco](http://v.example) today.|
+hit|R6-2 angle target and title|We met [Big](<http://u.example/a b> "t") [Telco](v) today.|
+hit|R6-2 greater-than in a double-quoted attribute|We met Big<a title="a>b">Telco</a> today.|
+hit|R6-2 greater-than in a single-quoted attribute|We met Big <a title='a>b'>Telco</a> today.|
+hit|R6-2 greater-than in an attribute inside the name|We met Big Te<span title="x>y">lco</span> today.|
+hit|R6-2 image link|We met ![Big](http://u.example 'p') Telco today.|
+miss|R6-2 single-quoted title on unrelated words|We met [Big](http://u.example 'the title') and [Telco](http://v.example) today.|
+miss|R6-2 nested parentheses on unrelated words|We met [Big](http://u.example/a_(b)) and [Telco](http://v.example) today.|
+miss|R6-2 attribute with greater-than, unrelated words|We met <a title="a>b">Big</a> and Telco today.|
+miss|R6-2 attribute with greater-than, near name|We met Big <a title="a>b">Tel</a> co today.|
+miss|R6-2 unbalanced quote in a tag|We met <a it's>Big</a> and more, Telco not.|
+miss|R6-2 ordinary prose with angle brackets|We met when a < b and c > d, Big and Telco apart.|
+hit|R6-3 hyphen U+2010 between the words|We met Big\u2010Telco today.|
+hit|R6-3 non-breaking hyphen U+2011|We met Big\u2011Telco today.|
+hit|R6-3 en dash between the words|We met Big\u2013Telco today.|
+hit|R6-3 non-breaking hyphen in O'Brien spelling|We met O\u2011Brien today.|
+hit|R6-3 fullwidth grave U+FF40|We met O\uff40Brien today.|
+hit|R6-3 fullwidth apostrophe U+FF07|We met O\uff07Brien today.|
+hit|R6-3 fullwidth grave in a file name|Hello.|2026-09-17_o\uff40brien.md
+hit|R6-3 U+2010 in a file name|Hello.|2026-09-17_big\u2010telco.md
+miss|R6-3 U+2011 and a longer word|We met Big\u2011Telcom today.|
+miss|R6-3 fullwidth grave and a longer word|We met O\uff40Brienne today.|
+miss|R6-3 U+2010 in a near name|We met Big\u2010Telcom today.|
+miss|R6-3 U+2011 between unrelated words|We met Big\u2011and Telco today.|
+miss|R6-3 L'Oreal is not a configured name|We met L'Or\u00e9al and O\u2011Neil today.|
+EOF
+
+# A non-empty .gitkeep under outbound/ is read by E5 and by nothing else (A5-F8); an empty one
+# stays ignored (LINT-01).
+gk="$(mktemp -d)"
+cp -R "$E5H/." "$gk/"
+printf 'leftover note about Big Telco\n' >"$gk/outbound/mails/.gitkeep"
+assert_lint "$gk" 1 'e5-hard gitkeep: a name in a non-empty outbound .gitkeep exits 1'
+assert_only E5 'e5-hard gitkeep: only [E5] fires (E1-E4 never see a .gitkeep)'
+assert_out_line '^outbound/mails/\.gitkeep:1: ERROR \[E5\] .*Big Telco' 'e5-hard gitkeep: reported with its line'
+printf 'keep this folder\n' >"$gk/outbound/mails/.gitkeep"
+assert_lint "$gk" 0 'e5-hard gitkeep: a non-empty .gitkeep without a name exits 0'
+assert_clean 'e5-hard gitkeep: innocuous content'
+: >"$gk/outbound/mails/.gitkeep"
+assert_lint "$gk" 0 'e5-hard gitkeep: an empty .gitkeep stays ignored'
+printf 'Big Telco\n' >"$gk/dossier/.gitkeep"
+assert_lint "$gk" 0 'e5-hard gitkeep: a non-empty .gitkeep outside outbound/ is not read'
+rm -rf "$gk"
+
+# A non-empty .gitkeep E5 cannot read is an "unreadable" error, never a silent skip (R6-4):
+# UTF-16, Latin-1, over 5 MB and a symlink. Positive and negative.
+gu="$(mktemp -d)"
+cp -R "$E5H/." "$gu/"
+printf '\xff\xfeB\x00i\x00g\x00 \x00T\x00e\x00l\x00c\x00o\x00\n\x00' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: UTF-16 exits 1'
+assert_only E5 'e5-hard unreadable gitkeep: UTF-16: only [E5] fires'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: UTF-16 reported as unreadable'
+printf 'caf\xe9 Telco\n' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: Latin-1 exits 1'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: Latin-1 reported as unreadable'
+python3 -c 'import sys; sys.stdout.write("x" * 5100000)' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: over 5 MB exits 1'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: over 5 MB reported as unreadable'
+rm -f "$gu/outbound/mails/.gitkeep"
+printf 'keep\n' >"$gu/real-keep"
+ln -s ../../real-keep "$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 1 'e5-hard unreadable gitkeep: a symlink exits 1'
+assert_out_line '^outbound/mails/\.gitkeep:0: ERROR \[E5\] .*unreadable' 'e5-hard unreadable gitkeep: a symlink reported as unreadable'
+rm -f "$gu/outbound/mails/.gitkeep"
+printf 'caf\xe9\n' >"$gu/dossier/.gitkeep"
+assert_lint "$gu" 0 'e5-hard unreadable gitkeep: an unreadable .gitkeep outside outbound/ is not read'
+rm -f "$gu/dossier/.gitkeep"
+printf 'plain ascii keep\n' >"$gu/outbound/mails/.gitkeep"
+assert_lint "$gu" 0 'e5-hard unreadable gitkeep: a readable non-empty .gitkeep stays clean'
+assert_clean 'e5-hard unreadable gitkeep: readable content'
+rm -rf "$gu"
+
+# The linter stays read-only on the scratch dossier (nothing written by the new passes).
+ro="$(mktemp -d)"
+cp -R "$E5H/." "$ro/"
+printf 'Status: draft\nTo: Jane\nSubject: x\nWritten by: a\n\nWe met **Big** Telco.\n' >"$ro/outbound/mails/2026-09-17_relance.md"
+before="$(find "$ro" -type f -exec shasum {} + | sort | shasum)"
+python3 "$(lint_py)" "$ro" >/dev/null 2>&1 || true
+after="$(find "$ro" -type f -exec shasum {} + | sort | shasum)"
+assert_eq "$before" "$after" 'e5-hard: the linter wrote nothing'
+rm -rf "$ro"
 
 # --- No dossier: exit 2, the stderr message, nothing on stdout (D-02, P-13) ---
 # The upward walk has no stop condition (D-01), so this case only means

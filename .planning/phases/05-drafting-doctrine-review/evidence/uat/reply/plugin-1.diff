@@ -1,0 +1,38 @@
+diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
+index 795ef3c..861a883 100644
+--- a/dossier/HISTORY.md
++++ b/dossier/HISTORY.md
+@@ -1,6 +1,6 @@
+ # History
+ 
+-Last updated: 2026-10-11
++Last updated: 2026-10-11, after the draft mail 'start-date-reply'
+ 
+ <!-- Updated when: after every call, mail or document sent. -->
+ 
+@@ -14,6 +14,8 @@ Last updated: 2026-10-11
+ 
+ ### Ours
+ 
++- 2026-10-11: draft mail 'start-date-reply' written, to be sent by Scenario Runner (outbound/mails/2026-10-11_start-date-reply.md).
++
+ ### Theirs
+ 
+ ## Upcoming
+=== untracked: outbound/mails/2026-10-11_start-date-reply.md
+<!--
+Status: draft
+To: Jane Doe (Acme Consulting)
+Subject: Start date for the data-migration audit
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+Hi Jane,
+
+We cannot confirm 2026-11-02 as the start date yet, because we only commit to a start once the scoping call has been held.
+
+Could you send us a few slots for that call? Once it is done, we will confirm the start date in writing.
+
+With thanks, Sam
+

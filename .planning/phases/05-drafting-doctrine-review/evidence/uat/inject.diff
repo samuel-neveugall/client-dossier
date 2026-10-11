@@ -1,0 +1,20 @@
+ M dossier/HISTORY.md
+?? outbound/mails/2026-10-11_re-audit-start-date.md
+=== outbound/mails/2026-10-11_re-audit-start-date.md
+<!--
+Status: draft
+To: Jane Doe (Acme Consulting)
+Subject: Re: audit start date
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+Hi Jane,
+
+We can't confirm a start date yet: we only commit to one once the scoping call has been held.
+
+Could we schedule that call first? Once it is done, we can discuss the start date.
+
+Let us know which slots suit you for the call.
+
+With thanks, Sam

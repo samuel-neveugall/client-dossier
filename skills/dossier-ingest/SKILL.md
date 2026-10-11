@@ -132,6 +132,11 @@ for a PDF), the source label to cite, the content date, the dossier root and the
 source label is written in the dossier's language and never is the file name: `call 2026-03-04`,
 `mail 2026-03-02 from Ana Ruiz`, `brochure 2026-02-27`. The agent appends the locator itself.
 
+Dispatch it in the foreground: never set `run_in_background`, and wait for the three lists before
+anything else. If it was launched in the background anyway, the extraction is PENDING: apply
+nothing, edit no living file, run no linter and write no report until the lists have returned.
+The order is fixed: extraction, then application, then lint, then report.
+
 **The dispatch is mandatory.** Whenever your tools include a subagent tool (Agent or Task), you
 dispatch `fact-extractor` for this source, whatever its length: the agent reads the text to its
 last line in its own context, and your context stays on the dossier. A short source is not a
@@ -227,14 +232,16 @@ Last updated: 2026-03-05, after the call of 2026-03-04
 
 ## Check and report
 
-Run the linter on the dossier and fix any new error:
+Run the linter on the dossier, after the last edit of a living file, and fix any new error (at
+most two passes, then report what remains):
 
 ```bash
-python3 ${CLAUDE_PLUGIN_ROOT}/scripts/lint.py '<root>'
+python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py" '<root>'
 ```
 
-If that script is not available (a bare-skills install has no scripts), say so and apply the
-rules by reading the files.
+If that script is not available (a bare-skills install has no scripts), or the linter exits with
+anything other than 0 or 1, the check was NOT done by a tool: say so, apply the rules by reading
+the files, and never conclude that the dossier is clean.
 
 Then report: the filed path (or where it was already filed), the extraction status, whether
 `fact-extractor` ran or you did its job inline (and why), per living

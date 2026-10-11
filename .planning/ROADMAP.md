@@ -31,7 +31,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - [x] **Phase 2: Linter & Test Harness** - `scripts/lint.py` mechanically enforces the shape of a dossier, proven by fixtures (completed 2026-10-10)
 - [x] **Phase 3: Protocol Skill & Hooks** - the `dossier` skill and its three hooks teach and enforce the read-before-act contract
 - [x] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts (completed 2026-10-10)
-- [ ] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
+- [x] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
 - [ ] **Phase 6: Calls & Status** - `dossier-call` and `dossier-status` close the loop on preparation, debrief, and "where are we"
 - [ ] **Phase 7: Manifests, Docs & Distribution** - both manifests, commands, README/LICENSE/CHANGELOG, and trigger-description eval
 
@@ -304,7 +304,30 @@ rules the skill applies), Phase 4 (history and learnings the draft skill reads b
      tone/history never touched, confidential name possibly leaked) to GREEN.
   5. The skill text contains the inline review procedure for a harness without subagents,
      and says what it does when `lint.py` is absent.
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1**
+
+- [x] 05-01-PLAN.md — tracer: build_dossier identity arguments, the draft-reply scenario harness
+  (G1-G6, reviewer dispatch gating as the 04 D-12 analogue) proven against a fake claude, then the
+  paid RED baseline without the plugin, before the skill exists (D-07)
+- [x] 05-02-PLAN.md — tracer: the read-only doctrine-reviewer agent with its shared review-rules
+  block and frontmatter guard, and the heading positions it relies on in both template languages
+  (D-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 05-03-PLAN.md — tracer: the dossier-draft skill, its contract test and its own shapes through
+  the real linter, with the dossier pointer and the test-skill-ingest loop edit in one commit after
+  the baseline; then the shapes' negative and French controls (D-01 to D-06, D-08)
+- [x] 05-04-PLAN.md — tracer: the French deadline draft scenario (ROADMAP criterion 1) proven against
+  the fake claude, without touching the baseline harness
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 05-05-PLAN.md — the paid French run then GREEN 3/3 with dossier-draft invoked and the reviewer
+  dispatched, CLAUDE.md lines and the spec check, full verification and the validation contract
 
 ### Phase 6: Calls & Status
 
@@ -364,6 +387,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 2. Linter & Test Harness | 9/9 | Complete    | 2026-10-10 |
 | 3. Protocol Skill & Hooks | 6/6 | Complete — verified + recette agent-run | 2026-10-10 |
 | 4. Ingest & Fact Extraction | 5/5 | Complete — verified + recette agent-run | 2026-10-10 |
-| 5. Drafting & Doctrine Review | 0/TBD | Not started | - |
+| 5. Drafting & Doctrine Review | 5/5 | Complete — verified + recette agent-run | 2026-10-11 |
 | 6. Calls & Status | 0/TBD | Not started | - |
 | 7. Manifests, Docs & Distribution | 0/TBD | Not started | - |

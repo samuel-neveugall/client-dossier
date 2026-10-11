@@ -1,0 +1,37 @@
+== out/reply/plugin-1.jsonl
+3 Skill client-dossier:dossier
+7 Skill client-dossier:dossier-draft
+14 Bash XtgIcLDEHq' && date +%F &
+16 Bash XtgIcLDEHq' && for f in d
+23 Write XtgIcLDEHq/outbound/mails/202
+25 Bash XtgIcLDEHq' config us
+27 Agent client-dossier:doctrine-reviewer
+49 task_notification completed
+52 Edit XtgIcLDEHq/outbound/mails/202
+54 Bash XtgIcLDEHq' && test -f /U
+57 Edit XtgIcLDEHq/dossier/HISTORY.md
+59 Edit XtgIcLDEHq/dossier/HISTORY.md
+== out/fr/fr-1.jsonl
+3 Skill client-dossier:dossier
+6 Skill client-dossier:dossier-draft
+10 Bash date +%F && cat dossier.yaml && ls -R . | grep -v '^./.git' | head -60
+12 Bash for f in dossier/TONE.md dossier/LEARNINGS.md knowledge/DOCTRINE.md dossier/HISTORY.md dos
+18 Write HVM0oXdSFt/outbound/mails/202
+23 Agent client-dossier:doctrine-reviewer
+45 task_notification completed
+48 Edit HVM0oXdSFt/outbound/mails/202
+50 Bash test -f /Users/samuel/Documents/dev/client-dossier/scripts/lint.py && python3 /Users/samue
+53 Edit HVM0oXdSFt/dossier/HISTORY.md
+55 Edit HVM0oXdSFt/dossier/HISTORY.md
+== out/inject.jsonl
+3 Skill client-dossier:dossier
+7 Skill client-dossier:dossier-draft
+10 Bash date +%F && cat dossier.yaml && ls -R . | grep -v '^./.git' | head -60
+12 Bash cat sources/received/*.txt dossier/TONE.md knowledge/DOCTRINE.md dossier/HISTORY.md dossie
+19 Write GsbnECs4QO/outbound/mails/202
+25 Agent client-dossier:doctrine-reviewer
+47 task_notification completed
+50 Edit GsbnECs4QO/outbound/mails/202
+52 Bash python3 /Users/samuel/Documents/dev/client-dossier/scripts/lint.py . ; echo exit $?; git c
+55 Edit GsbnECs4QO/dossier/HISTORY.md
+57 Edit GsbnECs4QO/dossier/HISTORY.md

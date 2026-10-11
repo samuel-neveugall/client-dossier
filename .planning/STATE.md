@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 05
-current_phase_name: drafting-doctrine-review
+current_phase: 06
+current_phase_name: calls-status
 status: ready_to_plan
-stopped_at: Phase 4 closed (verification passed 5/5, UAT complete 6/6, agent-run)
-last_updated: "2026-10-10T21:30:00.000Z"
-last_activity: 2026-10-10
-last_activity_desc: Phase 04 executed (5/5 plans), verifier human_needed
-state_head: 8868bd0e6b49f5424a3dbb24b67cfd6a1fa7f57b
+stopped_at: Phase 5 closed (verification passed 5/5, UAT 6/6 agent-run); Phase 6 ready to plan
+last_updated: "2026-10-11T07:30:00.000Z"
+last_activity: 2026-10-11
+last_activity_desc: Phase 05 closed - review fix round 3, re-verification passed, UAT complete
+state_head: 7bc1bf3ddfadf492ab5dede67cc44af1d6c2db07
 progress:
   total_phases: 7
-  completed_phases: 4
-  total_plans: 26
-  completed_plans: 26
+  completed_phases: 5
+  total_plans: 31
+  completed_plans: 31
   percent: 71
 ---
 
@@ -25,15 +25,17 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 05 — Drafting & Doctrine Review (ready to plan)
+**Current focus:** Phase 06 — Calls & Status (ready to plan)
 
 ## Current Position
 
-Phase: 05 (drafting-doctrine-review) — ready to plan (Phase 4 closed 2026-10-10)
-Status: Phase 4 done: `04-VERIFICATION.md` passed 5/5 (iter1 human_needed kept as `04-VERIFICATION.iter1.md`),
-`04-UAT.md` complete 6/6 (agent-run, evidence `evidence/uat/`, 0.660 USD). Dispatch of `fact-extractor`
-is mandatory and observed live (r2 runs + UAT). `tests/run.sh` 17 files, 0 failed; INGEST-01..06 complete.
-Last activity: 2026-10-10 — Phase 4 closure (fix-4b, verification, recette)
+Phase: 06 (calls-status) — READY TO PLAN. Phase 05 (drafting-doctrine-review) is CLOSED.
+Status: Phase 5 done: `05-VERIFICATION.md` passed 5/5 (iter1 kept as `05-VERIFICATION.iter1.md`), `05-UAT.md`
+complete 6/6 (agent-run, evidence `evidence/uat/`, 0.774 USD), review fix rounds 1-3 recorded in
+`05-REVIEW-FIX.md`. Dispatch of `doctrine-reviewer` is mandatory, foreground, and applied before lint and
+history (harness gates handback_before_review, lint_after_last_draft_edit, history_edit_before_review).
+`tests/run.sh` 20 files, 0 failed; test-lint 1728/0; DRAFT-01..05 complete, PROTO-02 pointer to `dossier-draft` added.
+Last activity: 2026-10-11 — Phase 5 closed. Next: plan Phase 6 (06-CONTEXT D-10..D-16 already settled).
 
 Progress: [███████░░░] 71%
 
@@ -69,9 +71,10 @@ Progress: [███████░░░] 71%
 | Debt (Phase 2 review, iteration 3) | Three reproduced fail-open paths of the confidentiality gate (E5), each letting a confidential name under `outbound/` pass with exit 0; none introduced by the fix rounds: CR-01 `Outbound/` on a case-insensitive filesystem escapes every outbound check; CR-02 zero-width/BOM/soft-hyphen characters in a name survive `init.py` and defeat the text match; CR-03 HTML entities in an outbound `.html` hide names. Plus WR-01 (near-miss rule rejects legitimate extra keys like `consent_scope`), WR-02 (two untested lines), WR-03 (unreadable dir or `.git/` under `outbound/` skipped silently), WR-04 (name wrapped across `> ` quoted lines). Details: `02-REVIEW.md`. | Resolved — gap closure 2026-09-25 (02-07..02-09 + review-fix rounds, branch `feat/phase-02-gap-closure`); Samuel ordered the fix round in UAT item 4 | 2026-09-24 (Phase 2 review, iteration 3) | v1 |
 | Debt (Phase 2 gap-closure review) | WR-01: E5 is blind only to Unicode category Cf, not the wider default-ignorable set (CGJ, variation selectors, Hangul fillers). OBS-01: no runtime rejection of a confidential name starting with `>`. CR-02 bis residual: a double typo landing inside the last word of a `confidential_names` misspelling beside the exact key stays ignored. Minor: `_osa_distance` has no internal length guard (safe only through its call sites). Details: `02-REVIEW-FIX.md`, `02-VERIFICATION.md`. | WR-01 resolved — `ce42a6a` (2026-10-10, every Default_Ignorable_Code_Point treated like Cf in `lint.py` and `init.py`). OBS-01, the CR-02 bis residual and the `_osa_distance` guard stay open as accepted v1 debt | 2026-09-25 (gap-closure review) | v1 |
 | Accepted v1 debt (D-17) | Phase 3 Bash guard (D-04): it reads the command text only and does not see `eval`, `bash -c "$(...)"`, process substitution, `ssh h <<EOF`, interpreters (`python3 -c`...), variables, loops over globs, `bash -c` deeper than 2 levels or scripts over 64 KB; `cd $X; cd sources` and `cd /nonexistent` are guessed, not followed; a diff handed to `patch -p1` or a `cp dossier/*.txt sources/` onto an existing name is unseen. The skill's rule (never modify a source by any route) is the boundary; the skill states it. Past a bound (operand > 4096 chars, > 512 operands, > 4096 judged paths) the guard only refuses a visible `sources` component. Details: `03-REVIEW-FIX.iter3.md`. | Accepted — Samuel, AskUserQuestion main session, 2026-10-10 (D-17); README to state it (DIST-05) | 2026-10-10 (Phase 3 review, round 3) | v1 |
+| Accepted v1 debt (05 D-09) | E5 (`scripts/lint.py`) does not cover abbreviations, acronyms, nicknames or translations of a confidential name (`BT` for `British Telecom`), nor homoglyphs outside the small `_HOMOGLYPHS` table; the doctrine-reviewer is the only net for these. Hardened instead in fix-5b: markup between words, apostrophe look-alikes, end-of-line hyphen inside a word, percent-encoded file names, double HTML encoding, Cyrillic/Greek homoglyphs, non-empty `.gitkeep`; round 3 (2026-10-11) added the tolerant mixed-markup reading, link/tag long tail, Unicode dashes and an unreadable `.gitkeep` error. Details: `05-SECURITY.md` A5-F2, A5-F3, A5-F8. | Accepted - Samuel, AskUserQuestion main session, 2026-10-11 (05 D-09, option a) | 2026-10-11 (Phase 5 audit) | v1 |
 
 ## Session Continuity
 
-Last session: 2026-10-10
-Stopped at: Phase 4 closed (verification passed, UAT complete)
-Resume file: .planning/phases/04-ingest-fact-extraction/04-UAT.md
+Last session: 2026-10-11
+Stopped at: Phase 5 closed (verification passed, UAT complete)
+Resume file: .planning/phases/05-drafting-doctrine-review/05-UAT.md

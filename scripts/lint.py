@@ -34,6 +34,7 @@ import os
 import re
 import sys
 import unicodedata
+import urllib.parse
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -1192,10 +1193,16 @@ class Tree:
     file), but recorded and reported the same way as `unreadable`.
     """
 
-    __slots__ = ("files", "dirs", "file_set", "pruned", "symlinks", "unreadable", "git_dirs")
+    __slots__ = ("files", "dirs", "file_set", "pruned", "symlinks", "unreadable", "git_dirs",
+                 "gitkeeps")
 
-    def __init__(self, files, dirs, pruned=(), symlinks=(), unreadable=(), git_dirs=()):
+    def __init__(self, files, dirs, pruned=(), symlinks=(), unreadable=(), git_dirs=(), gitkeeps=()):
         self.files = files
+        # The NON-EMPTY `.gitkeep` files under outbound/ (A5-F8, 05 D-09): an
+        # empty one is the placeholder LINT-01 ignores, one holding bytes is
+        # a document like any other. Kept out of `files`, so E1-E4 and E9
+        # never see it; only E5 reads it.
+        self.gitkeeps = list(gitkeeps)
         self.dirs = dirs
         self.file_set = frozenset(files)
         self.pruned = list(pruned)
@@ -1215,7 +1222,8 @@ def walk_tree(root):
     deliberately not overridden -- T-02-03: a link may point outside the
     dossier, or back up into it); each one is recorded in `symlinks` so it
     is reported, never silently skipped (WR-02). `.gitkeep` is dropped
-    everywhere (LINT-01). A dossier.yaml inside the fixed layout (LAYOUT_DIRS)
+    everywhere (LINT-01), except that a non-empty one under outbound/ is
+    recorded in `gitkeeps` for E5 (A5-F8). A dossier.yaml inside the fixed layout (LAYOUT_DIRS)
     is not a boundary: that folder is walked as usual, and under outbound/
     the stray file meets the outbound checks like any other (WR-03).
 
@@ -1233,6 +1241,7 @@ def walk_tree(root):
     symlinks = []
     unreadable = []
     git_dirs = []
+    gitkeeps = []
 
     def _onerror(err):
         unreadable.append(os.path.relpath(err.filename, root).replace(os.sep, "/"))
@@ -1262,7 +1271,16 @@ def walk_tree(root):
         for name in filenames:
             if name != GITKEEP:
                 files.append(prefix + name)
-    return Tree(files, dirs, pruned, symlinks, unreadable, git_dirs)
+            elif _in_outbound(prefix + name):
+                try:
+                    # lstat: a symlinked .gitkeep is measured as the link itself.
+                    if os.lstat(os.path.join(dirpath, name)).st_size > 0:
+                        gitkeeps.append(prefix + name)
+                except OSError:
+                    # A stat that fails says nothing about the content: E5 will
+                    # try to read it and report it unreadable (R6-4).
+                    gitkeeps.append(prefix + name)
+    return Tree(files, dirs, pruned, symlinks, unreadable, git_dirs, gitkeeps)
 
 
 def read_text_safe(path, follow_symlink=False):
@@ -1494,7 +1512,28 @@ def check_outbound_names(root, tree, config, findings):
 _NEVER_RE = re.compile(r"(?!)")
 
 
-def boundary_pattern(needle):
+# A private-use character standing for "a span a renderer draws as nothing":
+# a tag, a link target, a styling mark or an invisible character, replaced
+# by it in the tolerant reading of e5_haystacks() (R6-1). It is not a word
+# character, so it never glues two words together, and the tolerant patterns
+# accept it -- or nothing -- between any two letters of a name and between
+# its words.
+_GAP = "\ue000"
+
+
+def _anchored(body, first):
+    """BODY, which starts with the escaped character FIRST, with the left word
+    boundary moved AFTER that character: `B(?<![^\\W_]B)ig` instead of
+    `(?<![^\\W_])Big`. Same matches, but the pattern now starts with a
+    literal, so the regex engine skips ahead to the candidates instead of
+    testing a boundary at every position of a 5 MB file (R6-1 gave E5 more
+    haystacks to scan; this pays for them).
+    """
+    escaped = re.escape(first)
+    return escaped + r"(?<![^\W_]" + escaped + ")" + body[len(escaped):]
+
+
+def boundary_pattern(needle, gap=False):
     """A case-insensitive pattern matching NEEDLE as a whole name (D-11, F-02).
 
     Each whitespace-separated token is escaped first: it comes from
@@ -1507,13 +1546,19 @@ def boundary_pattern(needle):
     The obvious (?<!\\w) counts `_` as a word character, and since every
     outbound filename is YYYY-MM-DD_slug, a name at the head of a slug would
     never match -- the silent miss measured on 2026-09-17_acme-proposal.md.
-    This class still refuses `Acmetal`.
+    This class still refuses `Acmetal`. With `gap`, the pattern for the
+    tolerant reading (R6-1): _GAP may also sit between any two characters of
+    a token and between the words.
     """
     tokens = normalise(needle).split()
     if not tokens:
         return _NEVER_RE
-    body = r"\s+".join(re.escape(token) for token in tokens)
-    return re.compile(r"(?<![^\W_])" + body + r"(?![^\W_])", re.IGNORECASE)
+    if gap:
+        body = (r"[\s" + _GAP + r"]+").join(
+            (_GAP + "*").join(re.escape(ch) for ch in token) for token in tokens)
+    else:
+        body = r"\s+".join(re.escape(token) for token in tokens)
+    return re.compile(_anchored(body, tokens[0][0]) + r"(?![^\W_])", re.IGNORECASE)
 
 
 # Letters NFKD leaves whole, so fold_ascii() would keep them non-ASCII and a
@@ -1525,6 +1570,42 @@ _FOLD_TABLE = str.maketrans({
     "Ł": "l", "ł": "l", "Ø": "o", "ø": "o", "Æ": "ae", "æ": "ae", "Œ": "oe", "œ": "oe",
     "Đ": "d", "đ": "d", "Ð": "d", "ð": "d", "Þ": "th", "þ": "th", "ı": "i",
     "ß": "ss", "ẞ": "ss", "Ħ": "h", "ħ": "h",
+    # Every apostrophe look-alike folds to U+0027, the one the separator
+    # classes below accept (A5-F2, 05 D-09): U+2018, U+2019, U+201B, the
+    # modifier letter U+02BC (a letter to \w, so it would otherwise glue
+    # `O` and `Brien` into one token), the grave U+0060, the acute U+00B4
+    # (NFKD would turn it into a space), the primes U+2032 and U+2035.
+    # The absence of an apostrophe needs no entry: the separator is optional.
+    # The fullwidth grave U+FF40 is listed here too: NFKD would turn it into
+    # U+0060, but only AFTER this table has run (R6-3).
+    "‘": "'", "’": "'", "‛": "'", "ʼ": "'", "`": "'", "\uff40": "'",
+    "´": "'", "′": "'", "‵": "'",
+})
+
+# Homoglyphs (A5-F3, 05 D-09): letters of other scripts that a person -- or
+# a hostile paste -- uses in place of a Latin one, drawn the same on screen
+# (`Big Telсo` with a Cyrillic с). Applied by fold_ascii() to the NEEDLE and
+# the haystack alike AFTER casefolding, so it lists lowercase letters only:
+# the capitals casefold into them first. A small hand-picked table, not the
+# full Unicode confusables list (not in the standard library): Cyrillic and
+# Greek letters whose lowercase form is visually the Latin letter or a
+# near-identical one, plus the Latin-script IPA g and a, the Cyrillic palochka
+# and Greek lunate sigma. Folding both sides is the safe direction for a leak
+# check: a Cyrillic needle folds the same way as its haystack. Abbreviations
+# and acronyms (`BT` for `British Telecom`) are NOT covered: that is accepted
+# v1 debt (05 D-09), left to the doctrine-reviewer alone.
+_HOMOGLYPHS = str.maketrans({
+    # Cyrillic
+    "а": "a", "в": "b", "е": "e", "к": "k", "м": "m", "н": "h", "о": "o",
+    "р": "p", "с": "c", "т": "t", "у": "y", "х": "x", "і": "i", "ј": "j",
+    "ѕ": "s", "ԁ": "d", "һ": "h", "ԛ": "q", "ԝ": "w", "ӏ": "l", "ѵ": "v",
+    "ӓ": "a", "ё": "e",
+    # Greek
+    "α": "a", "β": "b", "ε": "e", "ι": "i", "κ": "k", "ν": "v", "ο": "o",
+    "ρ": "p", "τ": "t", "υ": "u", "χ": "x", "ω": "w", "η": "n", "ϲ": "c",
+    "γ": "y", "μ": "u",
+    # Latin-script look-alikes
+    "ɡ": "g", "ɑ": "a",
 })
 
 # The second customary spelling of a letter, tried on the NEEDLE only:
@@ -1538,14 +1619,21 @@ def fold_ascii(text, alternate=False):
 
     The letters NFKD cannot decompose are transliterated first
     (_FOLD_TABLE; with `alternate`, _FOLD_ALTERNATES wins where it applies),
-    then NFKD, combining marks dropped, casefolded. E4 only accepts a
+    then NFKD, combining marks dropped, casefolded, and the homoglyphs of
+    other scripts mapped to their Latin look-alike (_HOMOGLYPHS, A5-F3);
+    apostrophe look-alikes become U+0027 (A5-F2). E4 only accepts a
     lowercase ASCII slug, so `Société Exemple` can only appear in a
     conforming filename as `societe-exemple`, and `Łukasz` as `lukasz`.
     """
     if alternate:
         text = text.translate(_FOLD_ALTERNATES)
     decomposed = unicodedata.normalize("NFKD", text.translate(_FOLD_TABLE))
-    return "".join(ch for ch in decomposed if not unicodedata.combining(ch)).casefold()
+    # Judged once per DISTINCT character and deleted with one C-level pass:
+    # the per-character generator this replaces dominated a 5 MB file.
+    marks = {ord(ch): None for ch in set(decomposed) if unicodedata.combining(ch)}
+    if marks:
+        decomposed = decomposed.translate(marks)
+    return decomposed.casefold().translate(_HOMOGLYPHS)
 
 
 def filename_pattern(needle):
@@ -1563,10 +1651,10 @@ def filename_pattern(needle):
         tokens = re.findall(r"[^\W_]+", fold_ascii(needle, alternate))
         body = r"[\W_]*".join(re.escape(token) for token in tokens)
         if tokens and body not in bodies:
-            bodies.append(body)
+            bodies.append(_anchored(body, tokens[0][0]))
     if not bodies:
         return _NEVER_RE
-    return re.compile(r"(?<![^\W_])(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
+    return re.compile(r"(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
 
 
 # A needle the folded text pass may take: letters, digits, whitespace and
@@ -1579,10 +1667,27 @@ _TEXT_FOLDABLE_RE = re.compile(r"[\w\s'.\-]+")
 # hyphen, an underscore, an apostrophe, a dot, or nothing (`Big-Telco`,
 # `BigTelco`, `OBrien`, `jane.doe`). Never a comma or other sentence
 # punctuation, so `Big, Telco` stays two words.
-_TEXT_FOLD_SEPARATOR = r"[\s_'.\-]*"
+_TEXT_FOLD_DASHES = "\\-\u2010-\u2015\u2212"
+_TEXT_FOLD_SEPARATOR = r"[\s_'." + _TEXT_FOLD_DASHES + r"]*"
+_TEXT_FOLD_SEPARATOR_GAP = r"[\s_'." + _TEXT_FOLD_DASHES + _GAP + r"]*"
 
 
-def folded_text_pattern(needle):
+# A hyphen that ends a line INSIDE a word (`Big Tel-` / `co`, A5-F2, 05 D-09):
+# a hard-wrapped or typeset text splits a long word this way. Allowed between
+# any two letters of a token in the folded pass; it spans exactly one `\n`
+# (plus the blanks around it), so a match still starts on its own line and
+# the line contract e5_haystacks() promises holds.
+_WORD_BREAK = r"(?:[-\u2010\u2011][ \t]*\n[ \t]*)?"
+# The same inside the tolerant reading: _GAP may stand on either side of it.
+_WORD_BREAK_GAP = _GAP + r"*(?:[-\u2010\u2011][ \t]*\n[ \t]*" + _GAP + r"*)?"
+
+
+def _hyphenated(token, gap=False):
+    """TOKEN as a regex that also matches it split by an end-of-line hyphen."""
+    return (_WORD_BREAK_GAP if gap else _WORD_BREAK).join(re.escape(ch) for ch in token)
+
+
+def folded_text_pattern(needle, gap=False):
     """E5's second text pattern, matched against fold_ascii(text) (WR-03).
 
     The name as the filename half folds it -- accents dropped, the letters
@@ -1590,19 +1695,21 @@ def folded_text_pattern(needle):
     joined by _TEXT_FOLD_SEPARATOR, so a body typed without accents
     (`Societe Exemple`) or hyphenating the name (`Big-Telco`) is still a
     leak. Matching more is the safe side of a leak check. A needle whose
-    punctuation carries meaning (`C++`) gets no folded pattern.
+    punctuation carries meaning (`C++`) gets no folded pattern. With `gap`,
+    the pattern for the tolerant reading of e5_haystacks() (R6-1).
     """
+    separator = _TEXT_FOLD_SEPARATOR_GAP if gap else _TEXT_FOLD_SEPARATOR
     if _TEXT_FOLDABLE_RE.fullmatch(normalise(needle)) is None:
         return _NEVER_RE
     bodies = []
     for alternate in (False, True):
         tokens = re.findall(r"[^\W_]+", fold_ascii(normalise(needle), alternate))
-        body = _TEXT_FOLD_SEPARATOR.join(re.escape(token) for token in tokens)
+        body = separator.join(_hyphenated(token, gap) for token in tokens)
         if tokens and body not in bodies:
-            bodies.append(body)
+            bodies.append(_anchored(body, tokens[0][0]))
     if not bodies:
         return _NEVER_RE
-    return re.compile(r"(?<![^\W_])(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
+    return re.compile(r"(?:" + "|".join(bodies) + r")(?![^\W_])", re.IGNORECASE)
 
 
 # A quoted reply's markers, stripped from the START of every line only
@@ -1661,11 +1768,105 @@ def format_readings(text):
     one -- callers that need the line contract e5_haystacks() promises may
     rely on that.
     """
-    if not any(is_invisible(ch) for ch in text):
+    # Judged once per DISTINCT non-ASCII character (no ASCII character is
+    # invisible), then applied with one C-level translate: same result as a
+    # per-character test, a fraction of the time on a 5 MB file.
+    invisible = [ord(ch) for ch in set(text) if ch > "\x7f" and is_invisible(ch)]
+    if not invisible:
         return [text]
-    deleted = "".join(ch for ch in text if not is_invisible(ch))
-    spaced = "".join(" " if is_invisible(ch) else ch for ch in text)
+    deleted = text.translate({code: None for code in invisible})
+    spaced = text.translate({code: " " for code in invisible})
     return [deleted, spaced] if deleted != spaced else [deleted]
+
+
+# Markup that can sit BETWEEN (or inside) the words of a name (A5-F2, 05 D-09).
+# Nothing is parsed or executed: a few bounded regular expressions. Every
+# repetition is capped, and a `<` that closes no tag within the cap simply
+# fails to match, so a hostile file cannot make the scan quadratic.
+# - a Markdown link or image target, `](url)` / `](url "title")` / `][ref]`;
+# - an HTML tag, comment or declaration (`<b>`, `</p>`, `<wbr>`, `<!-- -->`);
+# - the Markdown punctuation that only styles or brackets text: `* ~ ` [ ] \\`
+#   (the underscore is left alone, the folded separator already accepts it).
+# - the long tail of a link target (R6-2): blanks around it, `<url with
+#   spaces>`, parentheses nested to three levels, a title in "double",
+#   'single' quotes or (parentheses);
+# - a tag whose quoted attribute holds a `>` (`<a title="a>b">`), tried
+#   before the plain form, which stays as the fallback for an unbalanced quote.
+# A run of plain characters first (the common case, one fast set repeat), then
+# at most 50 parenthesised groups, each followed by another run; the groups
+# nest to three levels. Every alternative starts with a different character,
+# so nothing backtracks into anything else.
+_URL_GROUP = r"\((?:[^()\s]|\((?:[^()\s]|\([^()\s]*\))*\))*\)"
+_URL_TARGET = r"[^()\s]{0,2000}(?:" + _URL_GROUP + r"[^()\s]{0,2000}){0,50}"
+_LINK_TAIL_RE = re.compile(
+    r"\]\(\s*(?:<[^<>\n]{0,2000}>|" + _URL_TARGET + r")"
+    r"(?:\s+(?:\"[^\"]{0,500}\"|'[^']{0,500}'|\([^()]{0,500}\)))?\s*\)"
+    r"|\]\[[^\[\]\n]{0,200}\]")
+_TAG_RE = re.compile(
+    r"<[/!?A-Za-z](?:[^<>\"']|\"[^\"]{0,500}\"|'[^']{0,500}'){0,2000}>"
+    r"|<[/!?A-Za-z][^<>]{0,2000}>")
+_MD_PUNCT_RE = re.compile(r"[*~`\[\]\\]")
+
+
+def blank_markup(text):
+    """TEXT with every link target, tag and styling mark replaced by one _GAP, or None
+    when it holds none (A5-F2, R6-1).
+
+    The one substitution chain markup_readings() and gap_reading() both read
+    from. A span that held `\\n` keeps them, so line k of the result is line
+    k of TEXT -- the contract e5_haystacks() promises. A _GAP already in TEXT
+    (a private-use character, never meaningful) becomes a space first.
+    """
+    if _MD_PUNCT_RE.search(text) is None and "<" not in text:
+        return None
+    if _GAP in text:
+        text = text.replace(_GAP, " ")
+
+    def blank(match):
+        return _GAP + "\n" * match.group().count("\n")
+
+    out = _MD_PUNCT_RE.sub(_GAP, _TAG_RE.sub(blank, _LINK_TAIL_RE.sub(blank, text)))
+    return out if _GAP in out else None
+
+
+def markup_readings(text, marked=None):
+    """The invisible-markup readings of TEXT: [] when it holds none (A5-F2).
+
+    Two strings, like format_readings(): every link target, tag and styling
+    mark deleted (what one sitting inside a word needs, `Te<b>lco</b>`), and
+    every one replaced by a space (what one between two words needs,
+    `<td>Telco</td><td>Corp</td>`). A removed span that held `\\n` keeps them,
+    so line k of a reading is line k of TEXT -- the contract e5_haystacks()
+    promises. The haystack is searched only; nothing is rewritten on disk.
+    MARKED is blank_markup(TEXT) when the caller already has it.
+    """
+    if marked is None:
+        marked = blank_markup(text)
+    if marked is None:
+        return []
+    deleted, spaced = marked.replace(_GAP, ""), marked.replace(_GAP, " ")
+    return [deleted, spaced] if deleted != spaced else [deleted]
+
+
+def gap_reading(text, marked=None):
+    """The tolerant reading of TEXT, or None when it holds nothing to blank (R6-1).
+
+    Every link target, tag, styling mark and invisible character becomes ONE
+    _GAP instead of being deleted or replaced by a space. The two readings
+    above each pick a single answer for all of them, so a text mixing both
+    needs -- `Hello<br>Big Tel<wbr>co`: the `<br>` must keep `Big` a word of
+    its own, the `<wbr>` must vanish inside `Telco` -- escapes the pair. The
+    tolerant patterns (`gap=True`) accept _GAP, or nothing, wherever a
+    reading would delete, and treat it as a word boundary like a space. A
+    removed span that held `\\n` keeps them, as in blank_markup().
+    """
+    out = marked if marked is not None else blank_markup(text)
+    if out is None:
+        out = text.replace(_GAP, " ") if _GAP in text else text
+    invisible = [ord(ch) for ch in set(out) if ch > "\x7f" and is_invisible(ch)]
+    if invisible:
+        out = out.translate({code: _GAP for code in invisible})
+    return out if _GAP in out else None
 
 
 def e5_haystacks(text):
@@ -1678,7 +1879,7 @@ def e5_haystacks(text):
     own line -- check_confidential_names() runs the exact and the folded
     pass on each one, keeping one newline index per string.
 
-    Three stages, each built on the last:
+    Five stages, each built on the last (the markup one is stage 2b):
     1. A quoted reply's markers are stripped from the start of every line,
        in place -- the stripped text replaces the base rather than joining
        it as a second variant, since a leading `>` never appears inside a
@@ -1690,28 +1891,57 @@ def e5_haystacks(text):
        pasted from a web page, so this applies to every outbound text file,
        not only `.html`. The exact pass is what finds a name holding `&`,
        since folded_text_pattern() deliberately refuses one.
+    2b. Link targets, HTML tags and Markdown styling marks are removed from
+       the raw and the fully decoded text, once deleted and once as spaces
+       (markup_readings(), A5-F2): `**Big** Telco`, `<b>Big</b> Telco`,
+       `Big<wbr>Telco` and `[Big](u) [Telco](v)` all read `Big Telco`. HTML
+       references are decoded up to three times (`&amp;amp;`).
     3. Every string built so far is replaced, in place, by its
        format_readings() (D-GAP-6): a soft hyphen, ZWSP, BOM, ZWNJ or word
        joiner hides no name whichever way it is read, including one
        decoded from an HTML reference by stage 2 (`&shy;`). Order is kept
        and duplicates are dropped.
+    4. A tolerant reading of the raw and the fully decoded text, appended
+       last (gap_reading(), R6-1): markup and invisible characters each
+       become one _GAP, for the text that mixes both needs.
     """
     stripped = _QUOTE_STRIP_RE.sub("", text)
     haystacks = [stripped]
-    decoded = _decode_html_entities(stripped)
-    if decoded != stripped:
+    # Decoded again until stable, at most three times: `&amp;amp;` and
+    # `&amp;#39;` are double-encoded, and each pass is one more variant.
+    current = stripped
+    for _ in range(3):
+        decoded = _decode_html_entities(current)
+        if decoded == current:
+            break
         haystacks.append(decoded)
+        current = decoded
+    # Markup readings of the raw and the fully decoded text only: a tag or a
+    # link target between the words of a name hides it from every other
+    # stage (A5-F2); `&lt;b&gt;` becomes a tag once decoded.
+    bases = (haystacks[0],) if len(haystacks) == 1 else (haystacks[0], haystacks[-1])
+    marked_bases = [(base, blank_markup(base)) for base in bases]
+    for base, marked in marked_bases:
+        for reading in markup_readings(base, marked):
+            if reading not in haystacks:
+                haystacks.append(reading)
     result = []
     for haystack in haystacks:
         for reading in format_readings(haystack):
             if reading not in result:
                 result.append(reading)
+    # The tolerant reading (stage 4, R6-1), last: it is the only string that
+    # holds _GAP, and the only one the tolerant patterns are run on.
+    for base, marked in marked_bases:
+        reading = gap_reading(base, marked)
+        if reading is not None and reading not in result:
+            result.append(reading)
     return result
 
 
 def _build_needle(name):
-    """One configured NAME -> (display, exact_patterns, name_pattern, folded_pattern), or
-    None when NAME is made only of format characters (D-GAP-6).
+    """One configured NAME -> (display, exact_patterns, name_pattern, folded_pattern,
+    gap_exact_patterns, gap_folded_pattern), or None when NAME is made only of format characters (D-GAP-6).
 
     `display` is the last of format_readings() applied to the normalised
     name, whitespace collapsed: the deletion reading when the name holds no
@@ -1736,7 +1966,36 @@ def _build_needle(name):
             continue
         seen_patterns.add(pattern.pattern)
         exact_patterns.append(pattern)
-    return display, exact_patterns, filename_pattern(display), folded_text_pattern(display)
+    # The tolerant patterns (R6-1): one per reading too, run only on the
+    # tolerant reading of e5_haystacks().
+    gap_exact = []
+    gap_seen = set()
+    for reading in readings:
+        pattern = boundary_pattern(reading, gap=True)
+        if pattern is _NEVER_RE or pattern.pattern in gap_seen:
+            continue
+        gap_seen.add(pattern.pattern)
+        gap_exact.append(pattern)
+    return (display, exact_patterns, filename_pattern(display), folded_text_pattern(display),
+            gap_exact, folded_text_pattern(display, gap=True))
+
+
+def percent_decodings(path):
+    """PATH as written, then percent-decoded up to three times (A5-F2, 05 D-09).
+
+    A file name saved from a URL carries `%20` for a space, `%C3%A9` for an
+    accent, `%2520` when encoded twice; `+` for a space is a separator
+    already (the filename pattern accepts any run of non-alphanumerics), so
+    it needs no reading of its own. Distinct spellings only, original first.
+    Invalid escapes stay as they are (errors="replace" never raises).
+    """
+    spellings = [path]
+    for _ in range(3):
+        decoded = urllib.parse.unquote(spellings[-1], errors="replace")
+        if decoded == spellings[-1]:
+            break
+        spellings.append(decoded)
+    return spellings
 
 
 def check_confidential_names(root, tree, config, findings):
@@ -1761,6 +2020,25 @@ def check_confidential_names(root, tree, config, findings):
     the text half only; the filename half always runs (P-07). The message
     names the needle and the location, never the surrounding sentence
     (T-02-09).
+
+    Hardened by 05 D-09 (A5-F2, A5-F3, A5-F8, Samuel's arbitrage of
+    2026-10-11): markup between or inside the words (Markdown emphasis, link
+    targets, HTML tags and comments, `<wbr>`), double-encoded HTML
+    references, every apostrophe look-alike, a hyphen that breaks a word at
+    the end of a line, percent-encoded file names, Cyrillic and Greek
+    homoglyphs (_HOMOGLYPHS), and a non-empty `.gitkeep` under outbound/.
+    Round 3 (R6-1..R6-4, same arbitrage): a text mixing markup and invisible
+    characters that need opposite readings (the tolerant reading, gap_reading()),
+    the Markdown link long tail and a `>` inside a quoted attribute, the
+    U+2010..U+2015 and U+2212 dashes as separators, U+FF40 as an apostrophe,
+    and a non-empty `.gitkeep` E5 cannot read, reported as unreadable.
+
+    NOT covered, accepted v1 debt (05 D-09): abbreviations and acronyms
+    (`BT` for `British Telecom`), nicknames, translations, a name split by
+    anything but the separators above, and homoglyphs outside the small
+    table. They stay with the doctrine-reviewer alone. E5 is a reminder
+    with a fast, honest scope, never a proof that no confidential name
+    left the dossier.
     """
     if consent_is_recorded(config) or not config["confidential_names"]:
         return
@@ -1768,19 +2046,29 @@ def check_confidential_names(root, tree, config, findings):
                (_build_needle(name) for name in config["confidential_names"])
                if needle is not None]
     prefix_len = len(OUTBOUND_DIR) + 1
-    for rel in outbound_files(tree):
+    # A non-empty `.gitkeep` is a document too (A5-F8): E5 reads it, E1-E4 never see it.
+    gitkeeps = frozenset(tree.gitkeeps)
+    for rel in outbound_files(tree) + list(tree.gitkeeps):
         # No EXEMPT_PATHS skip here, on purpose: a leaked name is a leak wherever it sits.
         path_readings = []
-        for reading in format_readings(normalise(rel[prefix_len:])):
-            folded_reading = fold_ascii(reading)
-            if folded_reading not in path_readings:
-                path_readings.append(folded_reading)
-        for name, _exact_patterns, name_pattern, _folded_pattern in needles:
+        for spelling in percent_decodings(rel[prefix_len:]):
+            for reading in format_readings(normalise(spelling)):
+                folded_reading = fold_ascii(reading)
+                if folded_reading not in path_readings:
+                    path_readings.append(folded_reading)
+        for name, _exact, name_pattern, _folded, _gap_exact, _gap_folded in needles:
             if any(name_pattern.search(path_reading) for path_reading in path_readings):
                 findings.append(Finding(rel, 0, ERROR, "E5",
                                         "confidential name '{}' in the file name under outbound/".format(name)))
         text = read_text_safe(os.path.join(root, *rel.split("/")))
         if text is None:
+            if rel in gitkeeps:
+                # Fail closed (R6-4): a non-empty .gitkeep E5 cannot read is a
+                # leak check that did not run on a file that holds bytes.
+                findings.append(Finding(rel, 0, ERROR, "E5",
+                                        "non-empty .gitkeep under outbound/ is unreadable (symlink, over "
+                                        "5 MB, or not UTF-8): it is not checked for confidential names; "
+                                        "empty it or make it a regular UTF-8 file"))
             continue
         norm = normalise(text).replace("\r\n", "\n").replace("\r", "\n")
         seen = set()
@@ -1788,7 +2076,11 @@ def check_confidential_names(root, tree, config, findings):
             newline_idx = None
             folded_haystack = None
             folded_idx = None
-            for name, exact_patterns, _name_pattern, folded_pattern in needles:
+            tolerant = _GAP in haystack
+            for (name, exact_patterns, _name_pattern, folded_pattern,
+                 gap_exact, gap_folded) in needles:
+                if tolerant:
+                    exact_patterns, folded_pattern = gap_exact, gap_folded
                 if exact_patterns and newline_idx is None:
                     newline_idx = [m.start() for m in re.finditer("\n", haystack)]
                 for regex in exact_patterns:

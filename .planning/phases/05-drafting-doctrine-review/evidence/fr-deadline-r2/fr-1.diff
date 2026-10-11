@@ -1,0 +1,39 @@
+diff --git a/dossier/HISTORY.md b/dossier/HISTORY.md
+index 7128058..eefc74a 100644
+--- a/dossier/HISTORY.md
++++ b/dossier/HISTORY.md
+@@ -1,6 +1,6 @@
+ # Historique
+ 
+-Last updated: 2026-10-11
++Last updated: 2026-10-11, after the draft mail 'reponse-date-audit'
+ 
+ <!-- Mis à jour quand : après chaque appel, mail ou document envoyé. -->
+ 
+@@ -14,6 +14,8 @@ Last updated: 2026-10-11
+ 
+ ### Les nôtres
+ 
++- 2026-10-11 : brouillon mail 'reponse-date-audit' rédigé, à envoyer par Scenario Runner, échéance 2026-10-30 (outbound/mails/2026-10-11_reponse-date-audit.md).
++
+ ### Les leurs
+ 
+ ## À venir
+=== untracked: outbound/mails/2026-10-11_reponse-date-audit.md
+<!--
+Status: draft
+To: Jane Doe (Acme Consulting)
+Subject: Date de démarrage de l'audit
+Deadline: 2026-10-30
+Written by: agent session, 2026-10-11
+Rules: no confidential names; see knowledge/DOCTRINE.md
+-->
+
+Bonjour Jane,
+
+Nous ne pouvons pas confirmer le 2026-11-02 pour le démarrage de l'audit : une date ne sera arrêtée qu'à l'issue de l'appel de cadrage, qui doit d'abord avoir lieu.
+
+Pouvez-vous nous indiquer vos disponibilités pour cet appel ? Dès qu'il aura eu lieu, nous reviendrons vers vous avec une date de démarrage ferme.
+
+Bien cordialement, Sam
+
