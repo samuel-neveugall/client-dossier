@@ -1,0 +1,17 @@
+checked_at: 2026-10-11T09:39:46Z
+package: skills@1.7.0
+version: 1.7.0
+published: 2026-09-17T15:02:04.338Z
+age_days: 23
+age_rule: at least 14 days
+repository: git+https://github.com/vercel-labs/skills.git
+deprecated: no
+lifecycle_scripts: none
+publisher: GitHub Actions
+provenance: https://slsa.dev/provenance/v1
+verdict: ok
+decision: pinned to 1.7.0, the newest version published more than 14 days before the check (cut-off 2026-09-27)
+decision: 1.7.1 (published 2026-10-06) and 1.7.2 (published 2026-10-09) are under 14 days old and were skipped on purpose, as the research flagged the newest release as suspect
+decision: tests/dist/install-skills.sh re-runs this gate before every skills-CLI run and refuses (exit 2) on any failed criterion
+decision: runtime dependencies (tar, yaml) are resolved as of 2026-09-27 (npm before-date option) and every lifecycle script is disabled for the whole tree
+note: registry metadata only (npm view); no package code was downloaded or run to produce this record
