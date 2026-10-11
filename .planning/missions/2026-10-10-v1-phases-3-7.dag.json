@@ -592,6 +592,18 @@
         "scripts/release.sh",
         "tests/"
       ],
+      "status": "done"
+    },
+    {
+      "id": "revue-7b",
+      "step": "re-review round 2 phase 7",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "skills/dossier-init/",
+        "scripts/release.sh"
+      ],
       "status": "ready"
     }
   ]
