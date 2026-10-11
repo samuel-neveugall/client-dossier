@@ -558,6 +558,17 @@
         "skills/dossier-call/",
         "tests/"
       ],
+      "status": "done"
+    },
+    {
+      "id": "revue-6b",
+      "step": "re-review round 2 phase 6",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/",
+        "tests/"
+      ],
       "status": "ready"
     }
   ]
