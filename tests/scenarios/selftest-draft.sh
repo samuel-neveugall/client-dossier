@@ -841,6 +841,216 @@ assert_eq INCOMPLETE "$(col 3)" 'fr + chat-only: verdict INCOMPLETE'
 assert_eq none "$(col 4)" 'fr + chat-only: draft_file none'
 assert_grep 'SCENARIO draft-deadline-fr: FAIL' "$OUT.stdout"
 
+# --- Case 15: drift guard, the sixteen constants of the contract ---
+assert_eq 'Acme Consulting|client|Jane Doe' "$(const_fr ORDERING_PARTY)" 'fr constant ORDERING_PARTY'
+assert_eq 'Northwind Bank|client final' "$(const_fr END_CLIENT)" 'fr constant END_CLIENT'
+assert_eq 'Northwind Bank' "$(const_fr CONFIDENTIAL_LONG)" 'fr constant CONFIDENTIAL_LONG'
+assert_eq 'Northwind' "$(const_fr CONFIDENTIAL_SHORT)" 'fr constant CONFIDENTIAL_SHORT'
+assert_eq 'reponse-date-audit' "$(const_fr SLUG)" 'fr constant SLUG'
+assert_eq '2026-10-30' "$(const_fr DEADLINE)" 'fr constant DEADLINE'
+assert_eq 'Bien cordialement,' "$(const_fr SIGN_OFF_HEAD)" 'fr constant SIGN_OFF_HEAD'
+assert_eq 'Sam' "$(const_fr SIGN_OFF_NAME)" 'fr constant SIGN_OFF_NAME'
+assert_eq 'espère que vous allez bien' "$(const_fr REFUSED_PHRASE)" 'fr constant REFUSED_PHRASE'
+assert_eq '- Répondre à la question dès la première phrase, rester sous 120 mots et finir par la formule « Bien cordialement, Sam » seule sur sa ligne (relecture de Sam le 2026-10-02).' "$(const_fr TONE_RULE)" 'fr constant TONE_RULE'
+assert_eq '- « J’espère que vous allez bien » refusé le 2026-10-02 comme formule creuse (relecture de Sam le 2026-10-02).' "$(const_fr REFUSED_LINE)" 'fr constant REFUSED_LINE'
+assert_eq '- Jane Doe (Acme Consulting) a demandé le 2026-10-08 si l’audit de migration de données de Northwind Bank peut démarrer le 2026-11-02, et attend notre réponse (mail du 2026-10-08 de Jane Doe).' "$(const_fr PENDING_LINE)" 'fr constant PENDING_LINE'
+assert_eq '- Une date de démarrage avant que l’appel de cadrage ait eu lieu (décision du 2026-09-20 par Sam).' "$(const_fr NEVER_SAY_LINE)" 'fr constant NEVER_SAY_LINE'
+assert_eq 'le la les des du est pour nous vous que une et avec sur' "$(const_fr FR_WORDS)" 'fr constant FR_WORDS'
+assert_eq 'the and is we you to for with on of that' "$(const_fr EN_WORDS)" 'fr constant EN_WORDS'
+assert_eq 'dossier-draft mail reponse-date-audit : réponds à la question de Jane Doe sur la date de démarrage de l’audit ; le mail doit partir au plus tard le 2026-10-30.' "$(const_fr PROMPT)" 'fr constant PROMPT'
+assert_eq 16 "$(grep -cE '^(ORDERING_PARTY|END_CLIENT|CONFIDENTIAL_LONG|CONFIDENTIAL_SHORT|SLUG|DEADLINE|SIGN_OFF_HEAD|SIGN_OFF_NAME|REFUSED_PHRASE|TONE_RULE|REFUSED_LINE|PENDING_LINE|NEVER_SAY_LINE|FR_WORDS|EN_WORDS|PROMPT)=' "$FR_HARNESS")" 'fr: sixteen named constants'
+assert_eq 1 "$(grep -cx '  seed_fixture "\$dir"' "$FR_HARNESS")" 'fr: seed_fixture has one call site'
+for name in ORDERING_PARTY END_CLIENT CONFIDENTIAL_LONG CONFIDENTIAL_SHORT SLUG DEADLINE SIGN_OFF_HEAD SIGN_OFF_NAME REFUSED_PHRASE TONE_RULE REFUSED_LINE PENDING_LINE NEVER_SAY_LINE FR_WORDS EN_WORDS PROMPT; do
+  val="$(const_fr "$name")"
+  case "$val" in
+    *'"'* | *'$'* | *'`'* | *'\'* | *"'"*)
+      echo "FAIL: fr constant $name holds a straight quote, dollar, backtick or backslash" >&2
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+      ;;
+    *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  esac
+done
+
+# --- Case 16: each GREEN condition removed is INCOMPLETE (exit 1), the named column flips ---
+# fr_incomplete LABEL COLUMN EXPECTED K=V... — one run from fr-draft with one change.
+fr_incomplete() {
+  local label="$1" column="$2" expected="$3"
+  shift 3
+  run_case_fr "$@"
+  assert_eq 1 "$CASE_STATUS" "fr $label: exit 1"
+  assert_eq INCOMPLETE "$(col 3)" "fr $label: verdict INCOMPLETE"
+  assert_eq "$expected" "$(col "$column")" "fr $label: column $column ($(header "$column")) $expected"
+  assert_grep 'SCENARIO draft-deadline-fr: FAIL' "$OUT.stdout"
+}
+fr_incomplete 'slug changed' 5 no FAKE_MODE=fr-slug
+fr_incomplete 'Deadline line removed' 8 no FAKE_MODE=fr-no-deadline
+assert_eq no "$(col 8)" 'fr Deadline removed: deadline_ok no'
+fr_incomplete 'Deadline 2026-10-31' 8 no FAKE_MODE=fr-wrong-deadline
+fr_incomplete 'English body' 9 no FAKE_MODE=fr-english-body
+assert_eq yes "$(col 10)" 'fr English body: the sign-off is still applied, only french_body flips'
+fr_incomplete 'translated field names' 6 no FAKE_MODE=fr-translated-header
+assert_eq none "$(col 7)" 'fr translated field names: status_value none'
+fr_incomplete 'refused phrase added' 10 no FAKE_MODE=fr-refused
+fr_incomplete 'sign-off removed' 10 no FAKE_MODE=fr-no-signoff
+fr_incomplete 'confidential name in the body' 11 yes FAKE_MODE=fr-leak
+fr_incomplete 'history bullet without the deadline' 12 no FAKE_MODE=fr-history-nodeadline
+fr_incomplete 'NOINVOKE' 13 no FAKE_MODE=fr-draft FAKE_NOINVOKE=1
+fr_incomplete 'NODISPATCH' 14 no FAKE_MODE=fr-draft FAKE_NODISPATCH=1
+assert_eq none "$(col 15)" 'fr NODISPATCH: reviewer_tools_ok none'
+fr_incomplete 'dispatch in error' 14 no FAKE_MODE=fr-draft FAKE_DISPATCH_ERROR=1
+fr_incomplete 'async launch only' 14 no FAKE_MODE=fr-draft FAKE_ASYNC=1
+run_case_fr FAKE_MODE=fr-draft FAKE_ASYNC=1 FAKE_ASYNC_DONE=1
+assert_eq GREEN "$(col 3)" 'fr async launch with a completed notification: GREEN'
+assert_eq yes "$(col 14)" 'fr async completed: reviewer_dispatched yes'
+
+# --- Case 17: informational columns never gate ---
+run_case_fr FAKE_MODE=fr-draft FAKE_REVIEWER_BASH=1
+assert_eq 0 "$CASE_STATUS" 'fr + reviewer Bash: exit 0'
+assert_eq GREEN "$(col 3)" 'fr + reviewer Bash: still GREEN'
+assert_eq no "$(col 15)" 'fr + reviewer Bash: reviewer_tools_ok no (informational)'
+run_case_fr FAKE_MODE=fr-draft
+assert_eq 0 "$(col 16)" 'fr + fr-draft: lint_exit 0'
+assert_eq fake-model "$(col 17)" 'fr + fr-draft: model recorded'
+assert_eq 0.0.0-fake "$(col 18)" 'fr + fr-draft: claude_code_version recorded'
+assert_eq 0.01 "$(col 19)" 'fr + fr-draft: cost recorded'
+assert_eq false "$(col 20)" 'fr + fr-draft: is_error false'
+fr_n=1
+for name in variant run verdict draft_file slug_kept header_ok status_value deadline_ok \
+  french_body tone_applied leak history_line draft_skill reviewer_dispatched \
+  reviewer_tools_ok lint_exit model claude_code_version cost_usd is_error \
+  dossier jsonl; do
+  assert_eq "$name" "$(header "$fr_n")" "fr header column $fr_n is $name"
+  fr_n=$((fr_n + 1))
+done
+case "$(col 4)" in
+  outbound/mails/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]_reponse-date-audit.md) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *)
+    echo "FAIL: fr draft_file must be the dated reponse-date-audit file (got '$(col 4)')" >&2
+    TESTS_FAILED=$((TESTS_FAILED + 1))
+    ;;
+esac
+
+# --- Case 18: harness errors are never verdicts ---
+# fr_harness_error LABEL REGEX K=V... — exit 2, HARNESS ERROR on stderr, no
+# GREEN or INCOMPLETE row.
+fr_harness_error() {
+  local label="$1" regex="$2" verdict
+  shift 2
+  run_case_fr "$@"
+  assert_eq 2 "$CASE_STATUS" "fr $label: exit 2"
+  assert_grep '^HARNESS ERROR:' "$CASE_ERR"
+  assert_grep "$regex" "$CASE_ERR"
+  verdict="$(col 3)"
+  case "$verdict" in
+    GREEN | INCOMPLETE)
+      echo "FAIL: fr $label: a harness error must not be a verdict (got $verdict)" >&2
+      TESTS_FAILED=$((TESTS_FAILED + 1))
+      ;;
+    *) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  esac
+}
+fr_harness_error 'is_error true' 'is_error' FAKE_MODE=error
+assert_eq HARNESS_ERROR "$(col 3)" 'fr is_error true: the row is HARNESS_ERROR'
+assert_eq true "$(col 20)" 'fr is_error true: is_error recorded'
+fr_harness_error 'no result event' 'result event' FAKE_MODE=fr-draft FAKE_NORESULT=1
+assert_eq HARNESS_ERROR "$(col 3)" 'fr no result event: the row is HARNESS_ERROR'
+fr_harness_error 'dossier-draft absent from the skills' 'client-dossier:dossier-draft' FAKE_MODE=fr-draft FAKE_NOSKILL=1
+fr_harness_error 'doctrine-reviewer absent from the agents' 'client-dossier:doctrine-reviewer' FAKE_MODE=fr-draft FAKE_NOAGENT=1
+run_case_fr FAKE_MODE=fr-draft FAKE_HELP_MISSING=--plugin-dir
+assert_eq 2 "$CASE_STATUS" 'fr missing --plugin-dir in --help: exit 2'
+assert_grep '^HARNESS ERROR:.*plugin-dir' "$CASE_ERR"
+if [ -f "$OUT/summary.tsv" ] && [ "$(wc -l <"$OUT/summary.tsv" | tr -d ' ')" -gt 1 ]; then
+  echo "FAIL: fr preflight failure must happen before any run (summary.tsv has data rows)" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+
+# run_copy_fr SED_EXPR... — a copy of the French harness edited by the sed
+# expressions (its two source lines rewritten to absolute paths so they still
+# resolve), run once against the fake in fr-draft mode. Sets OUT, CASE_STATUS and
+# CASE_ERR like run_case_fr.
+run_copy_fr() {
+  local copy="$WORK/fr-copy.sh"
+  sed -e "s|^source .*lib-scenario.sh\"\$|source \"$SCEN_DIR/lib-scenario.sh\"|" \
+    -e "s|^source .*lib-draft.sh\"\$|source \"$SCEN_DIR/lib-draft.sh\"|" \
+    "$@" "$FR_HARNESS" >"$copy"
+  drop_dossier
+  OUT="$(mktemp -d "$WORK/out.XXXXXX")"
+  CASE_ERR="$OUT.stderr"
+  CASE_STATUS=0
+  env SCENARIO_CLAUDE="$FAKE" FAKE_MODE=fr-draft \
+    bash "$copy" --runs 1 "$OUT" >"$OUT.stdout" 2>"$CASE_ERR" || CASE_STATUS=$?
+}
+
+# The fixture writer neutered: a harness error naming the fixture, never GREEN.
+run_copy_fr -e 's|^  seed_fixture "\$dir"$|  :|'
+assert_eq 2 "$CASE_STATUS" 'fr unseeded fixture: exit 2'
+assert_grep '^HARNESS ERROR:.*fixture' "$CASE_ERR"
+assert_eq HARNESS_ERROR "$(col 3)" 'fr unseeded fixture: the row is HARNESS_ERROR, never GREEN'
+# A fixture line that trips a lint warning is not lint-clean.
+run_copy_fr -e 's|^NEVER_SAY_LINE="- Une date|NEVER_SAY_LINE="- Bientôt, une date|'
+assert_eq 2 "$CASE_STATUS" 'fr fixture not lint-clean: exit 2'
+assert_grep '^HARNESS ERROR:.*lint-clean' "$CASE_ERR"
+# The identity: Northwind missing, Acme made confidential.
+run_copy_fr -e 's|--confidential-name "\$CONFIDENTIAL_SHORT"|--confidential-name Acme|'
+assert_eq 2 "$CASE_STATUS" 'fr identity without Northwind: exit 2'
+assert_grep '^HARNESS ERROR:.*Northwind' "$CASE_ERR"
+run_copy_fr -e 's|--confidential-name "\$CONFIDENTIAL_SHORT"|--confidential-name "$CONFIDENTIAL_SHORT" --confidential-name Acme|'
+assert_eq 2 "$CASE_STATUS" 'fr identity with Acme confidential: exit 2'
+assert_grep '^HARNESS ERROR:.*Acme' "$CASE_ERR"
+# The language: an English scaffold has no fifth/sixth French heading text, but
+# the check on dossier.yaml fires.
+run_copy_fr -e 's|build_dossier --language fr|build_dossier --language en|'
+assert_eq 2 "$CASE_STATUS" 'fr dossier built in English: exit 2'
+assert_grep '^HARNESS ERROR:.*language' "$CASE_ERR"
+
+# --- Case 19: usage errors and several runs ---
+fr_usage() {
+  local st=0
+  drop_dossier
+  OUT="$(mktemp -d "$WORK/out.XXXXXX")"
+  env SCENARIO_CLAUDE="$FAKE" FAKE_MODE=fr-draft bash "$FR_HARNESS" "$@" >/dev/null 2>&1 || st=$?
+  echo "$st"
+}
+assert_eq 2 "$(fr_usage --runs 0 "$OUT")" 'fr --runs 0: exit 2'
+assert_eq 2 "$(fr_usage --runs x "$OUT")" 'fr --runs x: exit 2'
+assert_eq 2 "$(fr_usage --runs)" 'fr --runs without a value: exit 2'
+assert_eq 2 "$(fr_usage --bogus "$OUT")" 'fr unknown flag: exit 2'
+assert_eq 2 "$(fr_usage --variant plugin "$OUT")" 'fr --variant is not a flag of this scenario: exit 2'
+CASE_ARGS="--runs 2"
+run_case_fr FAKE_MODE=fr-draft
+CASE_ARGS=""
+assert_eq 0 "$CASE_STATUS" 'fr --runs 2 + fr-draft: exit 0'
+assert_eq 2 "$(awk -F'\t' 'NR > 1 && $3 == "GREEN"' "$OUT/summary.tsv" | wc -l | tr -d ' ')" 'fr --runs 2: two GREEN rows'
+assert_grep '^plugin: GREEN 2/2 INCOMPLETE 0/2; gate GREEN 2/2: PASS' "$OUT.stdout"
+assert_eq 'SCENARIO draft-deadline-fr: PASS' "$(tail -1 "$OUT.stdout")" 'fr: the last line is the scenario verdict (PASS)'
+assert_file "$OUT/fr-2.jsonl"
+run_case_fr FAKE_MODE=fr-slug
+assert_eq 'SCENARIO draft-deadline-fr: FAIL' "$(tail -1 "$OUT.stdout")" 'fr: the last line is the scenario verdict (FAIL)'
+
+# --- Case 20: the local helper, on synthetic input (sourced out of the script) ---
+printf '%s\n' '<!--' 'Status: draft' '-->' '' 'Bonjour Jane, nous vous confirmons que le plan est prêt pour la suite.' 'Bien cordialement,' >"$U/fr-ok.md"
+printf '%s\n' '<!--' 'Status: draft' '-->' '' 'Hello Jane, we are sure that the date is set for you and the team.' >"$U/fr-en.md"
+printf '%s\n' '<!--' 'le la les des du est pour nous vous que une et avec sur' '-->' '' 'Hello, the and is we you to for with on of that.' >"$U/fr-header-only.md"
+fr_helper() {
+  # french_body is defined by the scenario script: extract it, run it.
+  (
+    sed -n '/^french_body() {/,/^}/p' "$FR_HARNESS" >"$WORK/french_body.sh"
+    FR_WORDS="$(const_fr FR_WORDS)"
+    EN_WORDS="$(const_fr EN_WORDS)"
+    . "$WORK/french_body.sh"
+    french_body "$1"
+  )
+}
+assert_eq yes "$(fr_helper "$U/fr-ok.md")" 'french_body: a French text'
+assert_eq no "$(fr_helper "$U/fr-en.md")" 'french_body: an English text'
+assert_eq no "$(fr_helper "$U/fr-header-only.md")" 'french_body: French words in the header block only do not count'
+assert_eq no "$(fr_helper "$U/absent.md")" 'french_body: missing file'
+
+# --- Case 21: the baseline harness is not a deliverable of this plan ---
+assert_eq 0 "$(ls "$SCEN_DIR" | grep -c '^test-')" 'fr: still no file under tests/scenarios named test-*.sh'
+
 drop_dossier
 
 finish
