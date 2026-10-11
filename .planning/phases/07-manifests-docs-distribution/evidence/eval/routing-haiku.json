@@ -1,0 +1,510 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.296",
+  "startedAt": "2026-10-11T09:46:59.386Z",
+  "durationSeconds": 206,
+  "costUsd": 0.06929225,
+  "partial": false,
+  "suite": {
+    "root": "<repo>",
+    "ablation": "none",
+    "modelOverride": "haiku",
+    "threshold": 0,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "client-dossier",
+        "version": "0.1.0",
+        "path": "<repo>"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "call-prepare",
+      "dir": "evals/routing/call-prepare",
+      "source": "mixed",
+      "promptMarkdown": "Prepare tomorrow's call with Jane.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "call-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-call\""
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 20,
+            "costUsd": 0.01033144,
+            "judgeCostUsd": 0,
+            "durationSeconds": 39,
+            "startedAt": "2026-10-11T09:46:59.418Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "call-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    },
+    {
+      "name": "deal-status",
+      "dir": "evals/routing/deal-status",
+      "source": "mixed",
+      "promptMarkdown": "Where are we with this deal?",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "draft-not-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-draft\"",
+            "min": 0,
+            "max": 0
+          }
+        },
+        {
+          "name": "status-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-status\""
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 12,
+            "costUsd": 0.00514383,
+            "judgeCostUsd": 0,
+            "durationSeconds": 12,
+            "startedAt": "2026-10-11T09:47:38.899Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "draft-not-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 0..0)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "status-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    },
+    {
+      "name": "draft-reply",
+      "dir": "evals/routing/draft-reply",
+      "source": "mixed",
+      "promptMarkdown": "Draft a short reply to Jane confirming Tuesday's meeting.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "draft-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-draft\""
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 17,
+            "costUsd": 0.00742356,
+            "judgeCostUsd": 0,
+            "durationSeconds": 18,
+            "startedAt": "2026-10-11T09:47:50.640Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "draft-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    },
+    {
+      "name": "ingest-transcript",
+      "dir": "evals/routing/ingest-transcript",
+      "source": "mixed",
+      "promptMarkdown": "Here is the transcript of today's call with Jane in call-2026-10-10.txt. What did we learn?",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "draft-not-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-draft\"",
+            "min": 0,
+            "max": 0
+          }
+        },
+        {
+          "name": "ingest-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-ingest\""
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 3,
+            "costUsd": 0.013193854999999999,
+            "judgeCostUsd": 0,
+            "durationSeconds": 47,
+            "startedAt": "2026-10-11T09:48:08.772Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "draft-not-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 0..0)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ingest-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    },
+    {
+      "name": "init-new-client",
+      "dir": "evals/routing/init-new-client",
+      "source": "mixed",
+      "promptMarkdown": "Set up a dossier in this repository for our new client Acme, contact Jane Doe.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "init-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-init\""
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 2,
+            "costUsd": 0.019366355000000002,
+            "judgeCostUsd": 0,
+            "durationSeconds": 56,
+            "startedAt": "2026-10-11T09:48:55.443Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "init-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    },
+    {
+      "name": "outside-dossier",
+      "dir": "evals/routing/outside-dossier",
+      "source": "prose",
+      "promptMarkdown": "Write a short thank-you note to our client for yesterday's workshop.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "names-missing-dossier",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "dossier\\.yaml|no dossier",
+            "flags": "i",
+            "match": "contains"
+          }
+        },
+        {
+          "name": "suggests-init",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "dossier-init",
+            "flags": "",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 0.5,
+            "passed": false,
+            "turns": 8,
+            "costUsd": 0.00446911,
+            "judgeCostUsd": 0,
+            "durationSeconds": 10,
+            "startedAt": "2026-10-11T09:49:51.092Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "names-missing-dossier",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched dossier\\.yaml|no dossier",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "suggests-init",
+                "passed": false,
+                "weight": 1,
+                "explanation": "pattern not found in last_message",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 0.5,
+        "passRate": 0
+      }
+    },
+    {
+      "name": "unrelated",
+      "dir": "evals/routing/unrelated",
+      "source": "prose",
+      "promptMarkdown": "Write a Python function that reverses a string.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "no-dossier-skill",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "dossier",
+            "min": 0,
+            "max": 0
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.00149401,
+            "judgeCostUsd": 0,
+            "durationSeconds": 2,
+            "startedAt": "2026-10-11T09:50:01.194Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "no-dossier-skill",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 0..0)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    },
+    {
+      "name": "write-to-client",
+      "dir": "evals/routing/write-to-client",
+      "source": "mixed",
+      "promptMarkdown": "Write to the client to say we can deliver the audit on 2026-11-02 instead of 2026-10-28.",
+      "runsPerCase": 3,
+      "timeoutSeconds": 240,
+      "maxTurns": 8,
+      "graders": [
+        {
+          "name": "draft-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-draft\""
+          }
+        },
+        {
+          "name": "ingest-not-fired",
+          "type": "tool_used",
+          "weight": 1,
+          "config": {
+            "tool": "Skill",
+            "input_match": "\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?dossier-ingest\"",
+            "min": 0,
+            "max": 0
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 19,
+            "costUsd": 0.00787009,
+            "judgeCostUsd": 0,
+            "durationSeconds": 22,
+            "startedAt": "2026-10-11T09:50:03.253Z",
+            "error": null,
+            "tracePath": "<tmp>",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "draft-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 1x (expected 1..∞)",
+                "withOnly": false,
+                "scored": true
+              },
+              {
+                "name": "ingest-not-fired",
+                "passed": true,
+                "weight": 1,
+                "explanation": "Skill called 0x (expected 0..0)",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 8,
+    "casesPassed": 8,
+    "overallScore": 0.9375,
+    "overallPassRate": 0.875
+  }
+}

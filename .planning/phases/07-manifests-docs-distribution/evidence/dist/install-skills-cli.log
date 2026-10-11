@@ -1,0 +1,160 @@
+source: HEAD b838f268cf12
+route: skills-cli
+checked_at: 2026-10-11T09:46:04Z
+package: skills@1.7.0
+version: 1.7.0
+published: 2026-09-17T15:02:04.338Z
+age_days: 23
+age_rule: at least 14 days
+repository: git+https://github.com/vercel-labs/skills.git
+deprecated: no
+lifecycle_scripts: none
+publisher: GitHub Actions
+provenance: https://slsa.dev/provenance/v1
+verdict: ok
+ok: registry gate ok for skills@1.7.0
+$ npm exec --yes --package=skills@1.7.0 -- skills add <clone> --skill '*' --agent ... --copy -y
+
+│
+●   claude-code_2-1-294_agent  Agent detected — installing non-interactively
+│
+◇  Source: <tmp>/src/repo
+│
+◇  Local path validated
+│
+◇  Found 6 skills
+│
+●  Installing all 6 skills
+
+│
+◇  Installation Summary ──────────────────────────────────────────────╮
+│                                                                     │
+│  ./.agents/skills/dossier                                           │
+│    copy → Claude Code, Codex, Cursor, Gemini CLI, OpenCode +1 more  │
+│                                                                     │
+│  ./.agents/skills/dossier-call                                      │
+│    copy → Claude Code, Codex, Cursor, Gemini CLI, OpenCode +1 more  │
+│                                                                     │
+│  ./.agents/skills/dossier-draft                                     │
+│    copy → Claude Code, Codex, Cursor, Gemini CLI, OpenCode +1 more  │
+│                                                                     │
+│  ./.agents/skills/dossier-ingest                                    │
+│    copy → Claude Code, Codex, Cursor, Gemini CLI, OpenCode +1 more  │
+│                                                                     │
+│  ./.agents/skills/dossier-init                                      │
+│    copy → Claude Code, Codex, Cursor, Gemini CLI, OpenCode +1 more  │
+│                                                                     │
+│  ./.agents/skills/dossier-status                                    │
+│    copy → Claude Code, Codex, Cursor, Gemini CLI, OpenCode +1 more  │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────╯
+│
+◇  Installation complete
+
+│
+◇  Installed 6 skills ──────────────────╮
+│                                       │
+│  ✓ dossier (copied)                   │
+│    → ./.claude/skills/dossier         │
+│    → ./.agents/skills/dossier         │
+│  ✓ dossier-call (copied)              │
+│    → ./.claude/skills/dossier-call    │
+│    → ./.agents/skills/dossier-call    │
+│  ✓ dossier-draft (copied)             │
+│    → ./.claude/skills/dossier-draft   │
+│    → ./.agents/skills/dossier-draft   │
+│  ✓ dossier-ingest (copied)            │
+│    → ./.claude/skills/dossier-ingest  │
+│    → ./.agents/skills/dossier-ingest  │
+│  ✓ dossier-init (copied)              │
+│    → ./.claude/skills/dossier-init    │
+│    → ./.agents/skills/dossier-init    │
+│  ✓ dossier-status (copied)            │
+│    → ./.claude/skills/dossier-status  │
+│    → ./.agents/skills/dossier-status  │
+│                                       │
+├───────────────────────────────────────╯
+
+│
+└  Done!  Review skills before use; they run with full agent permissions.
+ok: skills add exits 0
+ok: .claude/skills/dossier-call/SKILL.md exists
+ok: .agents/skills/dossier-call/SKILL.md exists
+ok: .claude/skills/dossier-draft/SKILL.md exists
+ok: .agents/skills/dossier-draft/SKILL.md exists
+ok: .claude/skills/dossier-ingest/SKILL.md exists
+ok: .claude/skills/dossier-ingest/scripts/extract-text.sh exists and is executable
+ok: .claude/skills/dossier-ingest/scripts/file_source.py exists and is executable
+ok: .agents/skills/dossier-ingest/SKILL.md exists
+ok: .agents/skills/dossier-ingest/scripts/extract-text.sh exists and is executable
+ok: .agents/skills/dossier-ingest/scripts/file_source.py exists and is executable
+ok: .claude/skills/dossier-init/SKILL.md exists
+ok: .claude/skills/dossier-init/scripts/init.py exists and is executable
+ok: .agents/skills/dossier-init/SKILL.md exists
+ok: .agents/skills/dossier-init/scripts/init.py exists and is executable
+ok: .claude/skills/dossier-status/SKILL.md exists
+ok: .claude/skills/dossier-status/scripts/status.py exists and is executable
+ok: .agents/skills/dossier-status/SKILL.md exists
+ok: .agents/skills/dossier-status/scripts/status.py exists and is executable
+ok: .claude/skills/dossier/SKILL.md exists
+ok: .agents/skills/dossier/SKILL.md exists
+ok: .claude/skills/dossier-init/templates/en exists
+ok: .claude/skills/dossier-init/templates/fr exists
+ok: .agents/skills/dossier-init/templates/en exists
+ok: .agents/skills/dossier-init/templates/fr exists
+ok: no lint.py, hooks.json, fact-extractor.md or doctrine-reviewer.md under the project folder
+$ python3 <project>/.claude/skills/dossier-init/scripts/init.py --target <dossier> --language en --counterpart ...
+templates: en
+created: sources/received/.gitkeep
+created: sources/transcripts/raw/.gitkeep
+created: knowledge/decisions/.gitkeep
+created: knowledge/watch/.gitkeep
+created: outbound/deliverables/.gitkeep
+created: outbound/mails/.gitkeep
+created: outbound/calls/.gitkeep
+created: dossier.yaml
+created: dossier/ACTORS.md
+created: dossier/HISTORY.md
+created: dossier/LEARNINGS.md
+created: dossier/TONE.md
+created: dossier/CHANNELS.md
+created: dossier/OPEN-QUESTIONS.md
+created: dossier/RELATIONSHIP.md
+created: knowledge/CONTEXT.md
+created: knowledge/DOCTRINE.md
+created: dossier/README.md
+created: sources/README.md
+created: outbound/README.md
+pointer: created AGENTS.md
+pointer: skipped CLAUDE.md (absent)
+done: 20 created, 0 kept
+ok: the copied init.py exits 0
+ok: the copied init.py wrote dossier.yaml
+$ python3 <project>/.claude/skills/dossier-status/scripts/status.py --json <dossier>
+{
+  "root": "<tmp>/dossier",
+  "today": "2026-10-11",
+  "status_line": null,
+  "commitments": [],
+  "upcoming": [],
+  "last_reflected": "2026-10-11",
+  "unreflected_sources": [],
+  "overdue_drafts": [],
+  "stale_files": [],
+  "staleness_days": 7,
+  "lint": {
+    "available": false,
+    "exit": null,
+    "errors": null,
+    "warnings": null,
+    "findings": [],
+    "info": []
+  },
+  "notes": []
+}
+
+ok: the copied status.py exits 0
+ok: lint.available is false (false expected: no plugin marker beside a bare copy)
+OK real configuration unchanged
+ok: real Claude Code, Codex, ~/.agents and ~/.claude/skills byte-identical
+DIST install-skills: PASS
