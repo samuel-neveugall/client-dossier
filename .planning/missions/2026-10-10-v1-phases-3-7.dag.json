@@ -186,7 +186,7 @@
         "exec-5"
       ],
       "scope": [],
-      "status": "ready",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -197,7 +197,7 @@
         "revue-5"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "uat-5",
@@ -499,6 +499,18 @@
         "exec-5"
       ],
       "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-5a",
+      "step": "fix R5-M1/m2, A5-F1/F4/F5 + GREEN re-run",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier-draft/",
+        "skills/dossier-ingest/SKILL.md",
+        "tests/"
+      ],
       "status": "ready"
     }
   ]
