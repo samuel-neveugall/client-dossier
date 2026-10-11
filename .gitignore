@@ -13,3 +13,6 @@ __pycache__/
 .planning/state.json
 .gsd/
 .planning/DRIVER.lock.children.jsonl
+
+# claude plugin eval run artefacts; recorded copies live under .planning/phases/*/evidence/
+evals/results/
