@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 06
 current_phase_name: calls-status
-status: ready_to_plan
-stopped_at: Phase 5 closed (verification passed 5/5, UAT 6/6 agent-run); Phase 6 ready to plan
+status: phase_complete
+stopped_at: Phase 6 executed (verification passed 5/5, UAT 3/3 agent-run); review pending
 last_updated: "2026-10-11T06:10:35.149Z"
 last_activity: 2026-10-11
 last_activity_desc: Phase 05 closed - review fix round 3, re-verification passed, UAT complete
 state_head: 0d552a9a10f6c8cebf8f91ddf90e2aae6f160576
 progress:
   total_phases: 7
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 37
-  completed_plans: 31
-  percent: 71
+  completed_plans: 37
+  percent: 86
 ---
 
 # Project State
@@ -25,19 +25,19 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 06 — Calls & Status (ready to plan)
+**Current focus:** Phase 06 — Calls & Status (executed; review revue-6 pending, then Phase 7)
 
 ## Current Position
 
-Phase: 06 (calls-status) — READY TO EXECUTE
+Phase: 06 (calls-status) — EXECUTED
 Status: Phase 5 done: `05-VERIFICATION.md` passed 5/5 (iter1 kept as `05-VERIFICATION.iter1.md`), `05-UAT.md`
 complete 6/6 (agent-run, evidence `evidence/uat/`, 0.774 USD), review fix rounds 1-3 recorded in
 `05-REVIEW-FIX.md`. Dispatch of `doctrine-reviewer` is mandatory, foreground, and applied before lint and
 history (harness gates handback_before_review, lint_after_last_draft_edit, history_edit_before_review).
 `tests/run.sh` 20 files, 0 failed; test-lint 1728/0; DRAFT-01..05 complete, PROTO-02 pointer to `dossier-draft` added.
-Last activity: 2026-10-11 — Phase 5 closed. Next: plan Phase 6 (06-CONTEXT D-10..D-16 already settled).
+Last activity: 2026-10-11 — Phase 6 executed: plans 06-01..06-06, `06-VERIFICATION.md` passed 5/5, `06-UAT.md` 3/3 agent-run, `tests/run.sh` 24 files 0 failed. CALL-04 RED 3/3 -> GREEN 3/3; CALL-05 RED 3/3 -> GREEN 3/3 (D-16 fallback unused). Phase 6 paid spend 1.74 USD. Next: revue-6, then Phase 7.
 
-Progress: [███████░░░] 71%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -76,5 +76,5 @@ Progress: [███████░░░] 71%
 ## Session Continuity
 
 Last session: 2026-10-11
-Stopped at: Phase 5 closed (verification passed, UAT complete)
-Resume file: .planning/phases/05-drafting-doctrine-review/05-UAT.md
+Stopped at: Phase 6 executed (verification passed 5/5, UAT 3/3)
+Resume file: .planning/phases/06-calls-status/06-VERIFICATION.md
