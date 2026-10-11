@@ -84,8 +84,10 @@ README and eval are Phase 7.
   `lint.py` (E5 included) still runs on it.
 - **D-15 — Two existing tests are rewritten in the pointer commit** (`test-skill-ingest.sh` and
   `test-skill-draft.sh` currently assert that `dossier-call`/`dossier-status` are not named).
-- **D-16 — CALL-05 baseline:** pending Samuel (Q14, asked 2026-10-11): harden the fixture and use a
-  pressured prompt; fallback to "baseline recorded" if still 0 RED.
+- **D-16 — CALL-05 baseline:** harden the fixture (unrelated seeded items, traps) and add pressure to
+  the prompt; if still 0 RED out of 3, CALL-05 reads "baseline recorded" (REQUIREMENTS and ROADMAP
+  criterion 5 amended), and GREEN relies on `dossier-status` being invoked plus `status.py` running.
+  (arbitrage Samuel, AskUserQuestion session principale, 2026-10-11, option (a))
 
 ### Claude's Discretion
 - Output format of `status.py` (plain text sections, plus `--json` for tests), file names of
