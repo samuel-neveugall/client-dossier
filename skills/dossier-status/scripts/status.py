@@ -399,6 +399,27 @@ def commitments_and_upcoming(root, today, notes):
 
 
 def one_line_status(root, notes):
+    """The first visible non-empty line under the first `## ` of RELATIONSHIP.md."""
+    rel = LIVING_DIR + "/RELATIONSHIP.md"
+    text = read_text_safe(os.path.join(root, LIVING_DIR, "RELATIONSHIP.md"))
+    if text is None:
+        notes.append("{} is missing or unreadable: no one-line status".format(rel))
+        return None
+    inside = False
+    for _number, line in visible_lines(text):
+        if line.startswith("## "):
+            if inside:
+                return None
+            inside = True
+            continue
+        if not inside:
+            continue
+        body = line.strip()
+        if not body:
+            continue
+        if body.startswith("#"):
+            return None
+        return body
     return None
 
 
@@ -408,6 +429,35 @@ def one_line_status(root, notes):
 
 
 def read_staleness_days(root, notes):
+    """The `staleness_days` of dossier.yaml, DEFAULT_STALENESS_DAYS when unusable."""
+    text = read_text_safe(os.path.join(root, CONFIG_NAME))
+    raw = None
+    if text is not None and text.lstrip().startswith("{"):
+        try:
+            data = json.loads(text)
+        except ValueError:
+            data = None
+        if isinstance(data, dict):
+            raw = data.get("staleness_days")
+            if isinstance(raw, bool):
+                raw = None
+            elif isinstance(raw, int):
+                raw = str(raw)
+            elif not isinstance(raw, str):
+                raw = None
+    elif text is not None:
+        match = _STALENESS_RE.search(text)
+        if match is not None:
+            value = match.group(1).strip()
+            if value[:1] in ("'", '"'):
+                end = value.find(value[0], 1)
+                raw = value[1:end] if end > 0 else None
+            else:
+                raw = re.sub(r"[ \t]+#.*$", "", value).strip()
+    if raw is not None and re.fullmatch(r"[0-9]+", raw.strip()) and int(raw.strip()) >= 1:
+        return int(raw.strip())
+    notes.append("staleness_days is missing or not a whole number of at least 1 in {}: "
+                 "using {}".format(CONFIG_NAME, DEFAULT_STALENESS_DAYS))
     return DEFAULT_STALENESS_DAYS
 
 
@@ -436,7 +486,16 @@ def living_dates(root, notes):
 
 
 def stale_files(dates, today, staleness_days, notes):
-    return []
+    """Living files last updated more than STALENESS_DAYS ago (future dates noted)."""
+    stale = []
+    for rel in sorted(dates):
+        days = (today - dates[rel]).days
+        if days < 0:
+            notes.append("{} has Last updated: {} in the future".format(rel, dates[rel].isoformat()))
+        elif days > staleness_days:
+            stale.append({"path": rel, "last_updated": dates[rel].isoformat(), "days": days})
+    stale.sort(key=lambda item: (item["last_updated"], item["path"]))
+    return stale
 
 
 # ---------------------------------------------------------------------------
@@ -461,7 +520,26 @@ def _walk_files(root, folder):
 
 
 def overdue_drafts(root, today):
-    return []
+    """Outbound files still `draft` or `reviewed by ...` past their Deadline:."""
+    drafts = []
+    for rel in _walk_files(root, OUTBOUND_DIR):
+        if not _is_header_target(rel):
+            continue
+        text = read_text_safe(os.path.join(root, *rel.split("/")))
+        if text is None:
+            continue
+        header = read_status_header(text)
+        status = header.get("Status")
+        deadline = header.get("Deadline")
+        if status is None or deadline is None:
+            continue
+        value = status[1]
+        if value != "draft" and not value.startswith("reviewed by"):
+            continue
+        if is_absolute_date(deadline[1]) and _to_date(deadline[1]) < today:
+            drafts.append({"path": rel, "status": value, "deadline": deadline[1]})
+    drafts.sort(key=lambda item: (item["deadline"], item["path"]))
+    return drafts
 
 
 # ---------------------------------------------------------------------------
