@@ -279,9 +279,9 @@ if [ -n "$OLD_AMOUNT" ]; then has_not "$OLD_AMOUNT" 'the scenario fixture old am
 if [ -n "$NEW_AMOUNT" ]; then has_not "$NEW_AMOUNT" 'the scenario fixture new amount'; fi
 if [ -n "$NEW_PERSON" ]; then has_not "$NEW_PERSON" 'the scenario fixture new person'; fi
 
-# --- D-11: the dossier skill points here, and still names none of the later-phase skills
-# (dossier-draft is Phase 5: its pointer is pinned by tests/test-skill-draft.sh; dossier-status
-# is pointed to since Phase 6, pinned by tests/test-skill-status.sh, D-15) ---
+# --- D-11: the dossier skill points here. It now names every task skill (dossier-draft is
+# pinned by tests/test-skill-draft.sh, dossier-call by tests/test-skill-call.sh, dossier-status by
+# tests/test-skill-status.sh); tests/test-skills-task.sh pins the final five (D-15) ---
 DOSSIER_MD="$REPO_ROOT/skills/dossier/SKILL.md"
 if grep -qF 'dossier-ingest' "$DOSSIER_MD" 2>/dev/null; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
@@ -289,14 +289,6 @@ else
   echo "FAIL: skills/dossier/SKILL.md does not name dossier-ingest (D-11)" >&2
   TESTS_FAILED=$((TESTS_FAILED + 1))
 fi
-for later in dossier-call; do
-  if grep -qF "$later" "$DOSSIER_MD" 2>/dev/null; then
-    echo "FAIL: skills/dossier/SKILL.md names a later-phase skill: $later" >&2
-    TESTS_FAILED=$((TESTS_FAILED + 1))
-  else
-    TESTS_PASSED=$((TESTS_PASSED + 1))
-  fi
-done
 
 # --- Extraction order and linter gate (R5-M1 mirrored, A5-F1) ---
 has_flat 'Dispatch it in the foreground: never set `run_in_background`' 'R5-M1: the extractor runs in the foreground'

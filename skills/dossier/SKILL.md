@@ -148,5 +148,8 @@ bare-skills install has no scripts), say so and apply the rules above by reading
 `dossier-draft` writes every draft addressed to the counterpart (a mail, a message, a deliverable or a
 note) under `outbound/`, has it reviewed by `doctrine-reviewer` and records the commitment in
 history; every draft goes through it.
+`dossier-call` prepares a call (a file in `outbound/calls/` with what we want to obtain, a timed
+agenda, what we do not do and the open questions to ask) and debriefs it from its transcript; every
+call preparation and every debrief goes through it.
 `dossier-status` answers where the deal stands, read-only: the one-line status, the commitments due,
 the overdue drafts, the sources not yet reflected, the stale living files and the lint findings.
