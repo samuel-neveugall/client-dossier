@@ -221,7 +221,10 @@ client-dossier/
         extract-text.sh               pdftotext wrapper, writes .txt next to the PDF
     dossier-draft/SKILL.md            write an outbound message or document
     dossier-call/SKILL.md             prepare a call, debrief a call
-    dossier-status/SKILL.md           where we are, what is due, what is stale
+    dossier-status/                   where we are, what is due, what is stale
+      SKILL.md                        judgement: run the script, present, suggest the next step; read-only
+      scripts/
+        status.py                     mechanics, read-only: due commitments, unreflected sources, overdue drafts, stale files, lint findings
   agents/
     fact-extractor.md                 reads one long source, returns dated sourced lines per file
     doctrine-reviewer.md              fresh-eyes review of a draft against doctrine, tone, confidentiality
@@ -320,10 +323,13 @@ written for triggering: they name the situations, not the features.
 - Prepare: writes a call file in `outbound/calls/` with context, what we want to obtain,
   a timed agenda, what we do not do in this call, and the open questions to ask (pulled from
   the open questions file, ordered by "when to ask"). Leaves an empty minutes section.
+  The call file carries no `Deadline:` (the call date is in its name, Phase 6 D-11), and a
+  preparation is not sent to `doctrine-reviewer` while `lint.py` still runs (D-14).
 - Debrief: ingests the transcript through `dossier-ingest`, then fills the minutes section,
   moves answered questions to the answered table with their timestamp, adds new
   commitments to history with owners and dates, and updates the relationship file if the
-  call was a milestone.
+  call was a milestone. Ingest runs through the `dossier-ingest` skill first; a commitment
+  shown done is corrected in place with `done <date>` (D-13).
 
 **`dossier-status`**
 - Prints: the one-line status, commitments due with their dates, sources ingested but not
@@ -331,6 +337,8 @@ written for triggering: they name the situations, not the features.
   the `Deadline:` of their status header, living files not updated for more than
   `staleness_days` (7 by default), lint findings.
 - Read-only. This is the "where are we" a human asks at the start of a session.
+- The items are computed by the skill's private, read-only script `scripts/status.py`
+  (Python 3.8+, standard library); the skill presents them and suggests the next step (D-02).
 
 ### 4.2 Agents
 

@@ -64,7 +64,7 @@ synthesized-for-tracking, not verbatim spec text.
 - [x] **PROTO-01**: The `dossier` skill triggers on any task in a repository containing
       `dossier.yaml`, or any mention of a client/counterpart/prospect/partner/call/message
       to someone outside the team, and is always loaded first
-- [ ] **PROTO-02**: The `dossier` skill's content covers the four-folder layout, the
+- [x] **PROTO-02**: The `dossier` skill's content covers the four-folder layout, the
       read-before-act/update-before-handoff table, the fact-line format, the status-header
       format, the "what the agent never does" list, the "Name (Organisation)" rule on first
       mention of a person in a file, and one-sentence pointers to the other five skills
@@ -89,7 +89,7 @@ synthesized-for-tracking, not verbatim spec text.
       recorded RED (agent edits the source) before the protocol skill/hooks exist, and
       re-run GREEN (the transcript stays byte-identical and the agent files the correction
       as a dated, sourced line in the living file concerned; Phase 3 D-09) after
-- [ ] **PROTO-08**: Every skill locates the nearest `dossier.yaml` (working directory, then
+- [x] **PROTO-08**: Every skill locates the nearest `dossier.yaml` (working directory, then
       parents); every task skill (all except `dossier-init` and the `dossier` entry skill)
       stops with a message when none is found; the `dossier` entry skill says so in one line,
       suggests `dossier-init` when relevant, and steps aside (03-CONTEXT D-05); in a repository
@@ -144,22 +144,22 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Call & status (dossier-call, dossier-status)
 
-- [ ] **CALL-01**: `dossier-call prepare <date> <slug>` writes a call file in
+- [x] **CALL-01**: `dossier-call prepare <date> <slug>` writes a call file in
       `outbound/calls/` with context, objectives, a timed agenda, a "what we do not do"
       section, and open questions pulled from the open-questions file ordered by "when to
       ask," leaving an empty minutes section
-- [ ] **CALL-02**: `dossier-call debrief <transcript>` ingests the transcript via
+- [x] **CALL-02**: `dossier-call debrief <transcript>` ingests the transcript via
       `dossier-ingest`, fills the minutes section, moves answered questions to the answered
       table with timestamps, adds new commitments to history with owners and dates, and
       updates `RELATIONSHIP.md` when the call is a milestone
-- [ ] **CALL-03**: `dossier-status` is read-only and prints the one-line status, commitments
+- [x] **CALL-03**: `dossier-status` is read-only and prints the one-line status, commitments
       due with dates, sources ingested but not yet reflected in living files, outbound
       drafts still marked draft past the `Deadline:` of their status header, living files
       stale beyond `staleness_days` from `dossier.yaml` (7 by default), and lint findings
-- [ ] **CALL-04**: The "prepare tomorrow's call" baseline pressure scenario is recorded RED
+- [x] **CALL-04**: The "prepare tomorrow's call" baseline pressure scenario is recorded RED
       (writes "tomorrow", skips open questions, no "what we do not do" section) before
       `dossier-call` exists, and re-run GREEN after
-- [ ] **CALL-05**: The "where are we with this deal" baseline pressure scenario is recorded
+- [x] **CALL-05**: The "where are we with this deal" baseline pressure scenario is recorded
       RED (re-reads everything, answers from memory, misses due commitments) before
       `dossier-status` exists, and re-run GREEN after
 
@@ -219,13 +219,13 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | LINT-02 | Phase 2 | Complete |
 | LINT-03 | Phase 2 | Complete |
 | PROTO-01 | Phase 3 | Complete (closed 2026-10-10) |
-| PROTO-02 | Phase 3 (pointers completed incrementally as each task skill lands in Phases 4-6, verified in full at Phase 6; D-07) | Partial — Phase 3 part done 2026-10-10; pointers to `dossier-init`, `dossier-ingest` (Phase 4) and `dossier-draft` (Phase 5, 2026-10-11) exist; `dossier-call` and `dossier-status` pointers due in Phase 6 |
+| PROTO-02 | Phase 3 (pointers completed incrementally as each task skill lands in Phases 4-6, verified in full at Phase 6; D-07) | Complete — Phase 3 part 2026-10-10; the five pointers completed incrementally (Phases 4-6) and pinned in full at Phase 6 (tests/test-skills-task.sh) |
 | PROTO-03 | Phase 3 | Complete (closed 2026-10-10) |
 | PROTO-04 | Phase 3 | Complete (closed 2026-10-10) |
 | PROTO-05 | Phase 3 | Complete (closed 2026-10-10) — Bash guard class D-04 accepted as documented v1 debt (D-17) |
 | PROTO-06 | Phase 3 | Complete (closed 2026-10-10) |
 | PROTO-07 | Phase 3 | Complete (closed 2026-10-10) |
-| PROTO-08 | Phase 3 (rule and hooks; the task-skill stop completed incrementally in Phases 4-6, verified in full at Phase 6) | Partial — Phase 3 part done 2026-10-10 (rule, hooks, entry skill) |
+| PROTO-08 | Phase 3 (rule and hooks; the task-skill stop completed incrementally in Phases 4-6, verified in full at Phase 6) | Complete — Phase 3 part 2026-10-10; the stop verified for every task skill and status.py's exit 2 at Phase 6 (tests/test-skills-task.sh) |
 | INGEST-01 | Phase 4 | Complete |
 | INGEST-02 | Phase 4 | Complete |
 | INGEST-03 | Phase 4 | Complete |
@@ -237,11 +237,11 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | DRAFT-03 | Phase 5 | Complete |
 | DRAFT-04 | Phase 5 | Complete |
 | DRAFT-05 | Phase 5 | Complete |
-| CALL-01 | Phase 6 | Pending |
-| CALL-02 | Phase 6 | Pending |
-| CALL-03 | Phase 6 | Pending |
-| CALL-04 | Phase 6 | Pending |
-| CALL-05 | Phase 6 | Pending |
+| CALL-01 | Phase 6 | Complete |
+| CALL-02 | Phase 6 | Complete |
+| CALL-03 | Phase 6 | Complete |
+| CALL-04 | Phase 6 | Complete |
+| CALL-05 | Phase 6 | Complete — baseline RED 3 of 3, GREEN 3 of 3 |
 | DIST-01 | Phase 7 | Pending |
 | DIST-02 | Phase 7 | Pending |
 | DIST-03 | Phase 7 | Pending |
@@ -261,4 +261,4 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 *Last updated: 2026-09-16 after the spec review (decisions §11 settled; SCAF-08, PROTO-08,
 INGEST-06, DRAFT-05, DIST-07 added; SCAF-01/02/04/07, LINT-01/02, PROTO-02, INGEST-01,
 DRAFT-02, CALL-03, DIST-03/04 amended); 2026-10-10 Phase 3 planning: PROTO-05/06/07 amended
-(D-01, D-03, D-04, D-09), PROTO-02/08 completed incrementally (D-07)*
+(D-01, D-03, D-04, D-09), PROTO-02/08 completed incrementally (D-07); Phase 6: CALL-01..05, PROTO-02, PROTO-08 complete*
