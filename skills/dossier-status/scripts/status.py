@@ -598,7 +598,60 @@ def _git_add_dates(root):
 
 
 def unreflected_sources(root, today, last_reflected, notes):
-    return []
+    """Source files filed strictly after the newest `Last updated:` date.
+
+    The filing date is the older of the add commit's author date and the
+    file's mtime date (a commit made the day after filing is not a false
+    positive); a file untracked or staged but never committed was filed today;
+    an ignored file, or any file when git is unavailable, uses its mtime date.
+    """
+    files = []
+    for rel in _walk_files(root, SOURCES_DIR):
+        name = rel.rsplit("/", 1)[-1]
+        if rel == SOURCES_DIR + "/" + README_NAME or name == GITKEEP or name in OS_METADATA_NAMES:
+            continue
+        files.append(rel)
+    if not files:
+        return []
+    inside = _git(root, ["rev-parse", "--is-inside-work-tree"])
+    in_repo = inside is not None and inside.strip() == b"true"
+    added = {}
+    fresh = set()
+    if in_repo:
+        added = _git_add_dates(root)
+        untracked = _git_paths(root, ["ls-files", "--others", "--exclude-standard",
+                                      "-z", "--", SOURCES_DIR])
+        staged = _git_paths(root, ["diff", "--cached", "--name-only", "--diff-filter=A",
+                                   "-z", "--", SOURCES_DIR])
+        if untracked is None or staged is None:
+            notes.append("git could not list the new files under {}/: some filing dates "
+                         "may use file modification times".format(SOURCES_DIR))
+        fresh = (untracked or set()) | (staged or set())
+    else:
+        notes.append("git is not available or {} is not inside a repository: filing dates "
+                     "use file modification times".format(root))
+    if last_reflected is None:
+        notes.append("no living file carries a valid Last updated: date: every source "
+                     "counts as not yet reflected")
+    found = []
+    for rel in files:
+        try:
+            mtime = datetime.date.fromtimestamp(os.lstat(os.path.join(root, *rel.split("/"))).st_mtime)
+        except (OSError, OverflowError, ValueError):
+            mtime = today
+        if rel in added:
+            filed = min(added[rel], mtime)
+            how = "git"
+        elif rel in fresh:
+            filed = today
+            how = "untracked"
+        else:
+            filed = mtime
+            how = "mtime"
+        if last_reflected is None or filed > last_reflected:
+            found.append({"path": rel, "filed": filed.isoformat(), "how": how})
+    found.sort(key=lambda item: (item["filed"], item["path"]))
+    return found
 
 
 # ---------------------------------------------------------------------------
