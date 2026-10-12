@@ -616,6 +616,22 @@
         "skills/dossier-init/"
       ],
       "status": "done"
+    },
+    {
+      "id": "revue-7c",
+      "step": "review closing plans 07-08/07-09",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-7c",
+      "step": "micro-fixes revue-7c",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
     }
   ]
 }
