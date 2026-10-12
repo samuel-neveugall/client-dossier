@@ -22,7 +22,8 @@ LICENSE, the CHANGELOG, `scripts/release.sh`, the `evals/routing/` suite and the
 checks under `tests/dist/`, extends the sources guard to Codex `apply_patch` edits, and settles the
 slash-command set by D-18 (settled by Samuel; see Commands). Read the spec before any work; when this file and the spec
 disagree, the spec wins and this file must be updated. Planning lives in `.planning/` (GSD):
-ROADMAP, REQUIREMENTS, STATE.
+ROADMAP, STATE, MILESTONES; milestone v1 (requirements, phases, audit) is archived under
+`.planning/milestones/`.
 
 Language: the plugin (skills, agents, scripts, docs, commit messages) is written in English.
 Dossier *content* produced by the plugin is in the language configured in `dossier.yaml`.
@@ -67,7 +68,7 @@ Division of responsibility, which decides where any new behaviour goes:
   (Phase 4 D-05, the second example; the shell script targets bash 3.2), referenced from
   `SKILL.md` as `${CLAUDE_SKILL_DIR}/…`, never by a relative path. A script shared by several skills stays at
   the repository-root `scripts/`, which is the rule that keeps `lint.py` where it is — see D-05
-  and D-06 of `.planning/phases/01-scaffold-templates/01-CONTEXT.md`; spec §4's tree was amended
+  and D-06 of `.planning/milestones/v1-phases/01-scaffold-templates/01-CONTEXT.md`; spec §4's tree was amended
   in Phase 1, and again in Phase 4, to match. Scripts target **Python 3.8 or newer**, standard library only.
 - **Hooks carry reminders** (`hooks/hooks.json`): SessionStart injects a pointer when a
   `dossier.yaml` is found upward, PreToolUse denies writes under `sources/`, Stop blocks once (the second stop of a

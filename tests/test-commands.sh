@@ -129,10 +129,10 @@ has_fixed '3 internal error' "$LINT_CMD" 'exit code 3 meaning'
 README="$REPO_ROOT/README.md"
 CHANGELOG="$REPO_ROOT/CHANGELOG.md"
 CLAUDE_MD="$REPO_ROOT/CLAUDE.md"
-REQS="$REPO_ROOT/.planning/REQUIREMENTS.md"
+REQS="$REPO_ROOT/.planning/milestones/v1-REQUIREMENTS.md"
 SPEC="$REPO_ROOT/docs/superpowers/specs/2026-09-16-client-dossier-design.md"
-CONTEXT="$REPO_ROOT/.planning/phases/07-manifests-docs-distribution/07-CONTEXT.md"
-ROADMAP="$REPO_ROOT/.planning/ROADMAP.md"
+CONTEXT="$REPO_ROOT/.planning/milestones/v1-phases/07-manifests-docs-distribution/07-CONTEXT.md"
+ROADMAP="$REPO_ROOT/.planning/milestones/v1-ROADMAP.md"
 
 if grep -qxF -- '### Commands' "$README" 2>/dev/null; then
   TESTS_PASSED=$((TESTS_PASSED + 1))
