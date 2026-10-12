@@ -204,6 +204,8 @@ status → manifests and distribution.
   — the paid DIST-06 routing eval, run by the agent, never part of `tests/run.sh`.
 - `bash tests/test-commands.sh` — `commands/` holds exactly `dossier-lint.md`, no command named
   like a skill, the command's frontmatter and quoting.
+- `bash tests/test-script-modes.sh` — every script a SKILL.md runs directly keeps its shebang,
+  its exec bit on disk and mode 100755 in the git index.
 - `/client-dossier:dossier-lint [PATH]` — in Claude Code with the plugin loaded: runs the linter
   on the dossier holding PATH and relays its output and exit code.
 - `claude --plugin-dir .` — load the plugin from the working copy during development.
