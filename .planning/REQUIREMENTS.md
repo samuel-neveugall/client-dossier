@@ -174,10 +174,14 @@ synthesized-for-tracking, not verbatim spec text.
       Agent-Skills-standard harness (Cursor, Copilot CLI, Gemini CLI, OpenCode) via the
       `skills` CLI or by copying the folder in; the skills behave without `scripts/`, hooks
       or agents (INGEST-06, DRAFT-05) and the README says what that install loses
-- [ ] **DIST-04**: Six thin slash commands exist under `commands/`: one per task skill
-      (`dossier-init`, `dossier-ingest`, `dossier-draft`, `dossier-call`, `dossier-status`)
-      invoking that skill, plus `dossier-lint` running `scripts/lint.py`; the `dossier`
-      protocol skill has no command (it is loaded, not invoked)
+- [ ] **DIST-04**: In Claude Code the five task skills are the slash commands
+      (`/client-dossier:dossier-init`, `/client-dossier:dossier-ingest`,
+      `/client-dossier:dossier-draft`, `/client-dossier:dossier-call`,
+      `/client-dossier:dossier-status`, arguments passed through), and one command file,
+      `commands/dossier-lint.md`, runs `scripts/lint.py`; no command file takes a skill's
+      name, because a same-named command shadows the skill for the user and the model
+      (amended in Phase 7 by D-18, option (a), settled by Samuel); the `dossier` protocol
+      skill has no command (it is loaded, not invoked)
 - [ ] **DIST-05**: README documents installation for all four distribution targets
       (Claude Code, Codex, Agent-Skills-standard harnesses, plain `AGENTS.md`-only use),
       plus versioning (semver, `CHANGELOG.md`, git tag per release) and the MIT `LICENSE`;

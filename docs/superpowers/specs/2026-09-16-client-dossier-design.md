@@ -228,8 +228,8 @@ client-dossier/
   agents/
     fact-extractor.md                 reads one long source, returns dated sourced lines per file
     doctrine-reviewer.md              fresh-eyes review of a draft against doctrine, tone, confidentiality
-  commands/                           thin slash commands that invoke the skills (Claude Code)
-    dossier-init.md  dossier-ingest.md  dossier-draft.md  dossier-call.md  dossier-status.md  dossier-lint.md
+  commands/                           one thin command (Claude Code); the task skills are themselves the slash commands
+    dossier-lint.md                   runs scripts/lint.py on the nearest dossier, read-only; no command is named like a skill (it would shadow it)
   hooks/
     hooks.json                        SessionStart reminder, PreToolUse guard on sources/, Stop check (blocks once)
     session-start.py  guard-sources.py  stop-check.py     Python 3.8+, standard library

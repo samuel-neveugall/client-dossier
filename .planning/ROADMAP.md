@@ -368,8 +368,7 @@ commands, and trigger-description eval to have something to reference)
      harnesses; the README states what the bare-skills install loses (scripts, hooks, agents).
   3. README documents installation for all four distribution targets plus versioning and
      license; `CHANGELOG.md` and an MIT `LICENSE` exist.
-  4. The six slash commands under `commands/` work in Claude Code: five invoke their task
-     skill, `dossier-lint` runs `scripts/lint.py`.
+  4. In Claude Code the five task skills answer as slash commands (`/client-dossier:dossier-<name>`, arguments passed through) and the one command `/client-dossier:dossier-lint` runs `scripts/lint.py`; no command shadows a skill (DIST-04 as amended by D-18).
   5. `claude plugin eval` runs against the trigger descriptions and confirms an ambiguous
      input such as "write to the client" routes to `dossier-draft`, not `dossier-ingest`.
   6. `scripts/release.sh <version>` leaves both manifests at the same version, a matching

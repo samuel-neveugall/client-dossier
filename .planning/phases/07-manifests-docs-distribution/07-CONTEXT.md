@@ -41,6 +41,7 @@ is outside the phase: it needs Samuel's explicit approval.
   the skills carry the same rules (CLAUDE.md doctrine).
 - **D-06 — Commands.** Six thin files under `commands/`: five invoke their task skill with the
   arguments, `dossier-lint` runs `scripts/lint.py`; the `dossier` entry skill has no command.
+  **Amended 2026-10-12 by D-18 (settled by Samuel):** one command, `commands/dossier-lint.md`; the five task skills are the slash commands. See D-18 below.
 - **D-07 — Eval.** `claude plugin eval` cases under `evals/`, at least the ambiguous "write to the
   client" → `dossier-draft` (not `dossier-ingest`), plus one positive trigger per task skill and
   the entry skill's step-aside outside a dossier; run by the team, results recorded, budget stated.
