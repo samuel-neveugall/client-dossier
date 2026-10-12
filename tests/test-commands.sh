@@ -34,11 +34,34 @@ has_fixed() {
 # --- The command set is exactly the expected one ---
 ACTUAL_COMMANDS=""
 if [ -d "$CMD_DIR" ]; then
-  ACTUAL_COMMANDS="$(find "$CMD_DIR" -maxdepth 1 -type f -name '*.md' -exec basename {} .md \; | sort | tr '\n' ' ' | sed 's/ $//')"
+  ACTUAL_COMMANDS="$(find "$CMD_DIR" -type f -name '*.md' -exec basename {} .md \; | sort | tr '\n' ' ' | sed 's/ $//')"
 fi
 assert_eq "$EXPECTED_COMMANDS" "$ACTUAL_COMMANDS" 'commands/ holds exactly the expected command files (D-18)'
 
 # --- Collision: no command stem equals a skills/ folder name (Pitfall 1, T-07-28) ---
+# collision_check COMMANDS_DIR SKILLS_DIR — recursive: a nested commands/sub/x.md
+# still shadows skills/x (and any subfolder is already refused by the set check).
+collision_check() {
+  find "$1" -type f -name '*.md' 2>/dev/null | while IFS= read -r f; do
+    stem="$(basename "$f" .md)"
+    if [ -d "$2/$stem" ]; then
+      echo "$f"
+    fi
+  done
+}
+COLLIDING="$(collision_check "$CMD_DIR" "$REPO_ROOT/skills")"
+if [ -n "$COLLIDING" ]; then
+  echo "FAIL: command(s) share a name with a skill and would shadow it (D-18): $COLLIDING" >&2
+  TESTS_FAILED=$((TESTS_FAILED + 1))
+else
+  TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+# Self-check on a scratch: a nested commands/sub/dossier-draft.md is caught.
+SCRATCH_C="$(mktemp -d)"
+mkdir -p "$SCRATCH_C/commands/sub" "$SCRATCH_C/skills/dossier-draft"
+: > "$SCRATCH_C/commands/sub/dossier-draft.md"
+assert_eq "$SCRATCH_C/commands/sub/dossier-draft.md" "$(collision_check "$SCRATCH_C/commands" "$SCRATCH_C/skills")" 'a nested command named like a skill is detected'
+rm -rf "$SCRATCH_C"
 for cmd_file in "$CMD_DIR"/*.md; do
   [ -f "$cmd_file" ] || continue
   stem="$(basename "$cmd_file" .md)"
@@ -76,7 +99,12 @@ done
 
 # --- commands/dossier-lint.md body: quoting, refusal, read-only, exit codes ---
 assert_file "$LINT_CMD"
-has_fixed 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py" '"'<path>'" "$LINT_CMD" 'the exact lint line, path single-quoted (A4-F1)'
+has_fixed 'python3 "${CLAUDE_PLUGIN_ROOT}/scripts/lint.py" -- '"'<path>'" "$LINT_CMD" 'the exact lint line, -- before the single-quoted path (A4-F1)'
+
+# The pinned line is only safe if lint.py takes -- then a path: '--help' as a
+# path must be read as a path (no such file, exit 2), never as an option (exit 0).
+python3 "$REPO_ROOT/scripts/lint.py" -- '--help' >/dev/null 2>&1
+assert_eq '2' "$?" "lint.py -- '--help' exits 2 (a path, not the help option)"
 
 # Every ${CLAUDE_PLUGIN_ROOT} is preceded by a double quote.
 TOTAL_ROOT="$(grep -o '\${CLAUDE_PLUGIN_ROOT}' "$LINT_CMD" 2>/dev/null | wc -l | tr -d ' ')"

@@ -68,8 +68,8 @@ Progress: [██████████] 100%
 Publication needs Samuel's explicit approval (D-01). Measure each item at publication time. The paid
 command smoke ran (Haiku, 0.04 USD in total) and is recorded in `evidence/uat/`.
 
-- [ ] 1. Scenario evidence under `.planning/phases/*/evidence/` (`/Users/...` paths, session ids):
-  `git grep -l '/Users/' -- '.planning/phases/*/evidence'`; `git grep -lE 'session_id|sessionId' -- '.planning/phases/*/evidence'`
+- [ ] 1. Scenario evidence under `.planning/phases/*/evidence/` (`/Users/...` and `/private/var/folders` paths, session ids):
+  `git grep -lE '/Users/|/private/var/folders' -- '.planning/phases/*/evidence'`; `git grep -lE 'session_id|sessionId' -- '.planning/phases/*/evidence'`
 - [ ] 2. The other `.planning/` files carrying `/Users/...`:
   `git grep -l '/Users/' -- .planning ':!.planning/phases/*/evidence'`
 - [ ] 3. `Claude-Session` URLs in commit history: `git log --format=%H --grep='Claude-Session' | wc -l`;
