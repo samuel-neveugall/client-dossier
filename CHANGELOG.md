@@ -7,6 +7,8 @@ All notable changes to client-dossier are recorded here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-13
+
 ### Added
 
 - Six skills: the `dossier` entry skill that carries the protocol, and the task skills
