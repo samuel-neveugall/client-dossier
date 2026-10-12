@@ -18,21 +18,21 @@ tech_debt:
   - phase: 03-protocol-skill-hooks
     items:
       - "Bash guard class D-04 (eval, interpreters, substitutions, variables, loops, printf | apply_patch, cd chains beyond 32) accepted as v1 debt (D-17)"
-      - "W3: each hook carries its own find_root copy of lint.py's upward search; drift risk, not a current break"
+      - "W3 (no change needed): each hook carries its own find_root copy of lint.py's upward search; tests/test-hooks-config.sh already fails on any divergence from lint.py"
   - phase: 05-drafting-doctrine-review
     items:
       - "Abbreviations and acronyms of confidential names caught only by doctrine-reviewer, not by E5 (D-09)"
   - phase: 06-calls-status
     items:
-      - "W5: status.py exits 0 even when its embedded lint run reports errors; the skill tells the reader to read the Lint: line"
+      - "W5 (kept by design): status.py exits 0 whenever a report is printed, since status is informational and not a gate; the lint verdict is in the report text and in the JSON lint field, and the skill maps any non-zero exit to a script failure"
   - phase: 07-manifests-docs-distribution
     items:
       - "W1: skills reach lint.py through ${CLAUDE_PLUGIN_ROOT}; on Codex or a bare-skills install the E5 gate reports 'not passed' (fails safe, check unavailable)"
       - "W2: no hooks in the Codex manifest; Codex hooks never run on a live Codex (no OpenAI key)"
-      - "W4: skill scripts rely on the exec bit, not checked by any manifest test"
+      - "W4 (fixed in the cleanup): tests/test-script-modes.sh pins the shebang, the exec bit and git mode 100755 of every script a SKILL.md runs directly"
       - "Task-skill slash-command argument pass-through not smoked with an argument (07-VERIFICATION)"
       - "Marketplace install from samuel-neveugall/client-dossier testable only after publication; pre-publication checklist recorded in STATE, not executed"
-      - "N1: CLAUDE.md Commands still describes two validate warnings; only one remains"
+      - "N1 (already fixed): CLAUDE.md Commands already describes the single validate warning"
       - "07-0x SUMMARY files carry no requirements-completed frontmatter (metadata only; 07-VERIFICATION maps DIST-01..07)"
 nyquist:
   compliant_phases: []
@@ -106,3 +106,16 @@ VALIDATION.md. This is a coverage TODO, not a failure (#2117).
 
 See the frontmatter. Each item was accepted during its phase (D-17, D-09, the Phase 2 carry-overs) or
 is a warning from the integration check (W1 to W5, N1). None of them blocks the release.
+
+## Cleanup (2026-10-12, branch chore/v1-cleanup)
+
+Samuel chose a short cleanup before closing v1.
+- **W4** — fixed. The new `tests/test-script-modes.sh` runs 17 checks. A negative control shows
+  that removing the exec bit from `status.py` makes 2 of them fail.
+- **W3** — no change needed. The parity test on `find_root` already exists.
+- **W5** — kept. The exit code contract is documented in `status.py` and relied on by the skill.
+- **N1** — already fixed in CLAUDE.md before the audit.
+- **W1, W2 and argument pass-through** — still debt. They depend on a live Codex or on publication.
+- **Flaky watch**: one `tests/run.sh` run during the cleanup reported 1 of 31 files failed. The
+  failing file was not captured. Five reruns in a row passed 31/31. Watch this; the shared
+  `/tmp/gsd-test-output.$$` capture in `tests/run.sh` is not the cause, since it is per process.
