@@ -38,6 +38,10 @@ human_verification:
   - test: "Start 'claude --plugin-dir .' in a dossier with the SessionStart hook disabled (or in a dossier subfolder with no reminder) and ask for a dossier-shaped task (e.g. 'prepare tomorrow's call with Jane at Acme')"
     expected: "The agent loads client-dossier:dossier on the strength of the description alone, before reading dossier.yaml"
     why_human: "In all three GREEN runs the first tool call is Skill(client-dossier:dossier) but the SessionStart reminder also fired (hook events present in the stream), so description-only triggering (criterion 1 tail, PROTO-01 'always loaded first') is confounded. The plan defers description validation to 'claude plugin eval' in Phase 7."
+audit_acknowledged:
+  milestone: v1
+  at: 2026-10-13
+  status: gaps_found
 ---
 
 # Phase 3: Protocol Skill & Hooks Verification Report

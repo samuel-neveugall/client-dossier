@@ -29,6 +29,10 @@ behavior_unverified_items:
     test: "In a real interactive Claude Code session with the plugin loaded (claude --plugin-dir .), ingest a multi-page source and watch whether the Agent tool is called with subagent_type client-dossier:fact-extractor"
     expected: "The agent is dispatched, returns the exact three-list markup (Read / Proposal / Contradicts / Uncertain), and the skill applies only lines citing the given source label; or Samuel confirms the inline path is acceptable when the agent is available"
     why_human: "In all 4 paid GREEN runs (3 transcript, 1 PDF) the Task/Agent tool and client-dossier:fact-extractor were registered in system/init, yet extractor_dispatched = no every time; the main agent extracted inline. Presence of the agent file and the skill instruction is verified, the dispatch itself has zero behavioural evidence, and a paid run is out of scope for this verification."
+audit_acknowledged:
+  milestone: v1
+  at: 2026-10-13
+  status: human_needed
 ---
 
 # Phase 4: Ingest & Fact Extraction Verification Report

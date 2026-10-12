@@ -42,6 +42,10 @@ human_verification:
   - test: "In a live session, run the skill against a copy of `tests/fixtures/make-adopt-fixture.sh`'s throwaway origin-shaped repository, and (a) confirm the proposed renames, (b) on a second run, decline them."
     expected: "On confirm: the skill executes the exact `git mv -- <old> <new>` commands from the proposal, one at a time, then completes whatever scaffold pieces are still missing (D-08), and commits nothing itself. On decline: nothing is renamed or written."
     why_human: "The read-only `--propose-renames` proposal step is mechanically verified (byte-exact match against `tests/golden/adopt-proposal.txt`), but the confirm/decline branch and the subsequent `git mv` execution is conversational orchestration described in SKILL.md prose, not exercised by any automated test in this phase (the plan's own 01-06-SUMMARY.md documents this as intentionally interactive-only, `human_judgment: true`)."
+audit_acknowledged:
+  milestone: v1
+  at: 2026-10-13
+  status: human_needed
 ---
 
 # Phase 1: Scaffold & Templates Verification Report
@@ -248,4 +252,3 @@ Two fresh copies of `tests/fixtures/make-adopt-fixture.sh` output.
 - `allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/init.py *)` was not exercised as a
   permission gate: runs used `--dangerously-skip-permissions`. The interpolation question
   (open point 2 of the mission report) stays open.
-
