@@ -1,0 +1,35 @@
+$ clean tree: scripts/release.sh --allow-branch 9.9.9-test
+release: tagged v9.9.9-test locally. Nothing was pushed.
+rc=0
+v9.9.9-test     client-dossier 9.9.9-test
+.claude-plugin/plugin.json | 2 +-
+ .codex-plugin/plugin.json  | 2 +-
+ CHANGELOG.md               | 2 ++
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+1 matches in 1F:
+
+[file] .claude-plugin/plugin.json (1):
+     3: "version": "9.9.9-test",
+
+# Changelog
+
+All notable changes to client-dossier are recorded here. The format follows
+[Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/) and the project follows
+[Semantic Versioning 2.0.0](https://semver.org/spec/v2.0.0.html). Each release is a git tag
+`vX.Y.Z` made by `scripts/release.sh`.
+
+## [Unreleased]
+
+## [9.9.9-test] - 2026-10-12
+
+### Added
+origin refs:        0
+--- dirty tree
+release: working tree is not clean; commit first
+rc=1
+--- existing tag
+release: tag v9.9.9-test already exists
+rc=1
+--- without allow-branch on non-main
+release: on branch 'scratch', not the default branch 'feat/phase-07-manifests-docs-distribution'; check it out (or pass --allow-branch)
+rc=1

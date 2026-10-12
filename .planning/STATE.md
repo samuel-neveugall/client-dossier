@@ -2,18 +2,18 @@
 gsd_state_version: "1.0"
 current_phase: 07
 current_phase_name: manifests-docs-distribution
-status: phase_complete
-stopped_at: Phase 6 executed (verification passed 5/5, UAT 3/3 agent-run); review pending
-last_updated: "2026-10-11T09:15:16.646Z"
-last_activity: 2026-10-11
-last_activity_desc: Phase 05 closed - review fix round 3, re-verification passed, UAT complete
+status: milestone_ready_for_audit
+stopped_at: Phase 7 closed (verification passed 6/6, UAT 8/8 agent-run); milestone v1 ready for audit
+last_updated: "2026-10-12T00:00:00.000Z"
+last_activity: 2026-10-12
+last_activity_desc: Phase 7 closed - verification passed 6/6, UAT 8/8 agent-run
 state_head: 12b12c281d72963fe84f3c8e46d30158780399f0
 progress:
   total_phases: 7
-  completed_phases: 6
+  completed_phases: 7
   total_plans: 46
-  completed_plans: 37
-  percent: 80
+  completed_plans: 46
+  percent: 100
 ---
 
 # Project State
@@ -25,19 +25,16 @@ See: .planning/PROJECT.md (updated 2026-09-16)
 **Core value:** Every agent session in a dossier repository reads the living dossier before
 acting and updates it before handing back — so nothing reaches the counterpart without a
 human and a doctrine check.
-**Current focus:** Phase 06 — Calls & Status (executed; review revue-6 pending, then Phase 7)
+**Current focus:** Milestone v1 — all 7 phases closed; ready for the milestone audit
 
 ## Current Position
 
-Phase: 07 (manifests-docs-distribution) — READY TO EXECUTE
-Status: Phase 5 done: `05-VERIFICATION.md` passed 5/5 (iter1 kept as `05-VERIFICATION.iter1.md`), `05-UAT.md`
-complete 6/6 (agent-run, evidence `evidence/uat/`, 0.774 USD), review fix rounds 1-3 recorded in
-`05-REVIEW-FIX.md`. Dispatch of `doctrine-reviewer` is mandatory, foreground, and applied before lint and
-history (harness gates handback_before_review, lint_after_last_draft_edit, history_edit_before_review).
-`tests/run.sh` 20 files, 0 failed; test-lint 1728/0; DRAFT-01..05 complete, PROTO-02 pointer to `dossier-draft` added.
-Last activity: 2026-10-11 — Phase 6 executed: plans 06-01..06-06, `06-VERIFICATION.md` passed 5/5, `06-UAT.md` 3/3 agent-run, `tests/run.sh` 24 files 0 failed. CALL-04 RED 3/3 -> GREEN 3/3; CALL-05 RED 3/3 -> GREEN 3/3 (D-16 fallback unused). Phase 6 paid spend 1.74 USD. Next: revue-6, then Phase 7.
+Phase: 07 (manifests-docs-distribution) — COMPLETE
+Status: `07-VERIFICATION.md` passed 6/6 (DIST-01..07), `07-UAT.md` complete 8/8 (agent-run, `evidence/uat/`, 0.024 USD).
+`tests/run.sh` 30 files, 0 failed; `claude plugin validate .` exit 0, one warning (root CLAUDE.md). Manifests stay 0.1.0 and CHANGELOG [Unreleased]: `release.sh 1.0.0` and the LOCAL `v1.0.0` tag come after the milestone audit (D-01). Codex hooks never run for real (no OpenAI login).
+Last activity: 2026-10-12 — Phase 7 closed (D-18: one command, `dossier-lint`). Next: milestone audit, then release 1.0.0 locally; publication needs Samuel's approval.
 
-Progress: [████████░░] 80%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -50,7 +47,7 @@ Progress: [████████░░] 80%
 
 ### Pending Todos
 
-- Phase 7: D-18 settled (one command, `dossier-lint`); plans 07-01..07-09 executed, the engine closes the phase after verification and UAT.
+- Milestone audit, then `scripts/release.sh 1.0.0` + local tag (D-01).
 
 ### Blockers/Concerns
 
@@ -69,7 +66,7 @@ Progress: [████████░░] 80%
 ## Pre-publication checklist (D-12, NOT executed in v1)
 
 Publication needs Samuel's explicit approval (D-01). Measure each item at publication time. The paid
-command smoke (Haiku, about 0.05 USD) is planned in 07-09 task 3 and recorded in `evidence/uat/`.
+command smoke ran (Haiku, 0.04 USD in total) and is recorded in `evidence/uat/`.
 
 - [ ] 1. Scenario evidence under `.planning/phases/*/evidence/` (`/Users/...` paths, session ids):
   `git grep -l '/Users/' -- '.planning/phases/*/evidence'`; `git grep -lE 'session_id|sessionId' -- '.planning/phases/*/evidence'`
@@ -87,6 +84,6 @@ command smoke (Haiku, about 0.05 USD) is planned in 07-09 task 3 and recorded in
 
 ## Session Continuity
 
-Last session: 2026-10-11
-Stopped at: Phase 6 executed (verification passed 5/5, UAT 3/3)
-Resume file: .planning/phases/06-calls-status/06-VERIFICATION.md
+Last session: 2026-10-12
+Stopped at: Phase 7 closed (verification passed 6/6, UAT 8/8); milestone v1 ready for audit
+Resume file: .planning/phases/07-manifests-docs-distribution/07-UAT.md

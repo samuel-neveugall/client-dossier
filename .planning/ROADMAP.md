@@ -33,7 +33,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - [x] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts (completed 2026-10-10)
 - [x] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
 - [x] **Phase 6: Calls & Status** - `dossier-call` and `dossier-status` close the loop on preparation, debrief, and "where are we"
-- [ ] **Phase 7: Manifests, Docs & Distribution** - both manifests, commands, README/LICENSE/CHANGELOG, and trigger-description eval
+- [x] **Phase 7: Manifests, Docs & Distribution** - both manifests, commands, README/LICENSE/CHANGELOG, and trigger-description eval (completed 2026-10-12)
 
 ## Phase Details
 
@@ -409,7 +409,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 07-09-PLAN.md — closure: CLAUDE.md, spec, traceability, the STATE pre-publication checklist
+- [x] 07-09-PLAN.md — closure: CLAUDE.md, spec, traceability, the STATE pre-publication checklist
   (D-12, D-13), the command smoke for 07-UAT, a release rehearsal on a scratch clone, full verification
 
 ## Progress
@@ -425,4 +425,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Ingest & Fact Extraction | 5/5 | Complete — verified + recette agent-run | 2026-10-10 |
 | 5. Drafting & Doctrine Review | 5/5 | Complete — verified + recette agent-run | 2026-10-11 |
 | 6. Calls & Status | 6/6 | Complete — verified + recette agent-run | 2026-10-11 |
-| 7. Manifests, Docs & Distribution | 0/TBD | Not started | - |
+| 7. Manifests, Docs & Distribution | 9/9 | Complete — verified + recette agent-run | 2026-10-12 |

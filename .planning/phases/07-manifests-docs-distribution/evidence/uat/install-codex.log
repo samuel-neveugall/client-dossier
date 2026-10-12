@@ -1,0 +1,57 @@
+source: HEAD d4061f8695c4
+note: uncommitted changes are not installed; this check installs HEAD only
+$ codex plugin marketplace add /var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.r622kpP3n5/src/repo
+Added marketplace `client-dossier` from <tmp>/src/repo.
+Installed marketplace root: <tmp>/src/repo
+ok: marketplace add exits 0
+ok: marketplace add output names client-dossier
+$ codex plugin add client-dossier@client-dossier
+Added plugin `client-dossier` from marketplace `client-dossier`.
+Installed plugin root: <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0
+ok: plugin add exits 0
+$ codex plugin list --json
+{
+  "installed": [
+    {
+      "pluginId": "client-dossier@client-dossier",
+      "name": "client-dossier",
+      "marketplaceName": "client-dossier",
+      "version": "0.1.0",
+      "installed": true,
+      "enabled": true,
+      "source": {
+        "source": "local",
+        "path": "<tmp>/src/repo"
+      },
+      "marketplaceSource": {
+        "sourceType": "local",
+        "source": "<tmp>/src/repo"
+      },
+      "installPolicy": "AVAILABLE",
+      "authPolicy": "ON_INSTALL"
+    }
+  ],
+  "available": []
+}
+ok: plugin list --json exits 0
+ok: client-dossier@client-dossier is installed
+ok: client-dossier@client-dossier is enabled
+ok: installed version 0.1.0 equals the clone version 0.1.0
+ok: source type is local (local expected)
+ok: cache folder exists: <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0
+ok: cache copy holds .codex-plugin/plugin.json
+ok: cache copy holds skills/dossier/SKILL.md
+ok: cache copy holds hooks/hooks.json
+$ codex debug prompt-input hi   (from an empty folder; the plugin's skill entries only)
+skill client-dossier:dossier -> <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0/skills/dossier/SKILL.md
+skill client-dossier:dossier-call -> <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0/skills/dossier-call/SKILL.md
+skill client-dossier:dossier-draft -> <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0/skills/dossier-draft/SKILL.md
+skill client-dossier:dossier-ingest -> <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0/skills/dossier-ingest/SKILL.md
+skill client-dossier:dossier-init -> <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0/skills/dossier-init/SKILL.md
+skill client-dossier:dossier-status -> <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0/skills/dossier-status/SKILL.md
+ok: debug prompt-input exits 0
+ok: prompt-input lists client-dossier:<name> for dossier dossier-call dossier-draft dossier-ingest dossier-init dossier-status (equals the 6 skills/ folders)
+note: hooks run on Codex after the user trusts them in /hooks; their run-time behaviour is documentation-backed here (an isolated CODEX_HOME is not logged in)
+OK real configuration unchanged
+ok: real Claude Code, Codex and ~/.agents configuration byte-identical
+DIST install-codex: PASS
