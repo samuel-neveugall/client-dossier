@@ -41,7 +41,7 @@ created: "2026-10-11"
 | 07-REQ-03 | tbd | tbd | DIST-02 | tests never touch real config (CODEX_HOME and HOME) | Codex manifest identity equals Claude's; `.agents` marketplace policy/category, no version | static | `bash tests/test-manifests.sh` | ❌ W0 | ⬜ pending |
 | 07-REQ-04 | tbd | tbd | DIST-02 | same | isolated `codex plugin marketplace add` + `plugin add`; `debug prompt-input` lists every skill | integration | `bash tests/dist/install-codex.sh` | ❌ W0 | ⬜ pending |
 | 07-REQ-05 | tbd | tbd | DIST-03 | pinned `skills@1.7.2`, human-verify checkpoint (SUS) | skill folders copied whole; no `lint.py`, `hooks`, `agents`; skills degrade (guards + stated fallbacks) | integration + static | `bash tests/dist/install-skills.sh && bash tests/test-skill-shape.sh` | ❌ W0 | ⬜ pending |
-| 07-REQ-06 | tbd | tbd | DIST-04 (amended, P-01) | no `allowed-tools`, single-quoted path | `commands/` = exactly `dossier-lint.md`; no command stem equals a skill name | static | `bash tests/test-commands.sh` | ❌ W0 | ⬜ pending |
+| 07-REQ-06 | tbd | tbd | DIST-04 (amended, D-18) | no `allowed-tools`, single-quoted path | `commands/` = exactly `dossier-lint.md`; no command stem equals a skill name | static | `bash tests/test-commands.sh` | ❌ W0 | ⬜ pending |
 | 07-REQ-07 | tbd | tbd | DIST-04 | none | `/client-dossier:dossier-lint` relays lint output and exit code; a task skill slash loads SKILL.md | paid smoke (agent-run) | recorded in `07-UAT.md` | manual-only | ⬜ pending |
 | 07-REQ-08 | tbd | tbd | DIST-05 | README states D-04/D-17 limits and 05 D-09 debt | four target headings, install commands, loses-list, Bash guard limits, semver, MIT, `/hooks` trust; LICENSE MIT "Samuel Neveu"; CHANGELOG `## [Unreleased]` only | static | `bash tests/test-readme.sh` | ❌ W0 | ⬜ pending |
 | 07-REQ-09 | tbd | tbd | DIST-06 | read-only tools + `Skill` only | every case has frontmatter keys from the allowed set, graders naming an existing skill, executable `set -eu` scaffolds; `evals/results/` ignored | static | `bash tests/test-evals-shape.sh` | ❌ W0 | ⬜ pending |
@@ -54,7 +54,7 @@ created: "2026-10-11"
 ## Wave 0 Requirements
 
 - [ ] `tests/test-manifests.sh` — DIST-01/02 static + validate
-- [ ] `tests/test-commands.sh` — DIST-04 collision + shape (P-01 isolated plan)
+- [ ] `tests/test-commands.sh` — DIST-04 collision + shape (D-18, settled by Samuel)
 - [ ] `tests/test-release.sh` — DIST-07
 - [ ] `tests/test-readme.sh` — DIST-05
 - [ ] `tests/test-evals-shape.sh` — DIST-06 static
