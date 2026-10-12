@@ -236,8 +236,9 @@ client-dossier/
   scripts/
     lint.py                           mechanical checks (python3, no dependencies)
     release.sh                        bumps the version in both manifests, tags
-  tests/                              fixture dossiers, the bash runner for lint.py and the hooks; scenarios/ holds the paid pressure-scenario harness
-  docs/                               this spec, the protocol reference, the fact-line reference
+  tests/                              fixture dossiers, the bash runner for lint.py and the hooks; scenarios/ holds the paid pressure-scenario harness; dist/ the isolated install checks (free, outside run.sh)
+  evals/                              claude plugin eval routing cases (paid, run by the team; results/ is ignored)
+  docs/                               this spec (the protocol lives in the dossier skill, the fact-line rules in §3.4 and the linter)
   README.md  LICENSE  CHANGELOG.md
 ```
 
@@ -374,6 +375,11 @@ to perform the same steps inline.
 Hooks are a convenience. The skills state the same rules so that a harness without hooks
 gets the same behaviour from prose.
 
+Codex loads the same `hooks/hooks.json` (it sets `CLAUDE_PLUGIN_ROOT` for compatibility) once the
+user trusts the hooks in `/hooks`. Codex edits files through `apply_patch`, and the PreToolUse
+guard judges every path of its `*** Add File:`, `*** Update File:`, `*** Delete File:` and
+`*** Move to:` headers exactly like the Write family (Phase 7 D-05).
+
 The hook scripts are Python 3.8+ standard library, find the dossier with an upward
 `dossier.yaml` search (the linter and the Stop hook use the nearest one; the PreToolUse guard tries every ancestor, so
 it denies under the sources folder of any of them), and fail open: on any internal error they
@@ -503,9 +509,15 @@ Plugin-level: `claude plugin eval` suites for the trigger descriptions once the 
 The submission processes of the two official marketplaces have to be checked at submission
 time; the repository layout above mirrors a plugin already published on both.
 
+OpenAI's public plugin directory does not list plugins with lifecycle hooks, so a submission there
+needs a hook-less variant decided at publication time (Phase 7 D-13). Publishing to any
+marketplace, pushing a tag and making the repository public each need Samuel's explicit approval
+(Phase 7 D-01).
+
 Versioning: semver, `CHANGELOG.md`, a git tag per release. The version lives in both
 manifests; `scripts/release.sh <version>` bumps them together, updates the changelog heading
-and creates the tag.
+and creates the tag. The marketplace entries carry no version, `plugin.json` being the single
+version source in each harness.
 
 The bare-skills path (third row) ships `skills/` only: no `scripts/`, no hooks, no agents.
 The skills are written for that case (section 6, last two items).

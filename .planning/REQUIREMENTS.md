@@ -166,15 +166,15 @@ synthesized-for-tracking, not verbatim spec text.
 
 ### Distribution (manifests, commands, README/LICENSE/CHANGELOG, plugin eval)
 
-- [ ] **DIST-01**: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` let a
+- [x] **DIST-01**: `.claude-plugin/plugin.json` + `.claude-plugin/marketplace.json` let a
       user install via `/plugin marketplace add` then `/plugin install` in Claude Code
-- [ ] **DIST-02**: `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json` provide
+- [x] **DIST-02**: `.codex-plugin/plugin.json` + `.agents/plugins/marketplace.json` provide
       the equivalent Codex CLI/app distribution path
-- [ ] **DIST-03**: `skills/*/SKILL.md` alone (no plugin installed) is installable on any
+- [x] **DIST-03**: `skills/*/SKILL.md` alone (no plugin installed) is installable on any
       Agent-Skills-standard harness (Cursor, Copilot CLI, Gemini CLI, OpenCode) via the
       `skills` CLI or by copying the folder in; the skills behave without `scripts/`, hooks
       or agents (INGEST-06, DRAFT-05) and the README says what that install loses
-- [ ] **DIST-04**: In Claude Code the five task skills are the slash commands
+- [x] **DIST-04**: In Claude Code the five task skills are the slash commands
       (`/client-dossier:dossier-init`, `/client-dossier:dossier-ingest`,
       `/client-dossier:dossier-draft`, `/client-dossier:dossier-call`,
       `/client-dossier:dossier-status`, arguments passed through), and one command file,
@@ -182,14 +182,14 @@ synthesized-for-tracking, not verbatim spec text.
       name, because a same-named command shadows the skill for the user and the model
       (amended in Phase 7 by D-18, option (a), settled by Samuel); the `dossier` protocol
       skill has no command (it is loaded, not invoked)
-- [ ] **DIST-05**: README documents installation for all four distribution targets
+- [x] **DIST-05**: README documents installation for all four distribution targets
       (Claude Code, Codex, Agent-Skills-standard harnesses, plain `AGENTS.md`-only use),
       plus versioning (semver, `CHANGELOG.md`, git tag per release) and the MIT `LICENSE`;
       README states the Bash guard's D-04 limits (Phase 3 D-17)
-- [ ] **DIST-06**: `claude plugin eval` suites verify the six skills' trigger descriptions —
+- [x] **DIST-06**: `claude plugin eval` suites verify the six skills' trigger descriptions —
       confirming, for example, that "write to the client" routes to `dossier-draft` and not
       `dossier-ingest`
-- [ ] **DIST-07**: `scripts/release.sh <version>` bumps the version in both manifests
+- [x] **DIST-07**: `scripts/release.sh <version>` bumps the version in both manifests
       (`.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`), updates the `CHANGELOG.md`
       heading and creates the git tag, so the two versions never diverge
 
@@ -247,13 +247,13 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 | CALL-03 | Phase 6 | Complete |
 | CALL-04 | Phase 6 | Complete |
 | CALL-05 | Phase 6 | Complete — baseline RED 3 of 3, GREEN 3 of 3 |
-| DIST-01 | Phase 7 | Pending |
-| DIST-02 | Phase 7 | Pending |
-| DIST-03 | Phase 7 | Pending |
-| DIST-04 | Phase 7 | Pending |
-| DIST-05 | Phase 7 | Pending |
-| DIST-06 | Phase 7 | Pending |
-| DIST-07 | Phase 7 | Pending |
+| DIST-01 | Phase 7 | Complete — evidence/dist/install-claude.log |
+| DIST-02 | Phase 7 | Complete — evidence/dist/install-codex.log; apply_patch guarded (07-03) |
+| DIST-03 | Phase 7 | Complete — evidence/dist/install-skills-copy.log (and install-skills-cli.log, skills gate ok) |
+| DIST-04 | Phase 7 | Complete — as amended by D-18 (settled by Samuel); smoke evidence/uat/ |
+| DIST-05 | Phase 7 | Complete — README.md, LICENSE, CHANGELOG.md (tests/test-readme.sh) |
+| DIST-06 | Phase 7 | Complete — evidence/eval/routing-sonnet.tsv, write-to-client 1.0 |
+| DIST-07 | Phase 7 | Complete — tests/test-release.sh; real 1.0.0 run after the milestone audit (D-01) |
 
 **Coverage:**
 
@@ -266,4 +266,4 @@ permanent v1 exclusions in Out of Scope below, not as a future release.
 *Last updated: 2026-09-16 after the spec review (decisions §11 settled; SCAF-08, PROTO-08,
 INGEST-06, DRAFT-05, DIST-07 added; SCAF-01/02/04/07, LINT-01/02, PROTO-02, INGEST-01,
 DRAFT-02, CALL-03, DIST-03/04 amended); 2026-10-10 Phase 3 planning: PROTO-05/06/07 amended
-(D-01, D-03, D-04, D-09), PROTO-02/08 completed incrementally (D-07); Phase 6: CALL-01..05, PROTO-02, PROTO-08 complete*
+(D-01, D-03, D-04, D-09), PROTO-02/08 completed incrementally (D-07); Phase 6: CALL-01..05, PROTO-02, PROTO-08 complete; Phase 7: DIST-01..07 (DIST-04 as amended by D-18)*
