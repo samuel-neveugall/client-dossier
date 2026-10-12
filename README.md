@@ -151,6 +151,15 @@ It lints the dossier holding `PATH` (the current directory by default), walking 
 `dossier.yaml`. It is read-only and has no repair mode. Exit codes: 0 no error (warnings allowed),
 1 at least one error, 2 no `dossier.yaml` found upward or unreadable, 3 internal error.
 
+### Commands
+
+In Claude Code the plugin also ships one command, `/client-dossier:dossier-lint [path]`. It runs
+`scripts/lint.py` on the dossier holding the path (the current directory by default) and reports
+its findings and exit code without fixing anything. The task skills need no separate command:
+`/client-dossier:dossier-draft …` already is the slash command of `dossier-draft`. Codex and
+bare-skills installs do not have this command; run `python3 scripts/lint.py` from a clone of this
+repository instead.
+
 ## Limits
 
 Two protections are heuristics. This section says where they stop, so you do not rely on them past

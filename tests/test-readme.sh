@@ -104,13 +104,8 @@ readme_has_no_email() {
   fi
 }
 readme_has_no_email
-# The command paragraph (### Commands) belongs to plan 07-08, not to this plan.
-if grep -qi 'dossier-lint' "$README" 2>/dev/null; then
-  echo "FAIL: README names dossier-lint (plan 07-08 owns the command paragraph)" >&2
-  TESTS_FAILED=$((TESTS_FAILED + 1))
-else
-  TESTS_PASSED=$((TESTS_PASSED + 1))
-fi
+# The command paragraph (### Commands) belongs to plan 07-08 and is pinned by tests/test-commands.sh
+# (D-18); this file only keeps the paragraph out of the checks above.
 
 # --- LICENSE -----------------------------------------------------------------
 assert_eq 'MIT License' "$(head -n 1 "$LICENSE_FILE")" 'LICENSE first line'

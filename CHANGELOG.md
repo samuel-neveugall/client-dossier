@@ -23,3 +23,4 @@ All notable changes to client-dossier are recorded here. The format follows
 - The `claude plugin eval` routing suite for the skill trigger descriptions.
 - `scripts/release.sh`, which bumps both manifests, writes the changelog heading and creates a
   local annotated tag.
+- The `/client-dossier:dossier-lint` command for Claude Code; the task skills are the slash commands.

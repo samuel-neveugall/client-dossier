@@ -404,8 +404,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 07-08-PLAN.md — P-01, provisional: the one dossier-lint command, the collision test and the
-  DIST-04 / spec §4 / D-06 / criterion 4 amendments, isolated so option (b) is a one-plan edit
+- [ ] 07-08-PLAN.md — D-18: the one dossier-lint command, the collision test and the
+  DIST-04 / spec §4 / D-06 / criterion 4 amendments, isolated in one plan
 
 **Wave 5** *(blocked on Wave 4 completion)*
 

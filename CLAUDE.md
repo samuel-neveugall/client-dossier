@@ -75,6 +75,10 @@ Division of responsibility, which decides where any new behaviour goes:
   `fact-extractor` (one source → proposed dated, sourced lines per living file, plus
   "contradicts" and "uncertain" lists) and `doctrine-reviewer` (reports findings on a draft,
   never rewrites). Skills must also contain the inline procedure for harnesses without subagents.
+- **Commands** (`commands/`, Claude Code only): one, `dossier-lint.md`, which runs `scripts/lint.py`.
+  The five task skills are themselves the slash commands (`/client-dossier:dossier-<name>`); a
+  command file never takes a skill's name, because it would shadow the skill for the user and the
+  model (Phase 7 D-18; `tests/test-commands.sh`).
 - Dual manifests: `.claude-plugin/{plugin,marketplace}.json` and `.codex-plugin/plugin.json` +
   `.agents/plugins/marketplace.json`. The version lives in both and is bumped together.
 
@@ -179,6 +183,10 @@ status → manifests and distribution.
 - `bash tests/scenarios/deal-status.sh [--variant baseline|plugin|plugin-pointer]... [--runs N] [--prompt plain|pressured] [OUTDIR]`
   — the CALL-05 pressure scenario (pressured prompt by default, D-16): paid headless `claude -p`
   runs, run by the agent, never part of `tests/run.sh`. Same exit codes.
+- `bash tests/test-commands.sh` — `commands/` holds exactly `dossier-lint.md`, no command named
+  like a skill, the command's frontmatter and quoting.
+- `/client-dossier:dossier-lint [PATH]` — in Claude Code with the plugin loaded: runs the linter
+  on the dossier holding PATH and relays its output and exit code.
 - `claude --plugin-dir .` — load the plugin from the working copy during development.
 
 Add more here as they are created.
