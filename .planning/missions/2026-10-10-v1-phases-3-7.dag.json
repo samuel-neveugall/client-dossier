@@ -319,7 +319,7 @@
         "revue-7"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "uat-7",
@@ -329,7 +329,7 @@
         "verify-7"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -339,7 +339,7 @@
         "uat-7"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-3a",
@@ -579,7 +579,7 @@
         "exec-7"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "fix-7a",
