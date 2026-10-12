@@ -1,0 +1,5 @@
+$ bash tests/run.sh | tail -1
+TOTAL: 30 files, 0 failed
+$ claude plugin validate .   (isolated CLAUDE_CONFIG_DIR/HOME)
+warning: root CLAUDE.md not loaded as plugin context; Validation passed with warnings; exit=0
+$ claude plugin marketplace add anthropics/claude-plugins-official@main   (isolated; accepted: "Source: GitHub (...@main)"; the #main form is normalised to the same)

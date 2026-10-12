@@ -41,6 +41,7 @@ is outside the phase: it needs Samuel's explicit approval.
   the skills carry the same rules (CLAUDE.md doctrine).
 - **D-06 — Commands.** Six thin files under `commands/`: five invoke their task skill with the
   arguments, `dossier-lint` runs `scripts/lint.py`; the `dossier` entry skill has no command.
+  **Amended 2026-10-12 by D-18 (settled by Samuel):** one command, `commands/dossier-lint.md`; the five task skills are the slash commands. See D-18 below.
 - **D-07 — Eval.** `claude plugin eval` cases under `evals/`, at least the ambiguous "write to the
   client" → `dossier-draft` (not `dossier-ingest`), plus one positive trigger per task skill and
   the entry skill's step-aside outside a dossier; run by the team, results recorded, budget stated.
@@ -57,9 +58,41 @@ is outside the phase: it needs Samuel's explicit approval.
 ### Claude's Discretion
 - Eval case layout, README structure, command argument hints.
 
-</decisions>
+### Manager decisions after research (2026-10-11, reversible)
+- **D-11 — Eval suite (DIST-06).** `claude plugin eval` suite under `evals/`, about 7-8 cases
+  x 3 runs on Sonnet, `--ablation none`, about 3-3.5 USD (budget accepted, `--max-cost-usd 4`).
+  It includes the ambiguous "write to the client" -> `dossier-draft` and never `dossier-ingest`,
+  one positive trigger per task skill, the entry skill's step-aside outside a dossier and an
+  unrelated-prompt false-positive guard. Free shape test in `tests/run.sh`; the paid run is
+  recorded under `evidence/` and never part of `run.sh`.
+- **D-12 — Pre-publication checklist (D-10 refined).** A checklist in STATE.md names four
+  surfaces: (1) scenario evidence (`/Users/...` paths, session ids); (2) the other `.planning/`
+  files that carry `/Users/...`; (3) `Claude-Session` URLs in commit history; (4) `.planning/`
+  shipped inside every installation (or the option of excluding it from the public tree).
+  NOT executed in v1.
+- **D-13 — Codex public directory.** OpenAI's public directory refuses plugins with lifecycle
+  hooks; noted in the README and STATE for publication time, out of v1.
+- **D-14 — `.codex-plugin/plugin.json` must exist** (the marker `scripts/status.py` requires to
+  locate the linter).
+- **D-15 — Harmonise the `"${CLAUDE_SKILL_DIR}"` quoting** in `skills/dossier-init/SKILL.md`
+  with the other skills (found in the Phase 6 review); skill tests re-run.
+- **D-16 — `release.sh` tests.** `scripts/release.sh <version>` is tested in a scratch clone,
+  never pushes, refuses a dirty tree, a non-semver version and an existing tag. The real
+  1.0.0 run plus the LOCAL `v1.0.0` tag happen after the milestone audit, outside this phase;
+  both manifests stay at `0.1.0` and CHANGELOG holds only `## [Unreleased]` until then.
+- **D-17 — Isolation.** Every install check (Claude, Codex, `skills`) sets `CLAUDE_CONFIG_DIR`,
+  `CODEX_HOME` and `HOME` to `mktemp -d` directories, installs from a fresh `git clone` of HEAD,
+  and never touches Samuel's real configuration.
 
-<canonical_refs>
+## Settled by Samuel (formerly P-01)
+
+- **D-18 (was P-01, Q15) — one slash command.** Ship ONE command, `commands/dossier-lint.md`; the
+  five task skills serve as the slash commands (`/client-dossier:dossier-<x>`), because a plugin
+  command with the same name as a plugin skill shadows the skill (research, 07-RESEARCH.md).
+  DIST-04, spec section 4, D-06 and `CLAUDE.md` are amended, and a test fails when a command shares
+  a skill's name. The v1.0.0 tag stays local; push, marketplace and public each need Samuel's
+  explicit approval. (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12, option (a))
+
 ## Canonical References
 
 - Spec `docs/superpowers/specs/2026-09-16-client-dossier-design.md` §4 (tree), §8 (distribution), §10.

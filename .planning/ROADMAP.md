@@ -33,7 +33,7 @@ from Phase 1 onward (SCAF-08); no marketplace is needed before Phase 7.
 - [x] **Phase 4: Ingest & Fact Extraction** - `dossier-ingest` files sources and turns them into dated, sourced facts (completed 2026-10-10)
 - [x] **Phase 5: Drafting & Doctrine Review** - `dossier-draft` writes outbound content that a doctrine review has already checked
 - [x] **Phase 6: Calls & Status** - `dossier-call` and `dossier-status` close the loop on preparation, debrief, and "where are we"
-- [ ] **Phase 7: Manifests, Docs & Distribution** - both manifests, commands, README/LICENSE/CHANGELOG, and trigger-description eval
+- [x] **Phase 7: Manifests, Docs & Distribution** - both manifests, commands, README/LICENSE/CHANGELOG, and trigger-description eval (completed 2026-10-12)
 
 ## Phase Details
 
@@ -368,13 +368,49 @@ commands, and trigger-description eval to have something to reference)
      harnesses; the README states what the bare-skills install loses (scripts, hooks, agents).
   3. README documents installation for all four distribution targets plus versioning and
      license; `CHANGELOG.md` and an MIT `LICENSE` exist.
-  4. The six slash commands under `commands/` work in Claude Code: five invoke their task
-     skill, `dossier-lint` runs `scripts/lint.py`.
+  4. In Claude Code the five task skills answer as slash commands (`/client-dossier:dossier-<name>`, arguments passed through) and the one command `/client-dossier:dossier-lint` runs `scripts/lint.py`; no command shadows a skill (DIST-04 as amended by D-18).
   5. `claude plugin eval` runs against the trigger descriptions and confirms an ambiguous
      input such as "write to the client" routes to `dossier-draft`, not `dossier-ingest`.
   6. `scripts/release.sh <version>` leaves both manifests at the same version, a matching
      `CHANGELOG.md` heading and a git tag.
-**Plans**: TBD
+**Plans**: 9 plans
+
+Plans:
+**Wave 1**
+
+- [x] 07-01-PLAN.md — tracer: the completed Claude Code manifest and self-hosted marketplace installed
+  end to end from a clone of HEAD into an isolated configuration (tests/dist/install-claude.sh), the
+  Codex manifest and marketplace listing, tests/test-manifests.sh with the validate gate (D-02, D-03,
+  D-04, D-14, D-17)
+- [x] 07-02-PLAN.md — scripts/release.sh tested in scratch repositories (every refusal, injection
+  strings, annotated local tag, nothing pushed), MIT LICENSE, CHANGELOG with Unreleased only (D-01,
+  D-09, D-16)
+- [x] 07-03-PLAN.md — the sources guard reads Codex apply_patch headers (D-05 mirror), dossier-init's
+  script calls quoted and guarded (D-15), DIST-03 checks over every skill
+- [x] 07-04-PLAN.md — the eight-case `claude plugin eval` routing suite, its free shape test and the
+  evals/results/ ignore line (D-07, D-11)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [x] 07-05-PLAN.md — isolated Codex install check; bare-skills install check by copy and by the pinned
+  skills@1.7.2 behind an agent-run registry gate (D-04, D-05, D-17)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [x] 07-06-PLAN.md — README for the four targets, limits (03 D-04/D-17, 05 D-09), Codex trust and
+  directory (D-13), versioning, licence, privacy, with tests/test-readme.sh (D-08)
+- [x] 07-07-PLAN.md — recorded install logs, Haiku shake-out, then the recorded Sonnet routing run with
+  its mechanical gate (paid, agent-run, D-11)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [x] 07-08-PLAN.md — D-18: the one dossier-lint command, the collision test and the
+  DIST-04 / spec §4 / D-06 / criterion 4 amendments, isolated in one plan
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [x] 07-09-PLAN.md — closure: CLAUDE.md, spec, traceability, the STATE pre-publication checklist
+  (D-12, D-13), the command smoke for 07-UAT, a release rehearsal on a scratch clone, full verification
 
 ## Progress
 
@@ -389,4 +425,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 | 4. Ingest & Fact Extraction | 5/5 | Complete — verified + recette agent-run | 2026-10-10 |
 | 5. Drafting & Doctrine Review | 5/5 | Complete — verified + recette agent-run | 2026-10-11 |
 | 6. Calls & Status | 6/6 | Complete — verified + recette agent-run | 2026-10-11 |
-| 7. Manifests, Docs & Distribution | 0/TBD | Not started | - |
+| 7. Manifests, Docs & Distribution | 9/9 | Complete — verified + recette agent-run | 2026-10-12 |

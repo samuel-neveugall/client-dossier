@@ -16,7 +16,11 @@ agent (`agents/fact-extractor.md`). Phase 5 (drafting and doctrine review) adds 
 skill (`skills/dossier-draft/SKILL.md`, no private scripts) and the read-only `doctrine-reviewer`
 agent (`agents/doctrine-reviewer.md`). Phase 6 (calls and status) adds the `dossier-call` skill
 (`skills/dossier-call/SKILL.md`, no private scripts; prepare and debrief) and the `dossier-status`
-skill with its private, read-only `scripts/status.py`. Read the spec before any work; when this file and the spec
+skill with its private, read-only `scripts/status.py`. Phase 7 (manifests, docs and distribution)
+completes the Claude Code and Codex manifests with their marketplaces, adds the README, the MIT
+LICENSE, the CHANGELOG, `scripts/release.sh`, the `evals/routing/` suite and the isolated install
+checks under `tests/dist/`, extends the sources guard to Codex `apply_patch` edits, and settles the
+slash-command set by D-18 (settled by Samuel; see Commands). Read the spec before any work; when this file and the spec
 disagree, the spec wins and this file must be updated. Planning lives in `.planning/` (GSD):
 ROADMAP, REQUIREMENTS, STATE.
 
@@ -75,6 +79,10 @@ Division of responsibility, which decides where any new behaviour goes:
   `fact-extractor` (one source → proposed dated, sourced lines per living file, plus
   "contradicts" and "uncertain" lists) and `doctrine-reviewer` (reports findings on a draft,
   never rewrites). Skills must also contain the inline procedure for harnesses without subagents.
+- **Commands** (`commands/`, Claude Code only): one, `dossier-lint.md`, which runs `scripts/lint.py`.
+  The five task skills are themselves the slash commands (`/client-dossier:dossier-<name>`); a
+  command file never takes a skill's name, because it would shadow the skill for the user and the
+  model (Phase 7 D-18; `tests/test-commands.sh`).
 - Dual manifests: `.claude-plugin/{plugin,marketplace}.json` and `.codex-plugin/plugin.json` +
   `.agents/plugins/marketplace.json`. The version lives in both and is bumped together.
 
@@ -111,11 +119,12 @@ status → manifests and distribution.
 - Mechanical tests in `tests/`: fixture repositories (including a French-content one for the
   relative-date and opinion-marker word lists) and a bash runner asserting `lint.py` exit codes
   and messages. No test framework beyond bash and python3.
-- Trigger descriptions validated with `claude plugin eval` once skills exist.
+- Trigger descriptions validated with `claude plugin eval` (the `evals/routing/` suite, Phase 7;
+  paid, agent-run, recorded under the phase evidence).
 
 - Local loading during development: `claude --plugin-dir .` from the repository root. A
-  minimal `.claude-plugin/plugin.json` exists from Phase 1 for that purpose; the full
-  manifests come in Phase 7.
+  minimal `.claude-plugin/plugin.json` exists from Phase 1 for that purpose; Phase 7 completed
+  the manifests.
 
 ### Commands
 
@@ -126,12 +135,14 @@ status → manifests and distribution.
   repair mode.
 - `bash tests/run.sh` — the full test suite; every `tests/test-*.sh` file, one summary line.
 - `bash tests/test-lint.sh` — the lint tests alone.
-- `claude plugin validate .` — the manifest and `hooks/hooks.json`; exit 0 expected, with two
-  known warnings (`author` missing in plugin.json; the root `CLAUDE.md` is not loaded as
-  plugin context). `--strict` exits 1 on those two warnings until Phase 7 decides the manifest
-  author and where this development CLAUDE.md lives. Never delete CLAUDE.md to silence it.
+- `claude plugin validate .` — the manifest and `hooks/hooks.json`; exit 0 expected, with one
+  known warning (the root `CLAUDE.md` is not loaded as plugin context), kept on purpose because
+  this file holds the development instructions (Phase 7 D-03). `--strict` exits 1 because of it,
+  by design. Never delete CLAUDE.md to silence it. validate writes into the configuration it runs
+  with, so `tests/test-manifests.sh` runs it with temporary config and home folders.
 - `bash tests/test-hooks-config.sh` — `hooks/hooks.json` shape and wiring.
-- `bash tests/test-hook-guard-sources.sh` — the PreToolUse guard on `sources/`.
+- `bash tests/test-hook-guard-sources.sh` — the PreToolUse guard on `sources/`, Codex
+  `apply_patch` edits included.
 - `bash tests/test-hook-session-start.sh` — the SessionStart reminder.
 - `bash tests/test-hook-stop.sh` — the block-once Stop check.
 - `bash tests/test-skill-dossier.sh` — frontmatter and content checklist of the `dossier` skill.
@@ -179,6 +190,22 @@ status → manifests and distribution.
 - `bash tests/scenarios/deal-status.sh [--variant baseline|plugin|plugin-pointer]... [--runs N] [--prompt plain|pressured] [OUTDIR]`
   — the CALL-05 pressure scenario (pressured prompt by default, D-16): paid headless `claude -p`
   runs, run by the agent, never part of `tests/run.sh`. Same exit codes.
+- `bash tests/test-manifests.sh` — the four manifests and the validate gate.
+- `bash tests/test-release.sh` — `scripts/release.sh` in scratch repositories.
+- `bash tests/test-readme.sh` — README, LICENSE, CHANGELOG and version coherence.
+- `bash tests/test-evals-shape.sh` — the eval cases' shape and free scaffold runs.
+- `bash tests/dist/install-claude.sh`, `bash tests/dist/install-codex.sh` and
+  `bash tests/dist/install-skills.sh [--via skills-cli|copy] [--registry-only]` — free isolated
+  install checks from a clone of HEAD, run by the agent, never part of `tests/run.sh`. Exit 0
+  pass, 1 gate not met, 2 harness error.
+- `scripts/release.sh <version>` — bumps both manifests, adds the CHANGELOG heading and creates a
+  local annotated tag, never pushes. Run only in scratch clones until the milestone audit (D-01).
+- `claude plugin eval . --scaffold --trust-plugin --ablation none --model sonnet --runs 3 --no-publish --max-cost-usd 4 --threshold 0.66 --json <file>`
+  — the paid DIST-06 routing eval, run by the agent, never part of `tests/run.sh`.
+- `bash tests/test-commands.sh` — `commands/` holds exactly `dossier-lint.md`, no command named
+  like a skill, the command's frontmatter and quoting.
+- `/client-dossier:dossier-lint [PATH]` — in Claude Code with the plugin loaded: runs the linter
+  on the dossier holding PATH and relays its output and exit code.
 - `claude --plugin-dir .` — load the plugin from the working copy during development.
 
 Add more here as they are created.

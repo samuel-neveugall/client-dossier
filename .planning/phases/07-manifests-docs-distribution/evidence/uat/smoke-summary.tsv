@@ -1,0 +1,3 @@
+name	verdict	checks	model	cost_usd	is_error
+lint-smoke	PASS	ok:command-listed;ok:bash-ran-lint.py;ok:relays-finding-ids;ok:relays-exit-1;ok:dossier-unchanged	claude-haiku-5-5	0.0024258200000000004	false
+status-smoke	PASS	ok:skill-body-expanded-path-used;info:heading-in-stream=none;ok:no-shadowing-sign;info:bash-ran-status.py=yes;ok:dossier-unchanged	claude-haiku-5-5	0.00402194	false

@@ -560,11 +560,28 @@ shapes = [
     ("a million glob and brace characters", "rm " + "{a,b}" * 4000 + " " + "*/" * 100000, False),
     ("a million ANSI-C openers", "echo " + "$'" * (MB // 2), False),
     ("escaped ANSI-C openers", "echo " + "$'\\'" * (MB // 4), False),
+    ("a heredoc patch of 1 MB after 100 distinct cd targets",
+     "".join("cd d%d; " % i for i in range(100)) + "apply_patch <<'EOF'\n"
+     + "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(MB // 30)) + "EOF", False),
     ("rm -rf * repeated", "rm -rf *; " * (MB // 10), True),
 ]
+# Codex apply_patch (D-05, plan 07-03): the same 1 MB bounds hold for patch text.
+patch_shapes = [
+    ("apply_patch: 1 MB of Add File headers outside sources",
+     "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(MB // 30)), False),
+    ("apply_patch: 1 MB of headers, the last one under sources",
+     "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(MB // 30))
+     + "*** Update File: " + S + "\n", True),
+    ("apply_patch: 1 MB of Update headers, the last one under sources",
+     "".join("*** Update File: outbound/m%d.md\n" % i for i in range(MB // 28))
+     + "*** Delete File: " + S + "\n", True),
+    ("apply_patch: one 1 MB header line", "*** Add File: " + "a" * MB + "\n", False),
+    ("apply_patch: 1 MB of added lines", "*** Add File: dossier/x.md\n" + "+y\n" * (MB // 3), False),
+]
 bad = 0
-for name, command, want_deny in shapes:
-    stdin = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd})
+cases = [("Bash",) + shape for shape in shapes] + [("apply_patch",) + shape for shape in patch_shapes]
+for tool, name, command, want_deny in cases:
+    stdin = json.dumps({"tool_name": tool, "tool_input": {"command": command}, "cwd": cwd})
     start = time.time()
     try:
         proc = subprocess.run([sys.executable, guard], input=stdin, capture_output=True,
@@ -583,6 +600,173 @@ PY
 PERF_STATUS=$?
 printf '%s\n' "$PERF_OUT"
 assert_eq 0 "$PERF_STATUS" 'every 1 MB command is judged in under 4 s, exit 0'
+
+# --- Codex apply_patch (D-05, plan 07-03) ---
+# Codex edits files through a PreToolUse call named apply_patch whose
+# tool_input.command is the patch text (07-RESEARCH Pattern 8). A hunk header
+# is a line starting at column 0 with `*** Add File: `, `*** Update File: `,
+# `*** Delete File: ` or `*** Move to: `; added lines start with `+`.
+# mkpatch LINE... — a patch envelope around the given lines.
+mkpatch() { printf '*** Begin Patch\n'; printf '%s\n' "$@"; printf '*** End Patch\n'; }
+patch_json() { hook_json PreToolUse "$1" apply_patch command "$2"; }
+
+echo '--- apply_patch: headers under sources/ are denied ---'
+expect_deny 'apply_patch Update File of a source' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '@@' '-reprot' '+report')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch Add File of a NEW source (as for Write, D-03)' \
+  "$(patch_json "$d" "$(mkpatch '*** Add File: sources/received/new.txt' '+hello')")" 'sources/received/new.txt'
+expect_deny 'apply_patch Delete File of a source' \
+  "$(patch_json "$d" "$(mkpatch "*** Delete File: $TRANSCRIPT_REL")")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch Move to a path under sources/' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: dossier/HISTORY.md' '*** Move to: sources/received/moved.md' '@@' '-a' '+b')")" \
+  'sources/received/moved.md'
+expect_deny 'apply_patch Move of a source out of sources/' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '*** Move to: dossier/moved.txt' '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch absolute header path' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: $d/$TRANSCRIPT_REL" '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch dot-dot traversal into sources/' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File: dossier/../$TRANSCRIPT_REL" '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch two files, the second under sources/' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: dossier/HISTORY.md' '@@' '-a' '+b' '*** Add File: sources/received/second.txt' '+x')")" \
+  'sources/received/second.txt'
+expect_deny 'apply_patch CRLF line endings' \
+  "$(patch_json "$d" "$(printf '*** Begin Patch\r\n*** Update File: %s\r\n@@\r\n-a\r\n+b\r\n*** End Patch\r\n' "$TRANSCRIPT_REL")")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch relative header from a subfolder cwd' \
+  "$(patch_json "$d/dossier" "$(mkpatch "*** Update File: ../$TRANSCRIPT_REL" '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+expect_deny 'apply_patch header with surrounding spaces' \
+  "$(patch_json "$d" "$(mkpatch "*** Update File:   $TRANSCRIPT_REL  " '@@' '-a' '+b')")" "$TRANSCRIPT_REL"
+
+# Codex trims a line before it reads a header, so an indented header counts (the
+# safe side); a `+` line never does, and a header under another folder stays silent.
+expect_deny 'apply_patch indented header after an added file (Codex trims)' \
+  "$(patch_json "$d" "$(mkpatch '*** Add File: dossier/notes.md' '+x' "  *** Update File: $TRANSCRIPT_REL")")" "$TRANSCRIPT_REL"
+
+echo '--- apply_patch: everything else is silent ---'
+expect_silent 'apply_patch on living files only' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: dossier/HISTORY.md' '@@' '-a' '+b' '*** Add File: outbound/mails/2026-10-11_note.md' '+Hello')")"
+expect_silent 'apply_patch whose added line looks like a sources header' \
+  "$(patch_json "$d" "$(mkpatch '*** Add File: dossier/notes.md' '+*** Update File: sources/x.txt' '+*** Move to: sources/y.txt')")"
+expect_silent 'apply_patch with no header' \
+  "$(patch_json "$d" 'just some text about sources/transcripts')"
+expect_silent 'apply_patch with an empty header path' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: ')")"
+expect_silent 'apply_patch with an empty command' "$(patch_json "$d" '')"
+expect_silent 'apply_patch with a numeric command' \
+  "$(python3 -c 'import json, sys
+print(json.dumps({"tool_name": "apply_patch", "tool_input": {"command": 12}, "cwd": sys.argv[1]}))' "$d")"
+expect_silent 'apply_patch with a list command' \
+  "$(python3 -c 'import json, sys
+print(json.dumps({"tool_name": "apply_patch", "tool_input": {"command": ["apply_patch", "*** Update File: sources/x"]}, "cwd": sys.argv[1]}))' "$d")"
+expect_silent 'apply_patch on sources/ outside any dossier' \
+  "$(patch_json "$outside" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '@@' '-a' '+b')")"
+expect_silent 'apply_patch sources header with a sibling name' \
+  "$(patch_json "$d" "$(mkpatch '*** Update File: sources-old/x.txt' '*** Add File: mysources/y.txt')")"
+
+echo '--- apply_patch: past the judged budget a visible sources still denies ---'
+bigpatch="$(python3 -c 'import sys
+n = 5000
+sys.stdout.write("*** Begin Patch\n" + "".join("*** Add File: dossier/n%d.md\n+x\n" % i for i in range(n))
+                 + "*** Add File: dossier/deep/sources/z.txt\n+x\n*** End Patch\n")')"
+run_hook guard-sources.py "$(patch_json "$d" "$bigpatch")"
+check_common 'apply_patch past MAX_JUDGED with a visible sources component'
+assert_eq deny "$(hook_field hookSpecificOutput.permissionDecision)" 'apply_patch past MAX_JUDGED: visible sources denies'
+
+echo '--- apply_patch: end to end through the hooks.json command, Codex-shaped stdin ---'
+HOOK_CMD="$(python3 -c 'import json, sys
+d = json.load(open(sys.argv[1]))
+print(d["hooks"]["PreToolUse"][0]["hooks"][0]["command"])' "$REPO_ROOT/hooks/hooks.json")"
+E2E_ERR="$(mktemp)"
+E2E_STATUS=0
+E2E_OUT="$(patch_json "$d" "$(mkpatch "*** Update File: $TRANSCRIPT_REL" '@@' '-reprot' '+report')" \
+  | CLAUDE_PLUGIN_ROOT="$REPO_ROOT" sh -c "$HOOK_CMD" 2>"$E2E_ERR")" || E2E_STATUS=$?
+assert_eq 0 "$E2E_STATUS" 'apply_patch end to end: exit status 0'
+assert_eq '' "$(cat "$E2E_ERR")" 'apply_patch end to end: empty stderr'
+rm -f "$E2E_ERR"
+assert_eq deny "$(printf '%s' "$E2E_OUT" | python3 -c 'import json, sys
+print(json.load(sys.stdin)["hookSpecificOutput"]["permissionDecision"])')" 'apply_patch end to end: decision is deny'
+case "$E2E_OUT" in
+  *"$SPEC_SENTENCE: $TRANSCRIPT_REL"*) TESTS_PASSED=$((TESTS_PASSED + 1)) ;;
+  *) echo "FAIL: apply_patch end to end: reason lacks the spec sentence and path: $E2E_OUT" >&2
+     TESTS_FAILED=$((TESTS_FAILED + 1)) ;;
+esac
+
+
+echo '--- Bash heredoc apply_patch on sources/ is denied (R8-F2, 03 D-16, Samuel 2026-10-10) ---'
+nl='
+'
+heredoc_patch() { printf "apply_patch <<'EOF'\n*** Begin Patch\n%s\n*** End Patch\nEOF" "$1"; }
+bash_deny 'heredoc apply_patch Update File of a source' \
+  "$(heredoc_patch "*** Update File: $TRANSCRIPT_REL${nl}@@${nl}-reprot${nl}+report")"
+bash_deny 'heredoc apply_patch Delete File of a source' \
+  "$(heredoc_patch "*** Delete File: $TRANSCRIPT_REL")"
+bash_deny 'heredoc apply_patch Move to a path under sources/' \
+  "$(heredoc_patch "*** Update File: dossier/HISTORY.md${nl}*** Move to: sources/received/moved.md${nl}@@${nl}-a${nl}+b")" \
+  "$b" 'sources/received/moved.md'
+bash_deny 'heredoc apply_patch Add File over an existing source' \
+  "$(heredoc_patch "*** Add File: $TRANSCRIPT_REL${nl}+x")"
+bash_ok 'heredoc apply_patch on dossier/ stays allowed' \
+  "$(heredoc_patch "*** Update File: dossier/HISTORY.md${nl}@@${nl}-a${nl}+b")"
+bash_ok 'cat > dossier/notes.md heredoc citing a patch header outside sources/' \
+  "cat > dossier/notes.md <<'EOF'${nl}*** Update File: dossier/HISTORY.md${nl}EOF"
+bash_ok 'a command mentioning *** with no header' \
+  "echo '*** Begin Patch' > dossier/notes.md"
+
+echo '--- Bash heredoc apply_patch: relative headers follow cd, ANSI-C one-liners (R9-2, R9-3; 03 D-16, Samuel 2026-10-10) ---'
+mkdir -p "$b/sources/received"
+bash_deny 'cd sources && heredoc apply_patch Update File received/t.md' \
+  "cd sources && $(heredoc_patch "*** Update File: received/t.md${nl}@@${nl}-a${nl}+b")" "$b" 'sources/received/t.md'
+bash_deny 'cd sources/received ; heredoc Add File t.md' \
+  "cd sources/received ; $(heredoc_patch "*** Add File: t.md${nl}+x")" "$b" 'sources/received/t.md'
+bash_deny 'pushd sources then Delete File' \
+  "pushd sources >/dev/null && $(heredoc_patch "*** Delete File: received/t.md")" "$b" 'sources/received/t.md'
+bash_deny 'cd sources then Move to a relative target' \
+  "cd sources && $(heredoc_patch "*** Update File: ../dossier/HISTORY.md${nl}*** Move to: received/moved.md${nl}@@${nl}-a${nl}+b")" "$b" 'sources/received/moved.md'
+bash_deny 'subshell (cd sources && apply_patch)' \
+  "(cd sources && $(heredoc_patch "*** Update File: received/t.md")${nl})" "$b" 'sources/received/t.md'
+bash_deny 'cd into sources inside bash -c' \
+  "bash -c \"cd sources && apply_patch <<'EOF'${nl}*** Update File: received/t.md${nl}EOF${nl}\"" "$b" 'sources/received/t.md'
+bash_deny 'cd to a subfolder of sources then a ../ header' \
+  "cd sources/received && $(heredoc_patch "*** Update File: ../transcripts/2026-10-01_kickoff.txt")"
+bash_deny 'cd to an unknown directory from inside sources/ (guessed cwd)' \
+  "cd \$X && $(heredoc_patch "*** Update File: t.md")" "$b/sources/received" 'sources/received/t.md'
+bash_deny 'relative header from a cwd inside sources/ (no cd)' \
+  "$(heredoc_patch "*** Update File: t.md")" "$b/sources/received" 'sources/received/t.md'
+bash_ok 'cd dossier && heredoc apply_patch on HISTORY.md' \
+  "cd dossier && $(heredoc_patch "*** Update File: HISTORY.md${nl}@@${nl}-a${nl}+b")"
+bash_ok 'cd dossier, cd .., then a root-relative header outside sources' \
+  "cd dossier; cd .. && $(heredoc_patch "*** Update File: dossier/HISTORY.md")"
+# Safe side by design: every cd target is a base, so a cd into sources/ and back out still judges
+# a bare HISTORY.md against sources/ (a refused false positive, never a missed write).
+bash_deny 'cd sources then cd back out: the safe side refuses a bare name' \
+  "cd sources; cd ../dossier && $(heredoc_patch "*** Update File: HISTORY.md")" "$b" 'sources/HISTORY.md'
+bash_ok 'cd to a dossier folder, headers outside sources (commit-free)' \
+  "cd dossier && cat > notes.md <<'EOF'${nl}*** Update File: received/t.md${nl}EOF"
+bash_ok 'git commit -m quoting a header outside sources' \
+  "git commit -m 'docs: mention *** Update File: dossier/HISTORY.md in the guide'"
+bash_ok 'cd dossier && git commit -m quoting a relative header' \
+  "cd dossier && git commit -m \"fix\" -m '*** Update File: HISTORY.md'"
+# R9-3: a one-line ANSI-C string, the patch lines joined by a literal backslash-n.
+bash_deny 'ANSI-C one-liner apply_patch Update File of a source' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: $TRANSCRIPT_REL\\n@@\\n-a\\n+b\\n*** End Patch'"
+bash_deny 'ANSI-C one-liner Delete File of a source' \
+  "apply_patch \$'*** Begin Patch\\n*** Delete File: $TRANSCRIPT_REL\\n*** End Patch'"
+bash_deny 'ANSI-C one-liner Move to a source' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: dossier/HISTORY.md\\n*** Move to: sources/received/m.md\\n*** End Patch'" "$b" 'sources/received/m.md'
+bash_deny 'ANSI-C one-liner after cd sources' \
+  "cd sources && apply_patch \$'*** Begin Patch\\n*** Update File: received/t.md\\n*** End Patch'" "$b" 'sources/received/t.md'
+bash_deny 'ANSI-C one-liner, last header at the end of the string' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: $TRANSCRIPT_REL'"
+bash_ok 'ANSI-C one-liner on dossier/' \
+  "apply_patch \$'*** Begin Patch\\n*** Update File: dossier/HISTORY.md\\n@@\\n-a\\n+b\\n*** End Patch'"
+bash_ok 'git commit -m with a literal backslash-n quoting a header outside sources' \
+  "git commit -m 'x\\n*** Update File: dossier/HISTORY.md'"
+# printf with a literal backslash-n shows the patch in the command's text: refused (same cut).
+bash_deny 'printf with literal backslash-n | apply_patch is visible text' \
+  "printf '*** Begin Patch\\n*** Update File: $TRANSCRIPT_REL\\n*** End Patch' | apply_patch"
+# The accepted D-04 class (03 D-17): a patch the command does not show as one string.
+bash_ok 'printf with a %s format and one argument per line | apply_patch is D-04' \
+  "printf '%s\\n' '*** Begin Patch' '*** Update File: $TRANSCRIPT_REL' '*** End Patch' | apply_patch"
+bash_ok 'a patch read from a file is D-04' "apply_patch < /tmp/patch-not-shown.txt"
 
 
 rm -rf "$b"

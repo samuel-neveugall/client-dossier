@@ -1,0 +1,70 @@
+source: HEAD d4061f8695c4
+note: uncommitted changes are not installed; this check installs HEAD only
+$ claude plugin marketplace add /var/folders/9t/1m3f81vn3bd677kc1tzbg2zm0000gn/T/tmp.sQTKmOKmbd/src/repo
+Adding marketplace…✔ Successfully added marketplace: client-dossier (declared in user settings)
+ok: marketplace add exits 0
+$ claude plugin install client-dossier@client-dossier
+Installing plugin "client-dossier@client-dossier"...✔ Successfully installed plugin: client-dossier@client-dossier (scope: user)
+ok: plugin install exits 0
+$ claude plugin list --json
+[
+  {
+    "id": "client-dossier@client-dossier",
+    "version": "0.1.0",
+    "scope": "user",
+    "enabled": true,
+    "installPath": "<tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0",
+    "readFromFolder": "<tmp>/src/repo",
+    "folderVersion": "0.1.0",
+    "installedAt": "2026-10-12T14:43:49.161Z",
+    "lastUpdated": "2026-10-12T14:43:49.161Z",
+    "projectEnabled": false
+  }
+]
+ok: plugin list --json exits 0
+ok: client-dossier@client-dossier is enabled
+ok: installed version 0.1.0 equals the clone version 0.1.0
+$ claude plugin details client-dossier@client-dossier
+client-dossier 0.1.0
+  Description: Turns a git repository into the memory and workbench of a relationship with an external party: immutable sources, a living dossier where every fact is dated and sourced, and an outbound folder where only a human sends a doctrine-checked draft.
+  Source: client-dossier@client-dossier
+
+Component inventory
+  Skills (7)  dossier, dossier-call, dossier-draft, dossier-ingest, dossier-init, dossier-lint, dossier-status
+  Agents (2)  fact-extractor, doctrine-reviewer
+  Hooks (3)  SessionStart, PreToolUse, Stop  (harness-only — no model context cost)
+  MCP servers (0)
+  LSP servers (0)
+
+Projected token cost
+  Always-on:   ~794 tok   added to every session
+
+Per-component (rounded)
+  component          always-on  on-invoke
+  dossier-init            ~100      ~2.7k
+  dossier                 ~140      ~2.2k
+  dossier-draft            ~90      ~4.4k
+  dossier-call            ~100        ~4k
+  dossier-ingest           ~80      ~3.9k
+  dossier-status          ~100      ~2.1k
+  fact-extractor           ~80       ~990
+  doctrine-reviewer        ~70       ~860
+  dossier-lint             ~30       ~130
+
+  On-invoke cost is paid each time a skill or agent fires.
+  Token counts are estimates and may differ from actual usage.
+ok: plugin details exits 0
+ok: Skills (7) equals 7 in the clone
+ok: Skills line names every one of dossier-call dossier-draft dossier-ingest dossier-init dossier-status dossier dossier-lint
+ok: Agents (2) equals 2 in the clone
+ok: Agents line names every one of doctrine-reviewer fact-extractor
+ok: Hooks (3) equals 3 in the clone
+ok: Hooks line names every one of SessionStart PreToolUse Stop
+ok: installPath exists: <tmp>/cfg/plugins/cache/client-dossier/client-dossier/0.1.0
+ok: installed copy holds skills/dossier/SKILL.md
+ok: installed copy holds hooks/hooks.json
+ok: installed copy holds scripts/lint.py
+ok: installed copy holds commands/dossier-lint.md
+OK real configuration unchanged
+ok: real Claude Code and Codex configuration byte-identical
+DIST install-claude: PASS

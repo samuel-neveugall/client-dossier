@@ -287,7 +287,7 @@
         "uat-6"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "exec-7",
@@ -298,7 +298,7 @@
         "uat-6"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "revue-7",
@@ -308,7 +308,7 @@
         "exec-7"
       ],
       "scope": [],
-      "status": "blocked",
+      "status": "done",
       "review_regime": "full"
     },
     {
@@ -319,7 +319,7 @@
         "revue-7"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "uat-7",
@@ -329,7 +329,7 @@
         "verify-7"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "docs",
@@ -339,7 +339,7 @@
         "uat-7"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "ready"
     },
     {
       "id": "revue-3a",
@@ -569,6 +569,68 @@
         "skills/",
         "tests/"
       ],
+      "status": "done"
+    },
+    {
+      "id": "exec-7b",
+      "step": "phase 7 plans 07-08 (P-01) and 07-09 (close)",
+      "stage": "",
+      "deps": [
+        "exec-7"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-7a",
+      "step": "fix R8-F1/F2/F5",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "skills/dossier-init/",
+        "hooks/",
+        "scripts/release.sh",
+        "tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-7b",
+      "step": "re-review round 2 phase 7",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "skills/dossier-init/",
+        "scripts/release.sh"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-7b",
+      "step": "round 3: R9-1..R9-3",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        "hooks/",
+        "skills/dossier-init/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue-7c",
+      "step": "review closing plans 07-08/07-09",
+      "stage": "",
+      "deps": [],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "fix-7c",
+      "step": "micro-fixes revue-7c",
+      "stage": "",
+      "deps": [],
+      "scope": [],
       "status": "done"
     }
   ]
