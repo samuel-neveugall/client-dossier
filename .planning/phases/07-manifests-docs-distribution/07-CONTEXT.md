@@ -83,24 +83,15 @@ is outside the phase: it needs Samuel's explicit approval.
   `CODEX_HOME` and `HOME` to `mktemp -d` directories, installs from a fresh `git clone` of HEAD,
   and never touches Samuel's real configuration.
 
-## Pending decisions (Samuel)
+## Settled by Samuel (formerly P-01)
 
-- **P-01 (Q15, asked 2026-10-11) — slash commands (DIST-04).** Research proved that a plugin
-  command with the same name as a plugin skill shadows the skill, for the user and for the model.
-  Planned on the PROVISIONAL option (a): ONE command, `commands/dossier-lint.md`; the five task
-  skills ARE the slash commands (`/client-dossier:dossier-<x>`). DIST-04, spec section 4, D-06
-  and `CLAUDE.md` are amended accordingly, and a free test fails if a command stem equals a
-  skill name. The choice is isolated in one plan, in the latest possible wave.
-  **Reversion path if Samuel answers (b)** (six commands with DISTINCT stems `init`, `ingest`,
-  `draft`, `call`, `status` + `dossier-lint`): edit only that plan's files: add
-  `commands/{init,ingest,draft,call,status}.md` (each invoking its skill with `$ARGUMENTS`, no
-  `allowed-tools`), relax the `tests/test-commands.sh` expected set accordingly (the collision
-  test stays), and revert the amendment wording in REQUIREMENTS DIST-04, spec section 4, D-06 and
-  `CLAUDE.md`. No other plan depends on it except the README usage table line.
+- **D-18 (was P-01, Q15) — one slash command.** Ship ONE command, `commands/dossier-lint.md`; the
+  five task skills serve as the slash commands (`/client-dossier:dossier-<x>`), because a plugin
+  command with the same name as a plugin skill shadows the skill (research, 07-RESEARCH.md).
+  DIST-04, spec section 4, D-06 and `CLAUDE.md` are amended, and a test fails when a command shares
+  a skill's name. The v1.0.0 tag stays local; push, marketplace and public each need Samuel's
+  explicit approval. (arbitrage Samuel, AskUserQuestion session principale, 2026-10-12, option (a))
 
-</decisions>
-
-<canonical_refs>
 ## Canonical References
 
 - Spec `docs/superpowers/specs/2026-09-16-client-dossier-design.md` §4 (tree), §8 (distribution), §10.
