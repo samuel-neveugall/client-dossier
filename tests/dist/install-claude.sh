@@ -113,6 +113,12 @@ for dir in "$CLONE"/skills/*/; do
   [ -f "${dir}SKILL.md" ] || continue
   SKILLS="$SKILLS $(basename "$dir")"
 done
+# Claude Code lists a plugin command in the same "Skills (N)" line as the skills
+# (probed in plan 07-08 with commands/dossier-lint.md), so the commands' stems join the list.
+for file in "$CLONE"/commands/*.md; do
+  [ -f "$file" ] || continue
+  SKILLS="$SKILLS $(basename "$file" .md)"
+done
 AGENTS=""
 for file in "$CLONE"/agents/*.md; do
   [ -f "$file" ] || continue
@@ -173,7 +179,7 @@ if [ -n "$INSTALL_PATH" ] && [ -d "$INSTALL_PATH" ]; then
       dist_bad "installed copy lacks $rel"
     fi
   done
-  # Generic on purpose (zero commands today): no later plan edits this script.
+  # Generic on purpose: it checks every commands/*.md of the clone.
   for file in "$CLONE"/commands/*.md; do
     [ -f "$file" ] || continue
     rel="commands/$(basename "$file")"
