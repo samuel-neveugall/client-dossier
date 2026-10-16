@@ -6,6 +6,10 @@ intermediary, a recruiter. It scaffolds a fixed layout, teaches the agent to rea
 acting and to update it before handing back, and checks the mechanical rules with a linter and hooks.
 It never sends anything and never renders documents.
 
+https://github.com/user-attachments/assets/9d956cd8-78d6-4dc5-b569-70225005838a
+
+A short video tour of the plugin (1:22, in French).
+
 ## What it is
 
 A dossier repository has four regimes:
