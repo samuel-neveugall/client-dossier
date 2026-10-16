@@ -3,8 +3,8 @@ gsd_state_version: "1.0"
 status: Awaiting next milestone
 stopped_at: Milestone v1 closed and archived (override_closeout, 3 verification gaps acknowledged)
 last_updated: "2026-10-12T23:05:59.586Z"
-last_activity: 2026-10-13
-last_activity_desc: Milestone v1 completed and archived
+last_activity: 2026-10-16
+last_activity_desc: Repository made public on GitHub; README video tour embedded
 state_head: 8e220b66899cf93a7e01001a2a25fb1939478082
 progress:
   total_phases: 7
@@ -33,7 +33,7 @@ doctrine check.
 Phase: Milestone v1 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-10-13 — Milestone v1 completed and archived
+Last activity: 2026-10-16 — Repository made public on GitHub, description and topics set, README video tour embedded (`f09a927`)
 
 ## Performance Metrics
 
@@ -54,6 +54,14 @@ Full log with outcomes in PROJECT.md Key Decisions; phase decisions in
   public each need Samuel's explicit approval (D-01); see the pre-publication checklist below.
 
 ### Blockers/Concerns
+
+- 2026-10-16: the repository was made PUBLIC (Samuel's explicit approval in the main session),
+  with a description and 10 topics, BEFORE the pre-publication checklist below was run. Items 1-4
+  (local `/Users/...` paths, session ids, `Claude-Session` URLs in history, `.planning/` in the
+  public tree) are now exposed and still to be measured; any scrub or history rewrite is Samuel's
+  decision. The `v1.0.0` tag was already on the remote.
+- The README video (`f09a927`) is a GitHub attachment URL (re-encoded to 9.2 MB, the upload cap),
+  not a committed file; the source stays in `../client-dossier-video/out/`.
 
 - `claude plugin validate .` keeps one known warning (root `CLAUDE.md`, D-03); `--strict` exits 1
   by design.
@@ -94,8 +102,8 @@ command smoke ran (Haiku, 0.04 USD in total) and is recorded in `evidence/uat/`.
 
 ## Session Continuity
 
-Last session: 2026-10-13
-Stopped at: Milestone v1 closed and archived; release 1.0.0 to be cut locally
+Last session: 2026-10-16
+Stopped at: Repository public; README video embedded; pre-publication checklist items 1-4 to measure
 Resume file: .planning/MILESTONES.md
 
 ## Operator Next Steps
